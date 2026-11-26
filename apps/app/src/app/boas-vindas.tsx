@@ -1,4 +1,4 @@
-import { DEMO_URL, ENTRY_INVITE_TEXT, WELCOME_TEXT, entryInviteFromText } from '@clarevo/core';
+import { DEMO_ENTRY_TEST_ID, DEMO_URL, ENTRY_INVITE_TEXT, WELCOME_TEXT, entryInviteFromText } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { BadgeCheck, ShieldCheck } from 'lucide-react-native';
@@ -64,10 +64,13 @@ export default function BoasVindas() {
       </View>
       <View style={{ gap: space[3] }}>
         <Button label={WELCOME_TEXT.create} onPress={() => router.push('/criar-conta')} />
+        {/* `DEMO_ENTRY_TEST_ID` só no build de demonstração: os roteiros de gravação conferem por ele que o build é o de demonstração (a versão
+            publicada também tem o botão, que abre a demonstração da web no navegador). */}
         <Button
           label={opening ? WELCOME_TEXT.demoOpening : WELCOME_TEXT.demo}
           tone="soft"
           accessibilityHint={demo ? undefined : WELCOME_TEXT.demoHint}
+          testID={demo ? DEMO_ENTRY_TEST_ID : undefined}
           onPress={seeDemo}
         />
         <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>

@@ -1,6 +1,6 @@
 import { monthsToReach } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, monthsCount, monthsDuration, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, monthsCount, monthsDuration, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { formatInteger } from '../learn/format';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
@@ -142,7 +142,7 @@ export function calcReserva(input: ReservaInput): CalcOutcome<ReservaResult, Res
       reference: RESERVA_REFERENCIA,
       resultLines,
       hypotheses,
-      notes: [],
+      ...calcNotes(),
     },
   };
 }

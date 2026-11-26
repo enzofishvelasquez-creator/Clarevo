@@ -1,6 +1,6 @@
 import { equivalentAnnualRate, impliedMonthlyRate } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, moneyField, rateText, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, moneyField, rateText, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney } from './inputs';
 
 /**
@@ -190,7 +190,7 @@ export function calcParceladoOuAVista(input: ParceladoInput): CalcOutcome<Parcel
       noteParams: action === 'anotar_parcelamento' ? { tipo: 'parcelada', natureza: 'compra_parcelada', parcelas: n, valor: parcela } : null,
       resultLines,
       hypotheses,
-      notes: [],
+      ...calcNotes(),
     },
   };
 }

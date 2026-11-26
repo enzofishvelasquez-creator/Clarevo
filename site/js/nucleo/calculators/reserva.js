@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/reserva.ts. Não edite: rode "node scripts/gerar-site.js".
 import { monthsToReach } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, monthsCount, monthsDuration, moneyField } from './common.js';
+import { FieldReader, calcNotes, countField, monthsCount, monthsDuration, moneyField } from './common.js';
 import { formatInteger } from '../learn/format.js';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs.js';
 export const RESERVA_REFERENCIA = {
@@ -80,7 +80,7 @@ export function calcReserva(input) {
             reference: RESERVA_REFERENCIA,
             resultLines,
             hypotheses,
-            notes: [],
+            ...calcNotes(),
         },
     };
 }

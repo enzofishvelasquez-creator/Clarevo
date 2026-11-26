@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/multa-e-juros.ts. Não edite: rode "node scripts/gerar-site.js".
 import { iofCents, lateChargesCents } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, daysCount, moneyField, rateField } from './common.js';
+import { FieldReader, calcNotes, countField, daysCount, moneyField, rateField } from './common.js';
 import { parseCount, parseMoney, parsePercentBp } from './inputs.js';
 export const FATURA_CYCLE_DAYS = 30;
 export const CONSUMER_FINE_CAP_BP = 200;
@@ -82,7 +82,7 @@ export function calcMultaEJuros(input) {
                 'Juros simples, proporcionais aos dias, com 30 dias por mês.',
                 'Sem correção monetária nem regras próprias, como as de tributos e de alguns contratos.',
             ],
-            notes: [...(aboveConsumerFine ? [MULTA_CONSUMER_FINE_TEXT] : []), MULTA_EXACT_TEXT, MULTA_CARD_TEXT],
+            ...calcNotes(aboveConsumerFine && ['warning', MULTA_CONSUMER_FINE_TEXT], ['estimate', MULTA_EXACT_TEXT], ['info', MULTA_CARD_TEXT]),
         },
     };
 }
@@ -139,13 +139,7 @@ function calcFatura(input) {
                 `IOF estimado: ${formatBRL(iof)}`,
             ],
             hypotheses: [MULTA_FATURA_HYPOTHESES.interest, MULTA_FATURA_HYPOTHESES.cycle, MULTA_FATURA_HYPOTHESES.fine, MULTA_FATURA_HYPOTHESES.iof],
-            notes: [
-                ...(beyondCycle ? [MULTA_FATURA_TEXT.beyondCycle(dias)] : []),
-                ...(capped ? [MULTA_FATURA_TEXT.cap] : []),
-                ...(aboveConsumerFine ? [MULTA_FATURA_TEXT.fine] : []),
-                MULTA_FATURA_TEXT.rotativo,
-                MULTA_FATURA_TEXT.exact,
-            ],
+            ...calcNotes(beyondCycle && ['warning', MULTA_FATURA_TEXT.beyondCycle(dias)], capped && ['warning', MULTA_FATURA_TEXT.cap], aboveConsumerFine && ['warning', MULTA_FATURA_TEXT.fine], ['info', MULTA_FATURA_TEXT.rotativo], ['estimate', MULTA_FATURA_TEXT.exact]),
         },
     };
 }

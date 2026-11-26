@@ -110,7 +110,6 @@ async function servir(zoom) {
  * rolagem suave. Vive no navegador, por isso não usa nada de fora. `cfg.tema`: a escolha de Conta › Tema guardada antes de o app abrir.
  */
 function prepararPagina(cfg) {
-  window.__clarevoSemTour = true; // o tour de boas-vindas (D-049) cobriria o Resumo
   if (cfg.tema) { try { localStorage.setItem('clarevo.tema.v1', cfg.tema); } catch { /* sem armazenamento: o app segue o aparelho */ } }
   const Real = Date;
   const desloc = Real.parse(cfg.agora) - Real.now();
@@ -231,8 +230,9 @@ function ferramentas(p, { altura, largura }) {
 async function entrarNaDemo(p, base, f, cenario = null) {
   await p.goto(`${base}/${cenario ? `?cenario=${cenario}` : ''}`);
   await f.esperar('Cuidar da vida financeira');
-  const entrar = f.botao('Ver a demonstração');
-  await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver a demonstração" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
+  // Só o build de demonstração marca o botão (DEMO_ENTRY_TEST_ID, core/welcome.ts): a versão publicada também tem "Ver a demonstração".
+  const entrar = p.locator('[data-testid="entrar-na-demonstracao"]').filter({ visible: true }).first();
+  await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('apps/app/dist não é o build de demonstração: o botão "Ver a demonstração" não tem a marca do build de demonstração (na versão publicada, ele abre a demonstração da web). Rode com --build'); });
   await entrar.click();
   await f.esperar('Diferença do mês');
   await f.esperar('R$ 2.100,00');

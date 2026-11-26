@@ -142,6 +142,11 @@ export const ACCESS_TEXT = {
   howToPay: 'No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.',
   howToPayStore: 'No celular, a assinatura é feita pela loja de aplicativos do aparelho.',
   notOpenYet: 'A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.',
+  /**
+   * Na demonstração, no lugar de como pagar e dos botões (revisão de 26/11/2026, diretriz 3.1.1 da App Store: o app das lojas abre a
+   * demonstração da web, que não pode levar a um pagamento fora da loja).
+   */
+  demoNote: 'Na demonstração não há assinatura nem pagamento.',
   readOnlyWhat: 'Em só ver e exportar, os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
   benefitNote: 'Se a sua empresa oferece a Clarevo como benefício, use o link do convite: com o benefício, nada a pagar.',
   loadFailed: 'Não foi possível carregar a assinatura. Tente de novo.',

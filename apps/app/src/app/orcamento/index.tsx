@@ -9,6 +9,7 @@ import {
   type BudgetRow,
   type IsoMonth,
   budgetCategoriesFor,
+  budgetRuleNotes,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, PieChart } from 'lucide-react-native';
@@ -41,8 +42,9 @@ import { cardShadowOpacity, colors, fonts, radius, space, tabular } from '@/them
  * "Dispensar aviso" (por categoria e mês, só neste aparelho; volta no mês seguinte); e a categoria com estorno informado numa fatura do
  * mês explica o estorno em uma linha (`BUDGET_TEXT.refundNote`, a frase do core).
  *
- * Estudo de 25/11/2026 (sinal 23, menos texto antes do conteúdo): a regra das compras no cartão não abre mais a tela. Ela vem no fim, junto
- * das outras notas, e só quando é relevante: com algum cartão cadastrado (cartões só existem no Pessoal).
+ * Estudo de 25/11/2026 (sinal 23, menos texto antes do conteúdo): as regras de contagem não abrem mais a tela. Vêm no fim, junto das
+ * outras notas: a dos gastos e contas pagas (mês da data do pagamento) sempre, porque vale com ou sem cartão; a das compras no cartão só
+ * quando o espaço tem algum cartão. Os cartões são lidos no espaço aberto, qualquer que seja o tipo (o Negócio também tem o dele, docs/52).
  */
 export default function OrcamentoScreen() {
   const { today } = useSession();
@@ -65,7 +67,7 @@ export default function OrcamentoScreen() {
   const without = s ? s.without.filter((c) => budgetable.includes(c)) : [];
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
-  const cards = useCards(work?.contextKind === 'pessoal' ? contextId : undefined);
+  const cards = useCards(contextId);
   const cardRule = (cards.data?.length ?? 0) > 0;
 
   return (
@@ -143,11 +145,11 @@ export default function OrcamentoScreen() {
             ) : null}
 
             <Card style={{ gap: space[2] }}>
-              {cardRule ? (
-                <Txt variant="caption" color={colors.textSecondary}>
-                  {BUDGET_TEXT.rule}
+              {budgetRuleNotes(cardRule).map((rule) => (
+                <Txt key={rule} variant="caption" color={colors.textSecondary}>
+                  {rule}
                 </Txt>
-              ) : null}
+              ))}
               <Txt variant="caption" color={colors.textSecondary}>
                 {BUDGET_TEXT.versusPaid}
               </Txt>

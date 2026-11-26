@@ -23,7 +23,7 @@ const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 const { PAGINA_DO_PLANO, dadosDoApp, pessoasNaFamilia } = require('./planos');
-const { chamadas, linhaDaCapa, rotuloDosPrecos, selosDasLojas, textoDoAcesso } = require('../estado');
+const { avisoDaAssinatura, chamadas, estadoEmVigor, linhaDaCapa, rotuloDosPrecos, selosDasLojas, textoDoAcesso } = require('../estado');
 
 const ARQUIVO = 'index.html';
 /**
@@ -44,11 +44,12 @@ const DESCRICAO_CURTA = 'Controle de gastos sem planilha: contas, cartões e gas
 /**
  * A seção Planos (pedido do Enzo, 16/11/2026): os dois planos com os nomes, os preços e as frases da tela Assinatura do app, lidos do
  * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Cada cartão tem um link só, que cobre o cartão inteiro, para a página
- * do plano. Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN do app), a frase da tela Assinatura diz que nada é cobrado até
- * o lançamento. Desde 25/11/2026 (D-125), antes do lançamento os preços levam a etiqueta "Preços no lançamento" (`estado.js`), e a seção
- * termina em "Comparar os planos". Só os planos mensais que existem hoje: o anual entra quando existir. `u` monta o caminho relativo.
+ * do plano. Enquanto a assinatura não abre (o SUBSCRIBE_OPEN do app, pelo estado do produto: `avisoDaAssinatura`), a frase da tela
+ * Assinatura diz que nada é cobrado até o lançamento; o site lançado exige a assinatura aberta, então a frase nunca aparece nele. Desde
+ * 25/11/2026 (D-125), antes do lançamento os preços levam a etiqueta "Preços no lançamento" (`estado.js`), e a seção termina em "Comparar
+ * os planos". Só os planos mensais que existem hoje: o anual entra quando existir. `u` monta o caminho relativo.
  */
-function conteudoPlanos(PLANOS, u, estado = { lancado: false }) {
+function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
   const cartoes = PLANOS.texto.plans
     .map(
       (p) => `<article class="cartao plano plano-link">
@@ -60,8 +61,10 @@ function conteudoPlanos(PLANOS, u, estado = { lancado: false }) {
     )
     .join('\n');
   const rotulo = rotuloDosPrecos(estado);
-  // Enquanto a assinatura não abre (SUBSCRIBE_OPEN), a mesma frase da tela Assinatura do app: nada é cobrado até o lançamento.
-  const aindaNao = PLANOS.aberta ? '' : ` ${esc(PLANOS.texto.notOpenYet)}`;
+  // Enquanto a assinatura não abre (SUBSCRIBE_OPEN, pelo estado do produto), a mesma frase da tela Assinatura do app: nada é cobrado até o
+  // lançamento.
+  const aviso = avisoDaAssinatura(estado);
+  const aindaNao = aviso ? ` ${esc(aviso)}` : '';
   return `<h2 id="planos">${esc(PLANOS.texto.plansTitle)}</h2>
 ${rotulo ? `<p class="etiqueta-precos"><span class="etiqueta">${esc(rotulo)}</span></p>\n` : ''}<div class="grade">
 ${cartoes}

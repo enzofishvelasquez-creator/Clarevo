@@ -287,10 +287,12 @@ describe('site público: páginas das calculadoras', () => {
       expect(h).toContain('não garantem resultado');
       expect(h).toContain(`<div class="calc" data-calculadora="${c.slug}">`);
       expect(h).toContain('<script type="module" src="calculadora.js"></script>');
-      // Sem JavaScript: o aviso, o link para a versão web e cada campo da calculadora (rótulo e dica do core).
+      // Sem JavaScript: o aviso, o link para o app que qualquer pessoa pode abrir agora (antes do lançamento, a demonstração, porque a tela
+      // inicial do app web convida a criar conta, D-064; depois, a versão web, em site-estado.test.ts) e cada campo da calculadora.
       const sem = /<noscript>([\s\S]*?)<\/noscript>/.exec(h)?.[1] ?? '';
       expect(sem).toContain('precisa de JavaScript');
-      expect(sem).toContain('versão web');
+      expect(sem).toContain('ou use a <a href="https://demo.clarevo.app.br" rel="noopener noreferrer">demonstração</a> da Clarevo.');
+      expect(h).not.toContain('href="https://app.clarevo.app.br"');
       const ignorados = c.slug === 'plano-dividas' ? ['dividas'] : c.slug === 'dividir-contas' ? ['pessoas'] : [];
       for (const [chave, spec] of Object.entries(calcFields(c.slug))) {
         if (ignorados.includes(chave)) continue;

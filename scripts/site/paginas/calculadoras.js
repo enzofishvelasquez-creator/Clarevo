@@ -16,7 +16,8 @@ const { esc } = require('../texto');
 const { rel, arquivoDaCalculadora, ARQUIVO_CALCULADORAS } = require('../util');
 const { montarPagina, bloco } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { URL_APP, SITE_SRC } = require('../config');
+const { SITE_SRC } = require('../config');
+const { appParaUsar, estadoEmVigor } = require('../estado');
 const { fechoDe } = require('../nucleo');
 const { cartaoDoTema, SECOES_DO_SITE } = require('./aprender');
 
@@ -257,11 +258,15 @@ const NOTA_DO_NUMERO = {
 
 const AVISO_EXTRA = 'Os resultados são estimativas feitas com os números que você digita e não garantem resultado.';
 
-function paginaDaCalculadora(info, { valores }) {
+function paginaDaCalculadora(info, { valores, estado = estadoEmVigor() }) {
   const c = catalogo();
   const arquivo = arquivoDaCalculadora(info.slug);
   const grupo = c.CALC_GRUPOS.find((g) => g.id === info.group);
   const u = (d) => rel(arquivo, d);
+  // O app que qualquer pessoa pode abrir agora, pelo estado do produto (D-125): antes do lançamento, a demonstração, porque a tela inicial
+  // do app web convida a criar conta (D-064); depois, a versão web.
+  const outroApp = appParaUsar(estado);
+  const linkDoOutroApp = `<a href="${esc(outroApp.href)}" rel="noopener noreferrer">${esc(outroApp.texto)}</a>`;
   const tambemFaz = TAMBEM_FAZ[info.slug] ? `${TAMBEM_FAZ[info.slug]} ` : '';
   const ex = exemploDa(info.slug);
   const temas = temasDaCalculadora(info.slug);
@@ -272,7 +277,7 @@ function paginaDaCalculadora(info, { valores }) {
 
   const sem = `<noscript>
 <div class="calc-sem-js">
-<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
+<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a ${linkDoOutroApp} da Clarevo.</p>
 <h3>O que ela pede</h3>
 <ul>
 ${listaDeCampos(info.slug)}
@@ -311,7 +316,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
 <div class="aviso-edu calc-aviso"><p>${esc(c.avisoDaCalculadora(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
 ${NOTA_DO_NUMERO[info.slug] ? `${NOTA_DO_NUMERO[info.slug](u)}\n` : ''}
 <div class="calc" data-calculadora="${esc(info.slug)}">
-<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
+<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a ${linkDoOutroApp} da Clarevo.</p>
 </div>
 ${sem}`,
       { rotulo: 'calcular' },

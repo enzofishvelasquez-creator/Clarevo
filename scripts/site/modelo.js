@@ -33,7 +33,8 @@ function menuHtml(arquivo) {
     return `<li><a href="${rel(arquivo, p.arquivo)}"${attrs}>${esc(p.rotulo)}</a></li>`;
   };
   const lista = MENU.map(item).join('');
-  // A chamada do cabeçalho segue o estado do produto (D-125): "Abrir a versão web" antes do lançamento, "Testar grátis" depois.
+  // A chamada do cabeçalho segue o estado do produto (D-125): "Entrar (quem testa)", para a tela de entrar do app web, antes do lançamento;
+  // "Testar grátis", para a tela de criar conta, depois.
   const { estadoEmVigor, chamadaDoMenu } = require('./estado');
   const cta = chamadaDoMenu(estadoEmVigor());
   return `<nav class="menu" aria-label="Principal">

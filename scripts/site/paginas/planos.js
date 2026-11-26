@@ -30,7 +30,7 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, icone, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { rotuloDosPrecos, sistemas } = require('../estado');
+const { avisoDaAssinatura, estadoEmVigor, rotuloDosPrecos, sistemas } = require('../estado');
 
 const ARQUIVO = 'planos.html';
 /** "R$ 29,90" → "29.90", para os dados estruturados. */
@@ -38,8 +38,10 @@ const precoDecimal = (texto) => texto.replace(/[^\d,]/g, '').replace(',', '.');
 
 /**
  * Os dados estruturados de app (SoftwareApplication, D-125), na página inicial e em Planos: o nome, a categoria, onde funciona hoje (pelo
- * estado do produto) e os dois planos com o preço mensal, do núcleo. Sem nota nem avaliação (a Clarevo ainda não tem). Só os planos
- * mensais que existem hoje.
+ * estado do produto) e, depois do lançamento, os dois planos com o preço mensal, do núcleo. Sem nota nem avaliação (a Clarevo ainda não
+ * tem). Só os planos mensais que existem hoje.
+ * Antes do lançamento, sem `offers`: os preços são os do lançamento ("Preços no lançamento" na página) e ninguém consegue assinar ainda, e
+ * uma oferta sem disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
  */
 function dadosDoApp(valores, estado, descricao) {
   const { PLANOS } = catalogo();
@@ -53,14 +55,18 @@ function dadosDoApp(valores, estado, descricao) {
     inLanguage: 'pt-BR',
     description: descricao,
     ...(dominio ? { url: `https://${dominio}/` } : {}),
-    offers: PLANOS.texto.plans.map((p) => ({
-      '@type': 'Offer',
-      name: `Plano ${PLANOS.nome[p.plan]}`,
-      price: precoDecimal(PLANOS.preco(p.plan)),
-      priceCurrency: 'BRL',
-      // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
-      description: `${p.who} ${PLANOS.texto.plansNote}`,
-    })),
+    ...(estado.lancado
+      ? {
+          offers: PLANOS.texto.plans.map((p) => ({
+            '@type': 'Offer',
+            name: `Plano ${PLANOS.nome[p.plan]}`,
+            price: precoDecimal(PLANOS.preco(p.plan)),
+            priceCurrency: 'BRL',
+            // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
+            description: `${p.who} ${PLANOS.texto.plansNote}`,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -192,7 +198,7 @@ const PERGUNTAS_DA_FAMILIA = [
 ];
 
 /** A página de um plano (`individual` ou `familiar`). */
-function paginaDoPlano(plano, { valores, estado = { lancado: false } }) {
+function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const arquivo = PAGINA_DO_PLANO[plano];
   const u = (d) => rel(arquivo, d);
   const { PLANOS } = catalogo();
@@ -200,7 +206,9 @@ function paginaDoPlano(plano, { valores, estado = { lancado: false } }) {
   const nome = PLANOS.nome[plano];
   const outro = OUTRO[plano];
   const familia = plano === 'familiar';
-  const aindaNao = PLANOS.aberta ? '' : `<p class="nota">${esc(t.notOpenYet)}</p>\n`;
+  // A frase da assinatura fechada segue o estado do produto (`avisoDaAssinatura`): nunca aparece no site lançado.
+  const aviso = avisoDaAssinatura(estado);
+  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
   // No fim da página: o outro plano e o resumo dos dois.
   const caminhos = `<p class="acoes"><a class="botao botao-principal" href="${u(PAGINA_DO_PLANO[outro])}">Ver o plano ${esc(PLANOS.nome[outro])}</a> <a class="botao botao-suave" href="${u(ARQUIVO)}">Comparar os planos</a></p>`;
 
@@ -291,11 +299,12 @@ function oQueMuda(plano) {
 }
 
 /** `planos.html`: o resumo curto, com os dois cartões (cada um leva à página do plano, por um link só) e o que muda entre eles. */
-function paginaPlanos({ valores, estado = { lancado: false } }) {
+function paginaPlanos({ valores, estado = estadoEmVigor() }) {
   const u = (d) => rel(ARQUIVO, d);
   const { PLANOS } = catalogo();
   const t = PLANOS.texto;
-  const aindaNao = PLANOS.aberta ? '' : `<p class="nota">${esc(t.notOpenYet)}</p>\n`;
+  const aviso = avisoDaAssinatura(estado);
+  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
   const rotulo = rotuloDosPrecos(estado);
 
   // Um link só por cartão, que cobre o cartão inteiro (como na página inicial): nada interativo dentro de outro.

@@ -1,28 +1,49 @@
 'use strict';
 /**
  * O estado do produto (D-125, 25/11/2026): um só lugar decide o que as páginas dizem sobre o acesso, para o início, Comece aqui, O app,
- * Planos, a página do MEI e o menu contarem a mesma história. O interruptor fica em `ESTADO_DO_PRODUTO` (`scripts/site/config.js`) e pode
- * ser trocado numa geração com `--estado <arquivo.json>` (os testes usam). Documentado em `docs/22_SITE.md`, seção 19.
+ * Planos, a página do MEI, as calculadoras, o kit de imprensa e o menu contarem a mesma história. O interruptor fica em `ESTADO_DO_PRODUTO`
+ * (`scripts/site/config.js`) e pode ser trocado numa geração com `--estado <arquivo.json>` (os testes usam). Documentado em
+ * `docs/22_SITE.md`, seção 19.
  *
  * Pré-lançamento (`lancado: false`, o padrão): "fase de testes", o acesso de pessoas e famílias abre no lançamento, os planos são os preços
- * do lançamento e as chamadas levam à demonstração e a "Como ter acesso". Nenhum convite a criar conta (D-064 e `docs/44`, seção 2).
+ * do lançamento (sem oferta nos dados estruturados) e as chamadas levam à demonstração e a "Como ter acesso". Nenhum convite a criar conta e
+ * nenhum link para a tela inicial do app web, que convida a criar conta (D-064 e `docs/44`, seção 2): o botão do menu é "Entrar (quem
+ * testa)", para a tela de entrar.
  * Lançado (`lancado: true`): nenhum texto de fase de testes; "Testar 14 dias grátis" leva à tela de criar conta do app web; os selos das
  * lojas aparecem só com o endereço de cada uma.
+ *
+ * A assinatura pelo app (`SUBSCRIBE_OPEN` do núcleo) não é um segundo interruptor do site: enquanto ela está fechada, as páginas de planos
+ * dizem "A assinatura pelo app abre no lançamento", e o estado recusa `lancado: true` (o site diria "Testar 14 dias grátis" ao lado dessa
+ * frase). Para ver o site lançado antes de a assinatura abrir, só o JSON do `--estado` aceita `simularAssinaturaAberta: true`, e a geração
+ * avisa e o `--final` recusa (`gerar.js`).
  */
-const { ESTADO_DO_PRODUTO, URL_APP, URL_CRIAR_CONTA, URL_DEMO } = require('./config');
+const { ESTADO_DO_PRODUTO, URL_APP, URL_CRIAR_CONTA, URL_DEMO, URL_ENTRAR } = require('./config');
 const { esc } = require('./texto');
 const { rel } = require('./util');
 
 /** Os endereços aceitos para cada loja: a página do app, nada de link encurtado nem de rastreamento. */
 const PREFIXO_DA_LOJA = { appStore: 'https://apps.apple.com/', googlePlay: 'https://play.google.com/' };
 
+/** A assinatura pelo app está aberta no núcleo (`SUBSCRIBE_OPEN` de `packages/core/src/plano.ts`, lido por `catalogo().PLANOS.aberta`)? */
+function assinaturaAbertaNoNucleo() {
+  return require('./catalogo').catalogo().PLANOS.aberta === true;
+}
+
 /**
- * O estado em vigor: o de `config.js`, com as chaves de `sobrescrever` por cima (as lojas, uma a uma). Recusa endereço de loja de outro
- * site e `lancado` que não seja verdadeiro ou falso.
+ * O estado em vigor: o de `config.js`, com as chaves de `sobrescrever` por cima (as lojas, uma a uma), mais `assinaturaAberta` (do núcleo
+ * ou, só em `sobrescrever`, de `simularAssinaturaAberta`) e `assinaturaSimulada` (a simulação difere do núcleo). Recusa endereço de loja de
+ * outro site, `lancado` que não seja verdadeiro ou falso e `lancado: true` com a assinatura fechada.
  */
 function estadoDoProduto(sobrescrever = {}) {
-  const lojas = { ...ESTADO_DO_PRODUTO.lojas, ...(sobrescrever.lojas || {}) };
-  const estado = { ...ESTADO_DO_PRODUTO, ...sobrescrever, lojas };
+  for (const chave of ['assinaturaAberta', 'simularAssinaturaAberta', 'assinaturaSimulada']) {
+    if (chave in ESTADO_DO_PRODUTO) throw new Error(`estado do produto: "${chave}" não vai em scripts/site/config.js; a assinatura aberta vem só do SUBSCRIBE_OPEN de packages/core/src/plano.ts`);
+  }
+  for (const chave of ['assinaturaAberta', 'assinaturaSimulada']) {
+    if (chave in sobrescrever) throw new Error(`estado do produto: "${chave}" vem do núcleo (SUBSCRIBE_OPEN); para testar o site lançado antes de a assinatura abrir, use "simularAssinaturaAberta": true no JSON do --estado`);
+  }
+  const { simularAssinaturaAberta, ...resto } = sobrescrever;
+  const lojas = { ...ESTADO_DO_PRODUTO.lojas, ...(resto.lojas || {}) };
+  const estado = { ...ESTADO_DO_PRODUTO, ...resto, lojas };
   if (typeof estado.lancado !== 'boolean') throw new Error('estado do produto: "lancado" precisa ser true ou false (scripts/site/config.js)');
   for (const [loja, url] of Object.entries(lojas)) {
     if (!(loja in PREFIXO_DA_LOJA)) throw new Error(`estado do produto: a loja "${loja}" não existe (use appStore e googlePlay)`);
@@ -30,6 +51,17 @@ function estadoDoProduto(sobrescrever = {}) {
     if (/[?#]/.test(url)) throw new Error(`estado do produto: o endereço de ${loja} vai sem parâmetro nem âncora (nada de rastreamento)`);
   }
   if (typeof estado.prazoDeResposta !== 'string') throw new Error('estado do produto: "prazoDeResposta" é um texto (vazio, nenhuma página promete prazo)');
+  if (simularAssinaturaAberta !== undefined && typeof simularAssinaturaAberta !== 'boolean') throw new Error('estado do produto: "simularAssinaturaAberta" precisa ser true ou false');
+  const doNucleo = assinaturaAbertaNoNucleo();
+  estado.assinaturaAberta = simularAssinaturaAberta ?? doNucleo;
+  estado.assinaturaSimulada = estado.assinaturaAberta !== doNucleo;
+  if (estado.lancado && !estado.assinaturaAberta) {
+    throw new Error(
+      'estado do produto: "lancado: true" com a assinatura pelo app ainda fechada (SUBSCRIBE_OPEN = false em packages/core/src/plano.ts). ' +
+        'O site lançado diria "Testar 14 dias grátis" ao lado de "A assinatura pelo app abre no lançamento". Abra a assinatura no núcleo ' +
+        '(SUBSCRIBE_OPEN = true, com a compra pelas lojas e pela web funcionando) e só depois mude "lancado" para true em scripts/site/config.js.',
+    );
+  }
   return estado;
 }
 
@@ -60,6 +92,12 @@ function diasDeTeste() {
   return require('./catalogo').catalogo().PLANOS.diasDeTeste;
 }
 
+/** Onde a Clarevo está aberta depois do lançamento: "na web", mais cada loja com endereço ("na web, na App Store e no Google Play"). */
+function ondeEstaAberta(estado) {
+  const onde = ['na web', ...lojasPublicadas(estado).map((l) => (l.id === 'appStore' ? 'na App Store' : 'no Google Play'))];
+  return onde.length === 1 ? onde[0] : `${onde.slice(0, -1).join(', ')} e ${onde[onde.length - 1]}`;
+}
+
 /**
  * O estado do acesso, numa frase completa (Comece aqui e o fim da página inicial). Antes do lançamento, o texto que as peças das redes
  * podem repetir (a bio e a peça P03, `docs/44`): mudou em 25/11/2026 de "abre no piloto" para "abre no lançamento", a mesma palavra da
@@ -67,10 +105,16 @@ function diasDeTeste() {
  */
 function textoDoAcesso(estado) {
   if (!estado.lancado) return 'A Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play. Até lá, veja a demonstração e acompanhe as Novidades. Empresas já podem pedir uma apresentação.';
-  const lojas = lojasPublicadas(estado).map((l) => (l.id === 'appStore' ? 'na App Store' : 'no Google Play'));
-  const onde = ['na web', ...lojas];
-  const lista = onde.length === 1 ? onde[0] : `${onde.slice(0, -1).join(', ')} e ${onde[onde.length - 1]}`;
-  return `A Clarevo está aberta para todas as pessoas ${lista}. Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.`;
+  return `A Clarevo está aberta para todas as pessoas ${ondeEstaAberta(estado)}. Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.`;
+}
+
+/**
+ * "Onde usar", nos fatos do kit de imprensa: antes do lançamento, a fase de testes e onde o acesso vai abrir; depois, onde a Clarevo está
+ * aberta (a web e cada loja com endereço). Sem "em breve": depois do lançamento, a loja sem endereço simplesmente não aparece.
+ */
+function ondeUsar(estado) {
+  if (!estado.lancado) return 'a Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play.';
+  return `${ondeEstaAberta(estado)}.`;
 }
 
 /** A linha curta embaixo das chamadas da capa (início e página do MEI). */
@@ -83,6 +127,15 @@ function linhaDaCapa(estado) {
 /** A etiqueta acima dos preços, antes do lançamento: os planos são os preços do lançamento. */
 function rotuloDosPrecos(estado) {
   return estado.lancado ? '' : 'Preços no lançamento';
+}
+
+/**
+ * A frase da tela Assinatura do app enquanto a assinatura está fechada ("A assinatura pelo app abre no lançamento. Até lá, nada é
+ * cobrado.", `ACCESS_TEXT.notOpenYet`), nas páginas de planos e na seção Planos do início; vazia com a assinatura aberta. Segue o mesmo
+ * estado: como `lancado: true` exige a assinatura aberta (`estadoDoProduto`), ela nunca aparece no site lançado.
+ */
+function avisoDaAssinatura(estado) {
+  return estado.assinaturaAberta ? '' : require('./catalogo').catalogo().PLANOS.texto.notOpenYet;
 }
 
 /**
@@ -100,9 +153,30 @@ function chamadas(arquivo, estado, { cenario = null } = {}) {
   return `<div class="acoes">\n${demo('botao-principal')}\n<a class="botao botao-suave" href="${rel(arquivo, 'comece.html')}#acesso">Como ter acesso</a>\n</div>`;
 }
 
-/** A chamada do cabeçalho: depois do lançamento, "Testar grátis"; antes, "Abrir a versão web", para quem já usa a versão de testes. */
+/**
+ * A chamada do cabeçalho: depois do lançamento, "Testar grátis" (a tela de criar conta); antes, "Entrar (quem testa)", que leva à tela de
+ * entrar do app web e diz para quem é. Até 25/11/2026 era "Abrir a versão web", para a tela inicial do app, que começa com "14 dias grátis,
+ * sem cartão" e "Criar conta" enquanto o site diz que o acesso abre no lançamento (D-064).
+ */
 function chamadaDoMenu(estado) {
-  return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Testar grátis' } : { href: URL_APP, texto: 'Abrir a versão web' };
+  return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Testar grátis' } : { href: URL_ENTRAR, texto: 'Entrar (quem testa)' };
+}
+
+/**
+ * O link para a versão web no meio de um texto (O app, "Onde usar"), em HTML: depois do lançamento, "Abrir a versão web" (a tela inicial do
+ * app web, com criar conta e entrar); antes, só a tela de entrar, para quem já testa.
+ */
+function linkDaVersaoWeb(estado) {
+  const link = (href, texto) => `<a href="${esc(href)}" rel="noopener noreferrer">${esc(texto)}</a>`;
+  return estado.lancado ? `${link(URL_APP, 'Abrir a versão web')}.` : `Para quem já testa a Clarevo: ${link(URL_ENTRAR, 'Entrar na versão web')}.`;
+}
+
+/**
+ * O app que qualquer pessoa pode abrir agora, para a nota das calculadoras ("ou use a ... da Clarevo"): depois do lançamento, a versão web;
+ * antes, a demonstração, que abre sem conta (a tela inicial do app web convida a criar conta, D-064).
+ */
+function appParaUsar(estado) {
+  return estado.lancado ? { href: URL_APP, texto: 'versão web' } : { href: URL_DEMO, texto: 'demonstração' };
 }
 
 /**
@@ -122,4 +196,20 @@ function sistemas(estado) {
   return ['Web', ...(lojas.some((l) => l.id === 'appStore') ? ['iOS'] : []), ...(lojas.some((l) => l.id === 'googlePlay') ? ['Android'] : [])].join(', ');
 }
 
-module.exports = { estadoDoProduto, usarEstado, estadoEmVigor, lojasPublicadas, textoDoAcesso, linhaDaCapa, rotuloDosPrecos, chamadas, chamadaDoMenu, selosDasLojas, sistemas };
+module.exports = {
+  estadoDoProduto,
+  usarEstado,
+  estadoEmVigor,
+  lojasPublicadas,
+  textoDoAcesso,
+  ondeUsar,
+  linhaDaCapa,
+  rotuloDosPrecos,
+  avisoDaAssinatura,
+  chamadas,
+  chamadaDoMenu,
+  linkDaVersaoWeb,
+  appParaUsar,
+  selosDasLojas,
+  sistemas,
+};

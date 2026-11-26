@@ -1,5 +1,9 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/common.ts. Não edite: rode "node scripts/gerar-site.js".
 import { formatInteger, formatRate } from '../learn/format.js';
+export function calcNotes(...items) {
+    const kept = items.filter((i) => Boolean(i));
+    return { notes: kept.map(([, text]) => text), noteKinds: kept.map(([kind]) => kind) };
+}
 export const LIMIT_TEXT = 'O valor máximo é R$ 9.999.999,99.';
 export function moneyField(label, what, example, extra = {}) {
     return {

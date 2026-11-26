@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/quitar-antes.ts. Não edite: rode "node scripts/gerar-site.js".
 import { presentValueCents } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, moneyField, rateField } from './common.js';
+import { FieldReader, calcNotes, countField, moneyField, rateField } from './common.js';
 import { parseCount, parseMoney, parsePercentBp } from './inputs.js';
 export const QUITAR_RATE_RANGE = { min: 0, max: 9_999 };
 export const QUITAR_TEXT = {
@@ -90,7 +90,7 @@ export function calcQuitarAntes(input) {
             overdueSumCents: overdueSum,
             resultLines,
             hypotheses,
-            notes: [QUITAR_ESTIMATE_TEXT],
+            ...calcNotes(['estimate', QUITAR_ESTIMATE_TEXT]),
         },
     };
 }

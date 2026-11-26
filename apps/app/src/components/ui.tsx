@@ -1,6 +1,6 @@
-import { DEMO_PILL_MAX_FONT_SCALE, clampedLines, completeMoneyText, formatBRL, maskMoneyTyping } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, clampedLines, formatBRL, maskMoneyEdit, moneyTextOnBlur } from '@clarevo/core';
 import { Check, Eye, EyeOff, type LucideIcon } from 'lucide-react-native';
-import { Children, forwardRef, useEffect, useId, useRef, useState, type ComponentProps, type ReactElement, type ReactNode, type Ref } from 'react';
+import { Children, forwardRef, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   FlatList,
   PixelRatio,
@@ -444,13 +444,51 @@ export function LinkButton({
 export const TextField = forwardRef<
   TextInput,
   TextInputProps & { label: string; error?: string; hint?: string; moneyHint?: boolean; large?: boolean; prefix?: string }
->(function TextField({ label, error, hint, moneyHint, large, prefix, style, onFocus, onBlur, onChangeText, secureTextEntry, ...props }, ref) {
+>(function TextField({ label, error, hint, moneyHint, large, prefix, style, onFocus, onBlur, onChangeText, onKeyPress, secureTextEntry, ...props }, ref) {
   const hidden = useValuesHidden();
   // Campo de valor em reais (prefixo "R$"): a mesma máscara em todos (estudo de 25/11/2026, sinal 26). Os milhares ganham o ponto durante a
-  // digitação ("2000" vira "2.000") e o valor fica completo ao sair do campo ("2.000,00"); o valor lido não muda (core/money-input.ts).
+  // digitação ("2000" vira "2.000") e o valor fica completo ao sair do campo ("2.000,00"); colar segue a leitura de parseBRL
+  // (core/money-input.ts).
   const money = prefix === 'R$';
   const current = typeof props.value === 'string' ? props.value : '';
-  const changeText = money && onChangeText ? (text: string) => onChangeText(maskMoneyTyping(current, text)) : onChangeText;
+  const input = useRef<TextInput | null>(null);
+  const setInput = useCallback(
+    (node: TextInput | null) => {
+      input.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+  // A última tecla (Delete apaga para a frente) e, na web, onde o cursor fica depois da máscara: sem isso, o navegador o leva para o fim
+  // sempre que os pontos mudam de lugar.
+  const lastKey = useRef<string | null>(null);
+  const caretAfterMask = useRef<{ text: string; caret: number } | null>(null);
+  const placeCaret = () => {
+    const want = caretAfterMask.current;
+    const el = input.current as unknown as HTMLInputElement | null;
+    if (!want || !el || typeof el.setSelectionRange !== 'function' || el.value !== want.text) return;
+    caretAfterMask.current = null;
+    if (document.activeElement === el) el.setSelectionRange(want.caret, want.caret);
+  };
+  useLayoutEffect(() => {
+    if (Platform.OS === 'web') placeCaret();
+  });
+  const changeText =
+    money && onChangeText
+      ? (text: string) => {
+          const el = Platform.OS === 'web' ? (input.current as unknown as HTMLInputElement | null) : null;
+          const caret = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
+          const edit = maskMoneyEdit(current, text, caret, { forward: lastKey.current === 'Delete' });
+          lastKey.current = null;
+          if (el) {
+            caretAfterMask.current = edit;
+            // O texto mascarado igual ao de antes (um ponto ignorado) não desenha o campo de novo: o cursor volta depois do quadro.
+            requestAnimationFrame(placeCaret);
+          }
+          onChangeText(edit.text);
+        }
+      : onChangeText;
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const id = useId().replace(/:/g, '');
@@ -471,7 +509,7 @@ export const TextField = forwardRef<
           </Txt>
         ) : null}
         <TextInput
-          ref={ref}
+          ref={setInput}
           accessibilityLabel={label}
           accessibilityHint={spokenHint === undefined ? undefined : yearA11y(spokenHint)}
           placeholderTextColor={colors.placeholder}
@@ -479,16 +517,20 @@ export const TextField = forwardRef<
           {...aria}
           {...props}
           onChangeText={changeText}
+          onKeyPress={(e) => {
+            lastKey.current = e.nativeEvent.key;
+            onKeyPress?.(e);
+          }}
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
           }}
           onBlur={(e) => {
             setFocused(false);
-            if (money && onChangeText) {
-              const complete = completeMoneyText(current);
-              if (complete !== current) onChangeText(complete);
-            }
+            // O valor completo ao sair ("2.000" vira "2.000,00"), só quando o texto muda e sem erro na tela (`moneyTextOnBlur`): o formulário
+            // apaga o erro do campo a cada mudança, e completar "0" para "0,00" tiraria o "maior que zero" com o valor ainda inválido.
+            const complete = money && onChangeText ? moneyTextOnBlur(current, Boolean(error)) : null;
+            if (complete !== null) onChangeText?.(complete);
             onBlur?.(e);
           }}
           style={[styles.inputText, large && styles.inputTextLarge, style]}

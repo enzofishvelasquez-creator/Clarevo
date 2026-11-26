@@ -783,6 +783,15 @@ const BUDGET_CARD_RULE =
   'No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga.';
 const BUDGET_PAID_RULE = 'Gastos e contas pagas contam no mês da data do pagamento.';
 
+/**
+ * As regras de contagem no fim da tela Orçamento por categoria (estudo de 25/11/2026, sinal 23, e revisão de 26/11/2026): a das compras
+ * no cartão só quando o espaço aberto tem algum cartão (no Pessoal ou no Negócio, que tem o dele); a dos gastos e contas pagas sempre,
+ * porque vale com ou sem cartão, também na Família.
+ */
+export function budgetRuleNotes(spaceHasCard: boolean): string[] {
+  return spaceHasCard ? [BUDGET_CARD_RULE, BUDGET_PAID_RULE] : [BUDGET_PAID_RULE];
+}
+
 /** Textos do orçamento por categoria. Neutros: sem cor que julgue, sem julgamento. */
 export const BUDGET_TEXT = {
   title: 'Orçamento por categoria',

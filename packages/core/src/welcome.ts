@@ -13,6 +13,13 @@ import { TRIAL_DAYS } from './plano';
  */
 export const DEMO_URL = 'https://demo.clarevo.app.br';
 
+/**
+ * Marca do botão "Ver a demonstração" só no build de demonstração (`data-testid` na web). Os roteiros de gravação (`scripts/video-demonstracao.js`,
+ * `scripts/gravar-videos-site.js` e `scripts/gravar-redes.js`) conferem por ela que `apps/app/dist` é o build de demonstração: o botão com o
+ * mesmo nome também existe na versão publicada, onde abre a demonstração da web.
+ */
+export const DEMO_ENTRY_TEST_ID = 'entrar-na-demonstracao';
+
 export const WELCOME_TEXT = {
   /** A frase central da marca (D-068), que segue como título até o fundador decidir outra. */
   title: 'Cuidar da vida financeira faz parte de cuidar de você.',
@@ -52,3 +59,12 @@ export const FIRST_STEPS_TEXT = {
   telegramLabel: 'Anotar pelo Telegram',
   telegramCaption: 'Mande "mercado 45" numa mensagem',
 } as const;
+
+/**
+ * Onde a oferta da biometria logo depois de entrar (16/11/2026) pode aparecer: só no Resumo ("/") e sem um atalho do primeiro passo à
+ * espera (revisão de 26/11/2026). Numa conta nova, "Importar extrato, fatura ou print" e "Anotar pelo Telegram" abrem a tela pedida por
+ * cima do Resumo, e a pergunta não cobre essa tela: ela vem quando a pessoa volta ao Resumo.
+ */
+export function biometricOfferFits(pathname: string, firstStepPending: boolean): boolean {
+  return pathname === '/' && !firstStepPending;
+}

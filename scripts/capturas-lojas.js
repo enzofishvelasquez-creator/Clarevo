@@ -185,7 +185,10 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
     f.entrar = async (cenario, endereco = '/') => {
       await p.goto(base + endereco + (cenario ? `?cenario=${cenario}` : ''));
       await f.esperar('Cuidar da vida financeira');
-      await f.botao('Ver a demonstração').click();
+      // Só o build de demonstração marca o botão (DEMO_ENTRY_TEST_ID, core/welcome.ts): a versão publicada também tem "Ver a demonstração".
+      const demo = p.locator('[data-testid="entrar-na-demonstracao"]').filter({ visible: true }).first();
+      await demo.waitFor({ timeout: 15000 }).catch(() => { throw new Error('apps/app/dist não é o build de demonstração: o botão "Ver a demonstração" não tem a marca do build de demonstração (na versão publicada, ele abre a demonstração da web). Rode npm --workspace apps/app run export:demo'); });
+      await demo.click();
       if (endereco === '/') {
         await f.esperar('Diferença do mês');
         if (!cenario) await f.esperar('R$ 2.100,00');

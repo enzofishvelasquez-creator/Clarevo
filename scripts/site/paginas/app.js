@@ -1,12 +1,12 @@
 'use strict';
 /**
  * O app: um passeio pelos recursos, cada um com o vídeo de uso ou a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada
- * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível: web
- * hoje; lojas "em breve", sem selos. Desde 18/11/2026 (D-115), cada vídeo fica no lugar da captura do recurso que ele mostra e toca
- * sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
+ * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível segue
+ * o estado do produto (`estado.js`, D-125): antes do lançamento, a web em fase de testes (o link só para a tela de entrar, de quem já
+ * testa) e as lojas "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 18/11/2026 (D-115), cada vídeo fica no
+ * lugar da captura do recurso que ele mostra e toca sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
  */
-const { URL_APP } = require('../config');
-const { chamadas, lojasPublicadas, selosDasLojas } = require('../estado');
+const { chamadas, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
@@ -235,7 +235,7 @@ ${selosDasLojas(estado)}
 <div class="grade">
 <article class="cartao">
 <h3>${estado.lancado ? 'Na web' : 'Na web, em fase de testes'}</h3>
-<p>A versão web da Clarevo funciona no navegador do celular ou do computador. <a href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>.</p>
+<p>A versão web da Clarevo funciona no navegador do celular ou do computador. ${linkDaVersaoWeb(estado)}</p>
 </article>
 ${noCelular}
 <article class="cartao">

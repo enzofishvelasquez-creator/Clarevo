@@ -56,7 +56,9 @@
  *   --retrato <arquivo>  lê o retrato dos indicadores de outro JSON (padrão: site-src/indicadores/retrato.json)
  *   --noticias <pasta>   lê as edições do resumo semanal de outra pasta (padrão: site-src/noticias)
  *   --estado <arquivo>   lê de um JSON as chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO` em scripts/site/config.js, D-125),
- *                        como {"lancado": true, "lojas": {"appStore": "https://apps.apple.com/..."}}, para ver ou testar o site lançado
+ *                        como {"lancado": true, "lojas": {"appStore": "https://apps.apple.com/..."}}, para ver ou testar o site lançado.
+ *                        "lancado": true é recusado com a assinatura pelo app fechada (SUBSCRIBE_OPEN do núcleo); para ver o site
+ *                        lançado antes disso, junte "simularAssinaturaAberta": true (a geração avisa, e o --final recusa)
  *   --atualizar-indicadores  antes de gerar, consulta o Banco Central (o mesmo código do worker) e grava o retrato dos indicadores; sem
  *                        rede, avisa e gera com o retrato anterior. O `--final` recusa retrato vazio, incompleto ou com mais de 7 dias
  * A imagem de compartilhamento (`site-src/imagens/og-clarevo-1200x630.png`) é feita à parte, por `node scripts/gerar-og-site.js`.

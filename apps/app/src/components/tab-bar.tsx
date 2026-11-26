@@ -1,9 +1,9 @@
-import { BAR_TEXT, INVESTMENT_TEXT, LEARN_UI_TEXT, TAB_LABEL_MAX_FONT_SCALE, barModeFor, barTabFor, tabLabelsShown } from '@clarevo/core';
+import { BAR_TEXT, INVESTMENT_TEXT, LEARN_UI_TEXT, TAB_LABEL_MAX_FONT_SCALE, barModeFor, barTabFor } from '@clarevo/core';
 import { router, usePathname, useSegments } from 'expo-router';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
 import { ArrowLeftRight, BookOpen, Flag, House, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { forwardRef, useEffect, useState, useSyncExternalStore } from 'react';
-import { Keyboard, PixelRatio, Pressable, StyleSheet, useWindowDimensions, View, type PressableProps } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, useWindowDimensions, View, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FitTxt } from '@/components/ui';
@@ -50,15 +50,16 @@ type FaceProps = PressableProps & { focused: boolean; label: string; a11y: strin
 
 /**
  * Botão da barra: o mesmo desenho nas abas e nas telas de consulta (ícone, rótulo curto, 56 px, aba marcada). Com letra grande (estudo de
- * 25/11/2026, sinal 20: "Resu…", "Movi…"), o rótulo cresce até 1,3 vez e encolhe para caber, nunca com reticências; acima dessa escala, só o
- * ícone, e o nome da aba continua para o leitor de tela (`tabLabelsShown`).
+ * 25/11/2026, sinal 20: "Resu…", "Movi…"), o rótulo cresce até 1,3 vez e encolhe para caber, nunca com reticências, e continua à vista em
+ * qualquer escala (revisão de 26/11/2026: sumir com o rótulo acima de 1,3 tirava o nome de quem mais precisa dele). No iPhone, tocar e
+ * segurar a aba mostra o nome grande no centro da tela (o visualizador de conteúdo grande do sistema, como nas barras de abas do próprio
+ * iOS); o nome acessível continua para o leitor de tela.
  */
 const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a11y, icon: Icon, ...props }, ref) {
   const color = focused ? colors.brandText : colors.textSecondary;
   // Cinco abas (D-093): o rótulo mais longo ("Movimentos") cabe inteiro de 320 px para cima, com letra de 12, 11 ou 10,5.
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const fontSize = width >= 375 ? 12 : width >= 340 ? 11 : 10.5;
-  const labeled = tabLabelsShown(fontScale || PixelRatio.getFontScale());
   return (
     <Pressable
       ref={ref}
@@ -67,17 +68,16 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
       accessibilityLabel={a11y}
       accessibilityState={{ selected: focused }}
       aria-selected={focused}
+      {...(Platform.OS === 'ios' ? { accessibilityShowsLargeContentViewer: true, accessibilityLargeContentTitle: label } : {})}
       style={(s) => [
         styles.button,
         focused && styles.buttonActive,
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
-      <Icon size={labeled ? 22 : 26} color={color} strokeWidth={focused ? 2.25 : 2} />
-      {labeled ? (
-        <FitTxt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE} minimumFontScale={0.6}>
-          {label}
-        </FitTxt>
-      ) : null}
+      <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
+      <FitTxt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE} minimumFontScale={0.6}>
+        {label}
+      </FitTxt>
     </Pressable>
   );
 });

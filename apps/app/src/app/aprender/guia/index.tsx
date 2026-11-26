@@ -113,10 +113,11 @@ const ENTRY_ICON: Record<string, LucideIcon> = {
 };
 
 /**
- * Como usar o Clarevo (D-049(1)): a lista das funções por grupos (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta
- * e privacidade), cada uma abrindo a entrada com "Para que serve", "Onde fica" e "Como usar". No topo, "Ver o tour de novo" mostra
- * outra vez os cinco cartões de boas-vindas (sem mudar o "já visto"). Tela de consulta, com a barra inferior. O app não registra
- * quais entradas a pessoa abre.
+ * Como usar o app da Clarevo (D-049(1)): a lista das funções por grupos (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta
+ * e privacidade), cada uma abrindo a entrada com "Para que serve", "Onde fica" e "Como usar". No topo, "Ver o tour do app" mostra os
+ * cinco cartões curtos com as áreas do app. Desde o estudo de 25/11/2026 (D-125), o tour só abre por aqui, quando a pessoa pede: não abre
+ * sozinho numa conta nova e não há marca de "já visto". Tela de consulta, com a barra inferior. O app não registra quais entradas a pessoa
+ * abre.
  */
 export default function GuiaScreen() {
   const [tour, setTour] = useState(false);

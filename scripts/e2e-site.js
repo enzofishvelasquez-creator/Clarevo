@@ -1576,10 +1576,14 @@ function varrerPagina() {
     // 7c10. O estado do produto (D-125, `scripts/site/estado.js`): um só interruptor para todas as páginas. Antes do lançamento (o padrão),
     // a capa do início leva à demonstração e a "Como ter acesso" (nada de criar conta), as páginas dizem "fase de testes" e os preços levam
     // "Preços no lançamento", sem selo de loja. Lançado (um site gerado à parte com --estado), "Testar 14 dias grátis" leva à tela de criar
-    // conta do app web, nenhuma página fala em fase de testes nem em "Preços no lançamento", o selo aparece só para a loja com endereço e o
-    // menu diz "Testar grátis".
+    // conta do app web, nenhuma página fala em fase de testes, "em breve", "abre no lançamento" nem "Preços no lançamento", o selo aparece só
+    // para a loja com endereço e o menu diz "Testar grátis". O botão do menu e o link da versão web em O app são SEGUIDOS nos dois estados
+    // (clique de verdade, no computador e no menu do celular), com o app web respondido por uma página falsa deste teste (`route`): o
+    // clique chega aonde o botão diz e nada sai para a rede. Antes do lançamento, nenhuma página leva à tela inicial do app web, que convida a
+    // criar conta (D-064): só à tela de entrar, de quem já testa.
     {
-      const PAGINAS_DO_ESTADO = ['', 'comece', 'app/', 'mei', 'planos', 'planos/individual', 'planos/familia', 'sobre'];
+      const URL_APP = 'https://app.clarevo.app.br';
+      const PAGINAS_DO_ESTADO = ['', 'comece', 'app/', 'mei', 'planos', 'planos/individual', 'planos/familia', 'sobre', 'imprensa', 'calculadoras/reserva'];
       const lerEstado = async (q, base) => {
         const r = {};
         for (const c of PAGINAS_DO_ESTADO) {
@@ -1588,7 +1592,10 @@ function varrerPagina() {
             const main = document.querySelector('main').innerText.replace(/ /g, ' ');
             return {
               testes: /fase de testes/i.test(main), piloto: /piloto/i.test(main), precosNoLancamento: /Preços no lançamento/.test(main),
+              breve: /em breve/i.test(main), abreNoLancamento: /abre no lançamento/i.test(main),
               criarConta: document.querySelectorAll('a[href*="/criar-conta"]').length, selos: [...document.querySelectorAll('.selo-loja')].map((a) => [a.textContent, a.getAttribute('href')]),
+              // Links para a tela inicial do app web (o endereço sem caminho), na página toda: o menu, o texto e o aviso sem JavaScript.
+              raizDoApp: [...document.querySelectorAll('a')].filter((a) => a.href === 'https://app.clarevo.app.br/').length,
               capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
               menu: [document.querySelector('.menu-cta')?.textContent, document.querySelector('.menu-cta')?.getAttribute('href')],
               plus: /Clarevo Plus|plano anual|R\$ ?[\d.,]+ por ano/i.test(main),
@@ -1597,22 +1604,85 @@ function varrerPagina() {
         }
         return r;
       };
+      /**
+       * Segue os botões: num contexto à parte (sem o registro de "pedido para fora" do resto do roteiro), o app web é respondido por uma
+       * página falsa e qualquer outro endereço de fora é recusado e anotado. Clica no botão do cabeçalho (1280 px, no início e numa
+       * calculadora), no do menu do celular (390 px) e no link da versão web em O app, e devolve aonde cada clique chegou, o que foi pedido
+       * ao app web e o que foi recusado.
+       */
+      const seguirBotoes = async (base, textoDoLink) => {
+        const contexto = await navegador.newContext({ locale: 'pt-BR' });
+        const aoApp = [];
+        const recusados = [];
+        await contexto.route('**/*', (rota) => {
+          const url = rota.request().url();
+          if (url.startsWith(base)) return rota.continue();
+          if (new URL(url).host === 'app.clarevo.app.br') {
+            // Só as navegações contam (o navegador pode pedir o ícone da página falsa, que recebe 404).
+            if (!rota.request().isNavigationRequest()) return rota.fulfill({ status: 404, body: '' });
+            aoApp.push(url);
+            return rota.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><html lang="pt-BR"><title>App falso do teste</title><p>App falso do teste</p></html>' });
+          }
+          recusados.push(url);
+          return rota.abort();
+        });
+        const q = await contexto.newPage();
+        const chegou = {};
+        const noApp = (u) => u.host === 'app.clarevo.app.br';
+        try {
+          await q.setViewportSize({ width: 1280, height: 900 });
+          for (const c of ['', 'calculadoras/reserva']) {
+            await q.goto(`${base}/${c}`);
+            await Promise.all([q.waitForURL(noApp), q.click('.menu-cta')]);
+            chegou[`cabeçalho de ${c || 'início'}`] = [q.url(), await q.title()];
+          }
+          await q.setViewportSize({ width: 390, height: 900 });
+          await q.goto(`${base}/planos`);
+          await q.click('details.menu-movel > summary');
+          await Promise.all([q.waitForURL(noApp), q.click('details.menu-movel li:last-child a')]);
+          chegou['menu do celular'] = [q.url(), await q.title()];
+          await q.goto(`${base}/app/`);
+          await Promise.all([q.waitForURL(noApp), q.click(`#onde ~ .grade a:text-is("${textoDoLink}")`)]);
+          chegou['O app, onde usar'] = [q.url(), await q.title()];
+        } finally {
+          await contexto.close();
+        }
+        return { chegou, aoApp, recusados };
+      };
       const p = await pagina();
       const pre = await lerEstado(p, origem);
       await p.close();
       const v = Object.values(pre);
-      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Abrir a versão web"; nada de Plus nem de plano anual',
-        v.every((x) => x.criarConta === 0 && x.selos.length === 0 && !x.plus && x.menu[0] === 'Abrir a versão web' && !x.piloto) &&
+      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Entrar (quem testa)" e aponta para a tela de entrar; nada de Plus nem de plano anual',
+        v.every((x) => x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && !x.plus && x.menu[0] === 'Entrar (quem testa)' && x.menu[1] === `${URL_APP}/entrar` && !x.piloto) &&
         JSON.stringify(pre['início'].capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br'], ['Como ter acesso', 'comece.html#acesso']]) &&
         JSON.stringify(pre.mei.capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio'], ['Como ter acesso', 'comece.html#acesso']]), JSON.stringify(pre));
       ok('estado do produto, antes do lançamento: "fase de testes" no início, em Comece aqui, em O app e na página do MEI; "Preços no lançamento" no início e nas três páginas de planos',
-        ['início', 'comece', 'app/', 'mei'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento]]))));
+        ['início', 'comece', 'app/', 'mei', 'imprensa'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento]]))));
+      // Antes do lançamento, os cliques levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
+      const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web');
+      const destinosPre = Object.values(seguidosPre.chegou);
+      ok('estado do produto, antes do lançamento: o botão do menu (no computador e no celular) e o link "Entrar na versão web" de O app, clicados, chegam à tela de entrar do app web, e nada sai para a rede',
+        destinosPre.length === 4 && destinosPre.every(([url, titulo]) => url === `${URL_APP}/entrar` && titulo === 'App falso do teste') &&
+          seguidosPre.aoApp.length === 4 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar`) && seguidosPre.recusados.length === 0,
+        JSON.stringify(seguidosPre));
       // O site lançado, gerado à parte com --estado (só a App Store com endereço, para conferir que o selo do Google não aparece sem o dele).
-      const arquivoEstado = path.join(dir, 'estado-lancado.json');
+      // Com a assinatura do núcleo ainda fechada (SUBSCRIBE_OPEN), o gerador recusa "lancado": true sozinho; o teste simula a assinatura aberta
+      // (simularAssinaturaAberta, que só o --estado aceita e que o --final recusa).
       const APP_STORE = 'https://apps.apple.com/br/app/clarevo/id0000000000';
-      fs.writeFileSync(arquivoEstado, JSON.stringify({ lancado: true, lojas: { appStore: APP_STORE } }));
+      const gerarLancado = (nome, estado) => {
+        const arquivo = path.join(dir, `${nome}.json`);
+        fs.writeFileSync(arquivo, JSON.stringify(estado));
+        return spawnSync(process.execPath, [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', REFERENCIA_DOS_POSTS, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--estado', arquivo, '--saida', path.join(dir, nome)], { encoding: 'utf8' });
+      };
+      if (!catalogo().PLANOS.aberta) {
+        const recusado = gerarLancado('site-lancado-recusado', { lancado: true, lojas: { appStore: APP_STORE } });
+        ok('estado do produto: com a assinatura fechada no núcleo, o gerador recusa "lancado": true, diz qual constante mudar e não grava nada',
+          recusado.status === 1 && /SUBSCRIBE_OPEN = false em packages\/core\/src\/plano\.ts/.test(recusado.stderr) && /"lancado" para true em scripts\/site\/config\.js/.test(recusado.stderr) && !fs.existsSync(path.join(dir, 'site-lancado-recusado')),
+          recusado.stderr.slice(-400));
+      }
       const saidaLancada = path.join(dir, 'site-lancado');
-      const g = spawnSync(process.execPath, [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', REFERENCIA_DOS_POSTS, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--estado', arquivoEstado, '--saida', saidaLancada], { encoding: 'utf8' });
+      const g = gerarLancado('site-lancado', { lancado: true, lojas: { appStore: APP_STORE }, simularAssinaturaAberta: true });
       ok('estado do produto: o gerador aceita --estado e grava o site lançado', g.status === 0, g.stderr.slice(-400));
       const lancado = await servir(saidaLancada, { hostDoSite: true });
       const outro = await navegador.newContext({ viewport: { width: 390, height: 900 }, locale: 'pt-BR' });
@@ -1623,8 +1693,15 @@ function varrerPagina() {
         q.on('pageerror', (e) => erros.push(e.message));
         const pos = await lerEstado(q, lancado.url);
         const w = Object.values(pos);
-        ok('estado do produto, lançado: nenhuma página fala em fase de testes nem em "Preços no lançamento"; o menu diz "Testar grátis" e leva à tela de criar conta',
-          w.every((x) => !x.testes && !x.piloto && !x.precosNoLancamento && !x.plus && x.menu[0] === 'Testar grátis' && x.menu[1] === 'https://app.clarevo.app.br/criar-conta') && erros.length === 0, JSON.stringify({ pos, erros }));
+        ok('estado do produto, lançado: nenhuma página fala em fase de testes, "em breve", "abre no lançamento" nem "Preços no lançamento" (inclusive o kit de imprensa); o menu diz "Testar grátis" e aponta para a tela de criar conta',
+          w.every((x) => !x.testes && !x.piloto && !x.precosNoLancamento && !x.breve && !x.abreNoLancamento && !x.plus && x.menu[0] === 'Testar grátis' && x.menu[1] === 'https://app.clarevo.app.br/criar-conta') && erros.length === 0, JSON.stringify({ pos, erros }));
+        // Lançado, os cliques do menu levam à tela de criar conta, e o link de O app, à tela inicial do app web (aberta a todas as pessoas).
+        const seguidosPos = await seguirBotoes(lancado.url, 'Abrir a versão web');
+        const destinosPos = Object.entries(seguidosPos.chegou);
+        ok('estado do produto, lançado: o botão do menu (no computador e no celular), clicado, chega à tela de criar conta; "Abrir a versão web" de O app, à tela inicial do app web; nada sai para a rede',
+          destinosPos.length === 4 && destinosPos.every(([onde, [url, titulo]]) => titulo === 'App falso do teste' && url === (onde === 'O app, onde usar' ? `${URL_APP}/` : `${URL_APP}/criar-conta`)) &&
+            seguidosPos.recusados.length === 0,
+          JSON.stringify(seguidosPos));
         ok('estado do produto, lançado: a capa do início e a do MEI com "Testar 14 dias grátis" (criar conta) e "Ver a demonstração", e o selo só da App Store, que tem endereço',
           JSON.stringify(pos['início'].capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br']]) &&
           JSON.stringify(pos.mei.capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio']]) &&

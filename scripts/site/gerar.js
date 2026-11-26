@@ -128,7 +128,8 @@ function hojeEmBrasilia() {
  * `retrato` (objeto) ou `arquivoRetrato`: o retrato dos indicadores (padrão: `site-src/indicadores/retrato.json`, D-106).
  * `noticias`: outra pasta de edições do resumo semanal (padrão: `site-src/noticias`).
  * `estado`: chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO` em `config.js`, D-125), como `{ lancado: true }`; sem ele, vale
- * o de `config.js`. O estado vale para todas as páginas desta geração (`usarEstado`, em `estado.js`).
+ * o de `config.js`. O estado vale para todas as páginas desta geração (`usarEstado`, em `estado.js`). `lancado: true` é recusado enquanto
+ * a assinatura pelo app estiver fechada (`SUBSCRIBE_OPEN`); os testes passam também `simularAssinaturaAberta: true`, que o --final recusa.
  */
 function gerarSite(opcoes = {}) {
   const estado = estadoDoProduto(opcoes.estado || {});
@@ -152,6 +153,13 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
     const lido = lerDados(arquivoDados || path.join(raiz, 'site', 'dados-da-empresa.json'));
     valores = lido.dados;
     avisos.push(...lido.avisos);
+  }
+  // O estado do produto com a assinatura simulada (`simularAssinaturaAberta` no JSON do --estado, só para testes): o site diria o contrário
+  // do app. Aviso no console, e o --final recusa.
+  if (estado.assinaturaSimulada) {
+    const p = `o estado do produto simula a assinatura ${estado.assinaturaAberta ? 'aberta' : 'fechada'} (simularAssinaturaAberta), ao contrário do SUBSCRIBE_OPEN de packages/core/src/plano.ts: só para testes`;
+    avisos.push(`o --final recusaria: ${p}`);
+    problemasFinais.push(p);
   }
 
   const problemasDaAjuda = conferirCobertura();

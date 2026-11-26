@@ -840,7 +840,10 @@ describe('site público: as páginas geradas', () => {
     expect(capa).toContain('<p class="estado-produto">Em fase de testes: o acesso abre no lançamento, com 14 dias grátis, sem cartão.</p>');
     expect(h).not.toContain('/criar-conta');
     expect(h).not.toContain('class="selo-loja"');
-    expect(h).toContain('<a class="menu-cta" href="https://app.clarevo.app.br" rel="noopener noreferrer">Abrir a versão web</a>');
+    // O botão do menu, antes do lançamento, leva só à tela de entrar de quem já testa (D-064: a tela inicial do app web convida a criar
+    // conta). Todas as páginas, nos dois estados, em site-estado.test.ts.
+    expect(h).toContain('<a class="menu-cta" href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar (quem testa)</a>');
+    expect(h).not.toContain('href="https://app.clarevo.app.br"');
     // A faixa de confiança: um link só para Segurança e privacidade, com "Você decide o que entra" (era "Sem conexão com o seu banco").
     expect(h).not.toContain('Sem conexão com o seu banco');
     const faixa = /<p class="confianca"><a href="seguranca\.html">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
@@ -877,12 +880,13 @@ describe('site público: as páginas geradas', () => {
     expect(foraDosPlanos.replace(/<p class="estado-produto">[^<]*<\/p>/, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')).not.toMatch(/gr[áa]tis/i);
     expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes|Clarevo Plus|plano anual/i);
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
-    // Os dados estruturados: Organization (com a frase de marca) e SoftwareApplication (os dois planos mensais, sem nota nem avaliação).
+    // Os dados estruturados: Organization (com a frase de marca) e SoftwareApplication (sem nota nem avaliação). Antes do lançamento, sem
+    // oferta: os preços são os do lançamento e ninguém assina ainda (os dois planos mensais com preço, no site lançado, em site-estado.test.ts).
     const dados = [...h.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]!));
     expect(dados.map((d) => d['@type'])).toEqual(['Organization', 'SoftwareApplication']);
     expect(dados[0].slogan).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
     expect(dados[1]).toMatchObject({ name: 'Clarevo', applicationCategory: 'FinanceApplication', operatingSystem: 'Web' });
-    expect(dados[1].offers.map((o: { price: string; priceCurrency: string }) => [o.price, o.priceCurrency])).toEqual([['29.90', 'BRL'], ['69.90', 'BRL']]);
+    expect(dados[1]).not.toHaveProperty('offers');
     expect(JSON.stringify(dados[1])).not.toMatch(/aggregateRating|ratingValue/);
   });
 
@@ -894,7 +898,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain(ACCESS_TEXT.notOpenYet);
     expect(SUBSCRIBE_OPEN).toBe(false);
     const { conteudoPlanos } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as {
-      conteudoPlanos: (planos: unknown, u: (d: string) => string) => string;
+      conteudoPlanos: (planos: unknown, u: (d: string) => string, estado?: { lancado: boolean; assinaturaAberta: boolean }) => string;
     };
     const { catalogo } = require(join(ROOT, 'scripts', 'site', 'catalogo.js')) as { catalogo: () => { PLANOS: { aberta: boolean } } };
     const { PLANOS } = catalogo();
@@ -914,8 +918,9 @@ describe('site público: as páginas geradas', () => {
     expect(secao).toContain('href="ajuda/conta.html#guia-assinatura"');
     expect(html('ajuda/conta.html')).toContain('id="guia-assinatura"');
     expect(secao).not.toMatch(/[\u2013\u2014]/);
-    // Com a assinatura aberta, o aviso sai.
-    expect(conteudoPlanos({ ...PLANOS, aberta: true }, (d) => d)).not.toContain(ACCESS_TEXT.notOpenYet);
+    // Com a assinatura aberta (no estado do produto, que a lê do SUBSCRIBE_OPEN), o aviso sai.
+    expect(conteudoPlanos(PLANOS, (d) => d, { lancado: false, assinaturaAberta: false })).toContain(ACCESS_TEXT.notOpenYet);
+    expect(conteudoPlanos(PLANOS, (d) => d, { lancado: false, assinaturaAberta: true })).not.toContain(ACCESS_TEXT.notOpenYet);
   });
 
   // Espaço Negócio no site (D-115, a partir de D-113 e docs/52): o recurso em O app, com a tela da demonstração e o link da Ajuda, o
@@ -1196,6 +1201,10 @@ describe('site público: as páginas geradas', () => {
     expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(mais)![0].match(/<article class="cartao">/g)?.length).toBe(3);
     // Antes do lançamento (o estado do produto, D-125), a web aparece "em fase de testes", e as chamadas da capa são as do estado.
     expect(h).toContain('Na web, em fase de testes');
+    // O link da versão web, antes do lançamento, só para a tela de entrar de quem já testa (D-064), e nenhum para a tela inicial do app.
+    expect(h).toContain('<p>A versão web da Clarevo funciona no navegador do celular ou do computador. Para quem já testa a Clarevo: <a href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar na versão web</a>.</p>');
+    expect(h).not.toContain('href="https://app.clarevo.app.br"');
+    expect(h).not.toContain('Abrir a versão web');
     expect(h).toContain('<a class="botao botao-principal" href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver a demonstração</a>');
     expect(h).toContain('tocar num vídeo pausa ou toca de novo');
     expect(h).not.toContain('botão redondo');

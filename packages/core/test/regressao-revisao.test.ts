@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   BUDGET_TEXT,
+  budgetRuleNotes,
   CARRIED_ATTEMPT_MAX_AGE_MS,
   DEMO_TEXT,
   DEMO_TODAY,
@@ -85,9 +86,11 @@ describe('CL-01: a regra do orçamento escrita uma vez só', () => {
   const rule = BUDGET_TEXT.rule;
 
   it('a frase da tela do orçamento é a do guia e a do manual (e a de docs/02), palavra por palavra', () => {
-    // Tela: a tela desenha BUDGET_TEXT.rule e nenhum texto escrito à mão sobre a regra.
+    // Tela: desde a revisão de 26/11/2026, as duas frases da regra vêm separadas no fim da tela (`budgetRuleNotes`; a do cartão só com
+    // cartão no espaço, conferido com a tela montada em primeiro-uso.test.ts), as mesmas palavras de BUDGET_TEXT.rule, e nenhum texto
+    // escrito à mão sobre a regra.
+    expect(budgetRuleNotes(true).join(' ')).toBe(rule);
     const screen = read('apps/app/src/app/orcamento/index.tsx');
-    expect(screen).toContain('{BUDGET_TEXT.rule}');
     expect(screen).not.toContain('Compras no cartão contam');
     // Guia (e a ajuda "?" da tela, que lê o mesmo catálogo).
     const entry = GUIDE_ENTRIES.find((e) => e.id === 'orcamento')!;

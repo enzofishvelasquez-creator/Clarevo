@@ -9,7 +9,7 @@ import type { Commitment, CommitmentSeries } from '../records';
 import { INSTALLMENT_NATURES } from '../records';
 import { remainingInstallments } from '../series';
 import { charCount } from '../validation';
-import { FieldReader, LIMIT_TEXT, countField, moneyField, monthsCount, monthsDuration, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, LIMIT_TEXT, countField, moneyField, monthsCount, monthsDuration, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './inputs';
 
 /**
@@ -987,11 +987,11 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   if (included.length > 0) hypotheses.push(H.cents);
 
   const unknown = infos.filter((d) => d.unknownRate).map((d) => d.name);
-  const notes = [
-    PLANO_ESTIMATE_TEXT,
-    ...(unknown.length > 0 ? [PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)] : []),
-    ...infos.filter((d) => d.stays).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)),
-  ];
+  const notes = calcNotes(
+    ['estimate', PLANO_ESTIMATE_TEXT],
+    unknown.length > 0 && ['warning', PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)],
+    ...infos.filter((d) => d.stays).map((d) => ['warning', PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)] as const),
+  );
 
   return {
     ok: true,
@@ -1009,7 +1009,7 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       sameOutcome: same,
       resultLines: lines,
       hypotheses,
-      notes,
+      ...notes,
     },
   };
 }

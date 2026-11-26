@@ -1,6 +1,6 @@
 import { presentValueCents } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parsePercentBp } from './inputs';
 
 /**
@@ -167,7 +167,7 @@ export function calcQuitarAntes(input: QuitarInput): CalcOutcome<QuitarResult, Q
       overdueSumCents: overdueSum,
       resultLines,
       hypotheses,
-      notes: [QUITAR_ESTIMATE_TEXT],
+      ...calcNotes(['estimate', QUITAR_ESTIMATE_TEXT]),
     },
   };
 }

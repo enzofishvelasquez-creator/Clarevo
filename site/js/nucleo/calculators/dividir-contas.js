@@ -2,7 +2,7 @@
 import { formatTenths } from '../learn/format.js';
 import { percentTenths, sharesCents } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, moneyField } from './common.js';
+import { FieldReader, calcNotes, moneyField } from './common.js';
 import { parseMoney } from './inputs.js';
 export const DIVIDIR_MIN_PEOPLE = 2;
 export const DIVIDIR_MAX_PEOPLE = 6;
@@ -94,10 +94,7 @@ export function calcDividirContas(input) {
             people,
             resultLines: ['Com estes números, a divisão fica assim:', ...people.map((p) => p.line)],
             hypotheses,
-            notes: [
-                ...(aboveIncome ? [DIVIDIR_NOTES.aboveIncome] : []),
-                modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.',
-            ],
+            ...calcNotes(aboveIncome && ['warning', DIVIDIR_NOTES.aboveIncome], ['info', modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.']),
         },
     };
 }

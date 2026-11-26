@@ -60,6 +60,10 @@ interface World {
   signedIn?: boolean;
   /** O que o pedido de biometria do sistema responde (padrão: 'ok'). */
   unlock?: 'ok' | 'cancelado' | 'indisponivel' | 'falhou';
+  /** A tela aberta (padrão: o Resumo, "/"). */
+  pathname?: string;
+  /** Um atalho do primeiro passo ainda à espera de abrir (`firstStepTarget.pending()`, lib/nav.ts). */
+  firstStepPending?: boolean;
 }
 
 async function setup(over: Partial<World> = {}) {
@@ -128,7 +132,7 @@ async function setup(over: Partial<World> = {}) {
         },
         useQueryClient: () => ({ getMutationCache: subscription, getQueryCache: subscription }),
       },
-      'expo-router': { router: { navigate: vi.fn() }, usePathname: () => '/' },
+      'expo-router': { router: { navigate: vi.fn() }, usePathname: () => world.pathname ?? '/' },
       'lucide-react-native': { LockKeyhole: () => null },
       'react-native': reactNative,
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
@@ -151,7 +155,7 @@ async function setup(over: Partial<World> = {}) {
         openDeviceSettings: vi.fn(),
       },
       '@/lib/device-prefs': { loadPrefs: async () => ({ hideOnOpen: false, ...world.prefs }), updatePrefs, useDevicePrefs: () => world.prefs },
-      '@/lib/nav': { signOutIntent: { mark: vi.fn() } },
+      '@/lib/nav': { signOutIntent: { mark: vi.fn() }, firstStepTarget: { pending: () => world.firstStepPending === true } },
       '@/lib/privacy': { PRIVACY_TEXT: { offerTitle: 'OFERTA DA BIOMETRIA' }, setValuesHidden: vi.fn() },
       '@/lib/reminders': { enableReminders: vi.fn(), queueReminders },
       '@/lib/widget-sync': { queueWidget },
@@ -316,6 +320,42 @@ describe('device-features: a oferta da biometria logo depois de entrar (16/11/20
     expect(offer(t)?.visible).toBe(true);
     offer(t)!.onCancel();
     expect(t.updatePrefs).toHaveBeenCalledWith('pessoa-1', { biometricOffered: true }, true);
+    t.unmount();
+  });
+
+  it('numa conta nova que começou por importar ou pelo Telegram, espera a volta ao Resumo em vez de cobrir a tela pedida (revisão de 26/11/2026)', async () => {
+    for (const shortcut of ['/importar', '/conta/telegram']) {
+      // A conta acabou de ser criada pelo atalho: o espaço fica pronto com o atalho ainda à espera, e a tela dele abre por cima do Resumo.
+      const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted, firstStepPending: true });
+      await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk, signedIn: true });
+      await wait(1100);
+      await t.change({});
+      expect(offer(t)?.visible ?? false, `${shortcut}, atalho à espera`).toBe(false);
+      await t.change({ firstStepPending: false, pathname: shortcut });
+      await wait(1100);
+      await t.change({});
+      expect(offer(t)?.visible ?? false, `${shortcut} aberta`).toBe(false);
+      // "Voltar" leva ao Resumo: agora a pergunta aparece.
+      await t.change({ pathname: '/' });
+      await wait(1100);
+      await t.change({});
+      expect(offer(t)?.visible, `${shortcut}, de volta ao Resumo`).toBe(true);
+      t.unmount();
+    }
+  }, 30_000);
+
+  it('quem sai do Resumo antes de a pergunta aparecer a vê na próxima volta, e não na tela de agora', async () => {
+    const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted });
+    await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk, signedIn: true });
+    // Saiu antes dos 900 ms.
+    await t.change({ pathname: '/registro/novo' });
+    await wait(1100);
+    await t.change({});
+    expect(offer(t)?.visible ?? false).toBe(false);
+    await t.change({ pathname: '/' });
+    await wait(1100);
+    await t.change({});
+    expect(offer(t)?.visible).toBe(true);
     t.unmount();
   });
 

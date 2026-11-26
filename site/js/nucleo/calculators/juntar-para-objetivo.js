@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/juntar-para-objetivo.ts. Não edite: rode "node scripts/gerar-site.js".
 import { monthlyShareCents, monthsToReach } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, monthsDuration, moneyField } from './common.js';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField } from './common.js';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs.js';
 export const OBJETIVO_NO_INFLATION = 'Sem inflação: o valor que você quer juntar fica o mesmo até o fim do prazo.';
 export const OBJETIVO_FIELDS = {
@@ -43,7 +43,7 @@ export function calcJuntarParaObjetivo(input) {
                 months: 0,
                 resultLines: ['Com estes números, você já tem o valor do objetivo: meta atingida, sem precisar guardar mais por mês.'],
                 hypotheses,
-                notes: [],
+                ...calcNotes(),
             },
         };
     }
@@ -59,7 +59,7 @@ export function calcJuntarParaObjetivo(input) {
                 months: meses,
                 resultLines: [`Com estes números, são ${formatBRL(monthly)} por mês, por ${monthsDuration(meses)}.`, faltam],
                 hypotheses: [...hypotheses, 'Valor por mês arredondado para cima, no centavo.'],
-                notes: [],
+                ...calcNotes(),
             },
         };
     }
@@ -73,7 +73,7 @@ export function calcJuntarParaObjetivo(input) {
             months,
             resultLines: [`Com estes números, guardando ${formatBRL(mensal)} por mês, você chega lá em ${monthsDuration(months)}.`, faltam],
             hypotheses: [...hypotheses, ...(missing % mensal === 0 ? [] : ['No último mês, falta menos que o valor de cada mês.'])],
-            notes: [],
+            ...calcNotes(),
         },
     };
 }

@@ -22,19 +22,31 @@ const URL_DEMO = 'https://demo.clarevo.app.br';
 const HOST_DEMO = 'demo.clarevo.app.br';
 /** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Testar 14 dias grátis" depois do lançamento. */
 const URL_CRIAR_CONTA = `${URL_APP}/criar-conta`;
+/**
+ * A tela de entrar do app web (`apps/app/src/app/entrar.tsx`): o destino de "Entrar (quem testa)" antes do lançamento. A tela inicial do app
+ * web começa com "14 dias grátis, sem cartão" e "Criar conta", e o cadastro de pessoas reais só abre no lançamento (D-064): antes dele, o
+ * site nunca leva à tela inicial do app, só à de entrar, para quem já testa.
+ */
+const URL_ENTRAR = `${URL_APP}/entrar`;
 
 /**
  * O estado do produto (D-125, 25/11/2026): UM interruptor para todas as páginas contarem a mesma história (`scripts/site/estado.js`,
  * `docs/22_SITE.md`, seção 19).
  *   - `lancado: false` (o padrão, pré-lançamento): as páginas dizem que a Clarevo está em fase de testes e que o acesso para pessoas e
- *     famílias abre no lançamento; os planos aparecem como os preços do lançamento; as chamadas levam à demonstração e a "Como ter
- *     acesso" (Comece aqui), sem convidar a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais abre por decisão do Enzo).
+ *     famílias abre no lançamento; os planos aparecem como os preços do lançamento, sem oferta nos dados estruturados; as chamadas levam à
+ *     demonstração e a "Como ter acesso" (Comece aqui), sem convidar a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais
+ *     abre por decisão do Enzo); o botão do menu é "Entrar (quem testa)" e leva à tela de entrar do app web (`URL_ENTRAR`).
  *   - `lancado: true`: some todo texto de fase de testes; a chamada principal vira "Testar 14 dias grátis" (a tela de criar conta do app
- *     web) e os selos das lojas aparecem, cada um só com o endereço dele preenchido em `lojas`.
+ *     web) e os selos das lojas aparecem, cada um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto
+ *     a assinatura pelo app estiver fechada (`SUBSCRIBE_OPEN` em `packages/core/src/plano.ts`): primeiro abre a assinatura, depois o site.
+ * A frase "A assinatura pelo app abre no lançamento" não é um segundo interruptor: segue o mesmo `SUBSCRIBE_OPEN`, e como o lançamento
+ * exige a assinatura aberta, ela nunca aparece no site lançado.
  * `lojas`: os endereços das páginas do app (só `https://apps.apple.com/...` e `https://play.google.com/...`), vazios até a publicação.
  * `prazoDeResposta`: o prazo de resposta do atendimento que a equipe consegue cumprir sempre (por exemplo, "até 1 dia útil, de segunda a
  * sexta"). Vazio, nenhuma página promete prazo; preenchido, entra em Sobre e em Suporte. Decisão do Enzo (pergunta do estudo de 25/11).
  * Para testar outro estado sem mudar este arquivo: `node scripts/gerar-site.js --estado <arquivo.json>` (as chaves do JSON trocam as daqui).
+ * Só o JSON do `--estado` (os testes) aceita também `simularAssinaturaAberta: true`, para ver o site lançado antes de a assinatura abrir;
+ * a geração avisa e o `--final` recusa. Aqui ela não é aceita: a assinatura aberta vem só do núcleo.
  */
 const ESTADO_DO_PRODUTO = {
   lancado: false,
@@ -144,6 +156,7 @@ module.exports = {
   URL_DEMO,
   HOST_DEMO,
   URL_CRIAR_CONTA,
+  URL_ENTRAR,
   ESTADO_DO_PRODUTO,
   URL_NR1,
   PESOS_FONTE,

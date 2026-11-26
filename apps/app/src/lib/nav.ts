@@ -33,6 +33,10 @@ export const firstStepTarget = {
   set(target: '/importar' | '/conta/telegram' | null) {
     firstStep = target;
   },
+  /** Há um destino guardado, ainda não aberto (a oferta da biometria espera, `biometricOfferFits`). */
+  pending(): boolean {
+    return firstStep !== null;
+  },
   /** Devolve o destino guardado uma única vez. */
   take(): string | null {
     const t = firstStep;

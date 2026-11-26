@@ -1,13 +1,11 @@
 import {
   calcNotice,
   CALC_UI_TEXT,
-  MAX_RECORD_CENTS,
   calcErrorText,
   calcFields,
   calcRowA11yLabel,
   calcTitle,
-  centsToInput,
-  parseBRL,
+  completeMoneyText,
   parsePercentBp,
   splitCalcNotes,
   type CalcErrorCode,
@@ -17,7 +15,7 @@ import {
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { Check, ChevronDown, ChevronRight, ChevronUp, CircleQuestionMark, Info, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View, type TextInput } from 'react-native';
 import Animated, { ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -111,11 +109,14 @@ export function CalcNote({ children, label }: { children: ReactNode; label?: str
 }
 
 /**
- * "Como a conta é feita" (estudo de 25/11/2026, sinal 23): os avisos e as hipóteses do resultado, com as leis citadas, recolhidos num
- * bloco que abre e fecha no lugar; a resposta fica no topo. Fecha de novo quando o resultado deixa de existir.
+ * "Como a conta é feita" (estudo de 25/11/2026, sinal 23): as hipóteses do resultado, com as leis citadas, e os avisos de apoio
+ * (`CalcNoteKind` 'info'), recolhidos num bloco que abre e fecha no lugar; a resposta, a estimativa e os avisos que mudam a leitura da
+ * conta ficam à vista. Fecha de novo quando o resultado deixa de existir. O botão diz se está aberto (`aria-expanded`) e qual bloco
+ * controla (`aria-controls`, com o bloco sempre na página, vazio quando fechado).
  */
 function HowSection({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const regionId = `como-a-conta-${useId().replace(/:/g, '')}`;
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View style={{ gap: space[3] }}>
@@ -123,6 +124,7 @@ function HowSection({ children }: { children: ReactNode }) {
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         aria-expanded={open}
+        aria-controls={regionId}
         accessibilityHint={CALC_UI_TEXT.howHint}
         onPress={() => setOpen((v) => !v)}
         style={(s) => [styles.how, (s as { focused?: boolean }).focused && ui.focusRing]}>
@@ -132,7 +134,9 @@ function HowSection({ children }: { children: ReactNode }) {
         </Txt>
         <Chevron size={18} color={colors.brandText} strokeWidth={2.25} aria-hidden />
       </Pressable>
-      {open ? <View style={{ gap: space[3] }}>{children}</View> : null}
+      <View nativeID={regionId} style={open ? { gap: space[3] } : null}>
+        {open ? children : null}
+      </View>
     </View>
   );
 }
@@ -141,8 +145,9 @@ function HowSection({ children }: { children: ReactNode }) {
  * Cartão do resultado. As linhas do resultado (ou o texto de espera) ficam numa região viva educada, sem o título, os
  * avisos e as hipóteses, para o leitor de tela não reler tudo a cada tecla. Fica sempre na tela, para a troca ser
  * anunciada. No iOS, sem região viva, a linha de destaque é anunciada quando a pessoa para de digitar.
- * A primeira linha é a resposta, em uma frase; depois vêm as outras linhas e o aviso de que o valor é estimado, quando houver. Os outros
- * avisos e as hipóteses ficam em "Como a conta é feita", recolhido (estudo de 25/11/2026, sinal 23).
+ * A primeira linha é a resposta, em uma frase; depois vêm as outras linhas e os avisos de estimativa e os que mudam a leitura da conta
+ * (multa acima de 2%, taxa acima do teto, saldo que não diminui), sempre à vista. Os avisos de apoio e as hipóteses ficam em "Como a conta
+ * é feita", recolhido (estudo de 25/11/2026, sinal 23; o tipo de cada aviso vem do core, `CalcNoteKind`).
  */
 export function CalcResult({
   texts,
@@ -168,7 +173,7 @@ export function CalcResult({
 }) {
   const hidden = useValuesHidden() && maskMoney;
   const [lead, ...rest] = (texts?.resultLines ?? []).map((l) => maskMoneyText(l, hidden));
-  const notes = splitCalcNotes(texts?.notes ?? []);
+  const notes = splitCalcNotes(texts);
   const shown = texts && lead !== undefined;
   // Anuncia o resultado inteiro: uma troca que mantém a primeira linha (como a taxa) também é dita.
   const spoken = shown ? (texts.resultLines.map((l) => maskMoneyLabel(l, hidden)).join(' ')) : waiting;
@@ -315,10 +320,9 @@ export function showError(code: CalcErrorCode | undefined, spec: CalcFieldSpec, 
   return code === 'fora_da_faixa' && aboveMax(text, spec);
 }
 
-/** Valor em reais formatado ao sair do campo ("1080" → "1.080,00"), como nos formulários. */
+/** Valor em reais formatado ao sair do campo ("1080" → "1.080,00"), como nos formulários (`completeMoneyText`, com o mesmo limite). */
 export function formatMoneyText(text: string): string {
-  const cents = parseBRL(text);
-  return cents !== null && cents >= 0 && cents <= MAX_RECORD_CENTS ? centsToInput(cents) : text;
+  return completeMoneyText(text);
 }
 
 /** Ligação de uma calculadora: campos (rótulos e faixas do core), o que foi digitado e os erros do último cálculo. */

@@ -3,7 +3,8 @@
  * Kit de imprensa (D-066): `imprensa.html` e os arquivos de `imprensa/`. Logotipo e símbolo oficiais (SVG de `docs/marca/`, copiados sem
  * mudança, e PNG que `scripts/gerar-marca-imprensa.js` desenha desses mesmos SVG), cores, fonte, descrições prontas (uma frase, 50 e 100
  * palavras, fiéis ao que o produto faz), capturas da demonstração (dados fictícios, identificados), regras de uso do logotipo e contato.
- * Sem números de uso, clientes nem prêmios: o kit só diz o que o produto faz hoje.
+ * Sem números de uso, clientes nem prêmios: o kit só diz o que o produto faz hoje. "Onde usar" segue o estado do produto (`estado.js`,
+ * D-125): antes do lançamento, a fase de testes; depois, a web e cada loja com endereço.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,6 +12,7 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
 const { MARCA, SITE_SRC, RAIZ } = require('../config');
+const { estadoEmVigor, ondeUsar } = require('../estado');
 const { IMAGENS } = require('../imagens');
 const png = require('../png');
 
@@ -107,7 +109,7 @@ function arquivosDaImprensa() {
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} KB`;
 
-function paginaImprensa({ valores, img }) {
+function paginaImprensa({ valores, img, estado = estadoEmVigor() }) {
   conferirDescricoes();
   const u = (d) => rel(ARQUIVO, d);
   const { arquivos } = arquivosDaImprensa();
@@ -172,7 +174,7 @@ ${descricoes}
 <li><strong>Nome:</strong> escreva Clarevo. O logotipo é "clarevo." em minúsculas, com o ponto lima.</li>
 <li><strong>O que é:</strong> um aplicativo e uma versão web para organizar finanças pessoais e da família, em cinco abas (Resumo, Movimentos, Metas, Investir e Aprender), com educação financeira com fonte.</li>
 <li><strong>O que não é:</strong> não é banco, não movimenta dinheiro, não oferece crédito, não recomenda produtos financeiros e não se conecta a contas bancárias.</li>
-<li><strong>Onde usar:</strong> na versão web. Os apps para iPhone e Android estão em breve na App Store e no Google Play.</li>
+<li><strong>Onde usar:</strong> ${esc(ondeUsar(estado))}</li>
 <li><strong>Para empresas:</strong> uma empresa pode oferecer a Clarevo como benefício e nunca vê as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como funciona</a>.</li>
 <li><strong>Dados:</strong> sem anúncios, sem venda de dados e sem rastreamento para publicidade. <a href="${u('seguranca.html')}">Segurança e privacidade</a>.</li>
 <li><strong>Quem oferece:</strong> [RAZÃO SOCIAL], CNPJ [CNPJ].</li>

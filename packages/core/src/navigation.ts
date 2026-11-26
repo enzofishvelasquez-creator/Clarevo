@@ -130,6 +130,22 @@ export function barTabFor(pathname: string, origin: TabRoute | null, fromConta =
   return origin ?? topicTabFor(pathname);
 }
 
+/** O estado do roteador, só com o que a barra precisa ler (o `getRootState()` do expo-router, sem tipos do roteador). */
+export type NavState = { routes?: readonly { name: string; state?: NavState }[]; routeNames?: readonly string[]; index?: number };
+
+/**
+ * A tela de agora foi aberta por cima da Conta (a Conta está mais abaixo na pilha das telas que têm as abas)? Assim, uma tela aberta da
+ * Conta, como Seu negócio ou Quem vê estes dados, também fica sem aba marcada, na barra de baixo e na barra lateral do computador
+ * (`barTabFor(..., fromConta)`). O roteador guarda a pilha das telas dentro de uma rota de fora: a busca desce até a pilha que tem as
+ * abas ("(tabs)"), no máximo quatro níveis. Só as rotas abaixo da atual contam: a Conta aberta agora é `isNoTabArea`.
+ */
+export function contaBelow(state: NavState | undefined): boolean {
+  let s = state;
+  for (let depth = 0; s && depth < 4 && !(s.routeNames ?? s.routes?.map((r) => r.name) ?? []).includes('(tabs)'); depth++) s = s.routes?.[s.index ?? 0]?.state;
+  if (!s?.routes) return false;
+  return s.routes.slice(0, s.index ?? 0).some((r) => r.name === 'conta' || r.name.startsWith('conta/'));
+}
+
 export const BAR_TEXT = {
   /** Nome acessível da barra de abas. */
   label: 'Navegação principal',

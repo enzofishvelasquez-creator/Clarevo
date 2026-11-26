@@ -2240,6 +2240,56 @@ setInterval(async () => {
   await calcWidths('multa e juros, fatura', 'Multa e juros por atraso');
   await backToCalcList();
 
+  // Revisão de 26/11/2026: cada aviso tem um tipo dito no core (CalcNoteKind). A estimativa e os avisos que mudam a leitura da conta (multa
+  // acima de 2%, teto do rotativo, taxa acima do teto do cheque especial) ficam à vista sem abrir "Como a conta é feita"; o bloco fechado
+  // guarda só as hipóteses e os avisos de apoio. Lido com bodyText(), que não abre o bloco (body() abre). O botão diz se está aberto e qual
+  // bloco controla (aria-expanded e aria-controls).
+  {
+    const howState = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button][aria-expanded]')].find((e) => e.getBoundingClientRect().width > 0 && (e.textContent || '').trim() === 'Como a conta é feita');
+      if (!b) return null;
+      const id = b.getAttribute('aria-controls');
+      const region = id ? document.getElementById(id) : null;
+      return { expanded: b.getAttribute('aria-expanded'), controls: id, region: region ? (region.innerText || '').trim().length : -1 };
+    });
+    const rawHas = (x) => waitUntil(async () => (await bodyText()).includes(x), 4000);
+    const CDC = 'A multa informada passa de 2%. Em relações de consumo abrangidas pelo Código de Defesa do Consumidor (art. 52, § 1º), a multa é limitada a 2%';
+    await openCalc('Multa e juros por atraso');
+    await typeIn('Valor da conta', '200,00'); await typeIn('Multa (%)', '10'); await typeIn('Juros ao mês (%)', '1'); await typeIn('Dias depois do vencimento', '10');
+    await rawHas('O valor exato é o do boleto atualizado.');
+    let raw = await bodyText(); let how = await howState();
+    ok('avisos à vista (revisão de 26/11/2026), multa de 10%: o limite de 2% do CDC e "O valor exato é o do boleto atualizado." aparecem sem abrir "Como a conta é feita"; as hipóteses e o aviso de apoio ficam no bloco fechado',
+      raw.includes(CDC) && raw.includes('O valor exato é o do boleto atualizado.') && !raw.includes('Multa cobrada uma vez sobre o valor da conta.') && !raw.includes('Para a fatura do cartão, escolha') &&
+        how !== null && how.expanded === 'false', JSON.stringify(how));
+    ok('"Como a conta é feita" fechado: aria-expanded="false" e aria-controls aponta para o bloco, que existe e fica vazio', how !== null && /^como-a-conta-/.test(how.controls || '') && how.region === 0, JSON.stringify(how));
+    await btn('Como a conta é feita').click(); await p.waitForTimeout(300);
+    how = await howState(); raw = await bodyText();
+    ok('"Como a conta é feita" aberto: aria-expanded="true", e o bloco controlado traz as hipóteses e o aviso de apoio', how !== null && how.expanded === 'true' && how.region > 0 &&
+      raw.includes('Multa cobrada uma vez sobre o valor da conta.') && raw.includes('Para a fatura do cartão, escolha'), JSON.stringify(how));
+    await backToCalcList();
+    await openCalc('Multa e juros por atraso');
+    await radio('Fatura do cartão').click(); await p.waitForTimeout(300);
+    await typeIn('Valor que ficou sem pagar', '1.000,00'); await typeIn('Juros do rotativo ao mês (%)', '99'); await typeIn('Juros de mora ao mês (%)', '1');
+    await typeIn('Multa (%)', '10'); await typeIn('Dias depois do vencimento', '30');
+    await rawHas('O valor exato é o da próxima fatura.');
+    raw = await bodyText(); how = await howState();
+    ok('avisos à vista, fatura com 99% de rotativo e multa de 10%: o teto da Lei 14.690/2023, a multa acima de 2% e "O valor exato é o da próxima fatura." sem abrir o bloco',
+      raw.includes('Desde 2024, os juros e os encargos do rotativo não podem passar do valor que ficou sem pagar (Lei 14.690/2023).') &&
+        raw.includes('A multa informada passa de 2%. Na fatura do cartão, uma relação de consumo, a multa é limitada a 2%') && raw.includes('O valor exato é o da próxima fatura.') &&
+        how !== null && how.expanded === 'false', JSON.stringify(how));
+    await backToCalcList();
+    await openCalc('Quanto custa uma dívida?');
+    await radio('Cheque especial').click(); await p.waitForTimeout(300);
+    await typeIn('Valor da dívida', '1.000,00'); await typeIn('Taxa de juros ao mês (%)', '10'); await typeIn('Por quantos meses', '3');
+    await rawHas('teto de 8% ao mês');
+    raw = await bodyText(); how = await howState();
+    ok('avisos à vista, cheque especial a 10% ao mês: o teto de 8% ao mês (Res. CMN 4.765/2019) e o aviso do CET sem abrir "Como a conta é feita"; as hipóteses no bloco fechado',
+      raw.includes('A taxa informada passa do teto de 8% ao mês do cheque especial de pessoas físicas e MEI (Res. CMN 4.765/2019).') &&
+        raw.includes('A conta usa só a taxa de juros, sem o CET.') && !raw.includes('Juros compostos, mês a mês, sem pagamentos no período.') && how !== null && how.expanded === 'false', JSON.stringify(how));
+    await shot('60c_calc_avisos_a_vista');
+    await backToCalcList();
+  }
+
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
   await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '3.750,00');
@@ -3885,6 +3935,43 @@ setInterval(async () => {
   ok('E Anotar gasto: Descrição, Valor, Data, "Como você pagou?" (a origem) e Categoria, nessa ordem, com "Dinheiro, débito ou Pix" marcado e "Cartão de crédito" desmarcado',
     Object.values(payTops).every((v) => v !== null) && payTops.descricao < payTops.valor && payTops.valor < payTops.data && payTops.data < payTops.como && payTops.como < payTops.categoria &&
     (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await visibleCount('textbox', 'Em quantas vezes?')) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1, JSON.stringify(payTops));
+  // Máscara de moeda (revisão de 26/11/2026, core/money-input.ts): o ponto digitado no teclado do computador vale como milhar quando vêm
+  // três algarismos e, com um ou dois, é lido como centavos ao sair do campo; colar por cima de um valor segue a leitura de parseBRL (antes,
+  // "9.99" por cima de "8,00" virava "999"); apagar logo depois de um ponto da máscara apaga o algarismo de antes, Delete apaga o de depois,
+  // e o cursor fica no lugar quando os pontos mudam (antes, ia para o fim).
+  {
+    const mv = field('Valor em reais');
+    const mval = () => mv.inputValue();
+    const mcaret = () => mv.evaluate((e) => e.selectionStart);
+    const mtype = async (keys) => { await mv.fill(''); await mv.focus(); await p.keyboard.type(keys, { delay: 25 }); await p.waitForTimeout(150); return mval(); };
+    const typed = {};
+    for (const keys of ['2000', '1.500', '10.000,00', '12.5', '1234.56']) typed[keys] = await mtype(keys);
+    ok('máscara, digitando: "2000" vira "2.000"; "1.500" e "10.000,00" ficam com o ponto dos milhares; "12.5" e "1234.56" ficam como digitados, lidos como centavos',
+      JSON.stringify(typed) === JSON.stringify({ '2000': '2.000', '1.500': '1.500', '10.000,00': '10.000,00', '12.5': '12.5', '1234.56': '1234.56' }), JSON.stringify(typed));
+    const blurred = {};
+    for (const keys of ['1.500', '12.5', '1234.56']) { await mtype(keys); await mv.press('Tab'); await p.waitForTimeout(150); blurred[keys] = await mval(); }
+    ok('máscara, ao sair do campo: "1.500" vira "1.500,00", "12.5" vira "12,50" e "1234.56" vira "1.234,56"',
+      JSON.stringify(blurred) === JSON.stringify({ '1.500': '1.500,00', '12.5': '12,50', '1234.56': '1.234,56' }), JSON.stringify(blurred));
+    const pasted = {};
+    for (const [before, paste] of [['8,00', '9.99'], ['45,90', '12.50'], ['45,90', '100.00'], ['500', '12.5'], ['1.234,56', '1.250']]) {
+      await mv.fill(before); await mv.focus(); await mv.selectText(); await p.keyboard.insertText(paste); await p.waitForTimeout(150);
+      pasted[`${before} + ${paste}`] = await mval();
+    }
+    ok('máscara, colando por cima de um valor: "9.99" sobre "8,00" é 9,99 (antes, 999), "12.50" e "100.00" sobre "45,90" são 12,50 e 100,00, "12.5" sobre "500" é 12,5 e "1.250" é mil duzentos e cinquenta',
+      JSON.stringify(pasted) === JSON.stringify({ '8,00 + 9.99': '9,99', '45,90 + 12.50': '12,50', '45,90 + 100.00': '100,00', '500 + 12.5': '12,5', '1.234,56 + 1.250': '1.250' }), JSON.stringify(pasted));
+    const carets = {};
+    await mv.fill('1.234'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(2, 2)); await p.keyboard.press('Backspace'); await p.waitForTimeout(200);
+    carets.backspace = [await mval(), await mcaret()];
+    await mv.fill('1.234'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(1, 1)); await p.keyboard.press('Delete'); await p.waitForTimeout(200);
+    carets.delete = [await mval(), await mcaret()];
+    await mv.fill('123'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(1, 1)); await p.keyboard.type('9'); await p.waitForTimeout(200);
+    carets.middle = [await mval(), await mcaret()];
+    await mv.fill('1.234,56'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(3, 3)); await p.keyboard.press('Backspace'); await p.waitForTimeout(200);
+    carets.regroup = [await mval(), await mcaret()];
+    ok('máscara, cursor na web: Backspace em "1.|234" dá "|234"; Delete em "1|.234" dá "1|34"; "9" em "1|23" dá "1.9|23"; Backspace em "1.2|34,56" dá "1|34,56"',
+      JSON.stringify(carets) === JSON.stringify({ backspace: ['234', 0], delete: ['134', 1], middle: ['1.923', 3], regroup: ['134,56', 1] }), JSON.stringify(carets));
+    await mv.fill(''); await mv.press('Tab'); await p.waitForTimeout(150);
+  }
   await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
   t = await body();
   ok('E Anotar gasto com cartão: escolhe o único cartão, pede "Em quantas vezes?" (1 a 48), troca para "Data da compra" e o botão vira "Anotar compra no cartão"',
@@ -6685,7 +6772,8 @@ setInterval(async () => {
   await f2Open();
   t = await f2Keep();
   ok('F2 /orcamento: título, barra inferior com Movimentos marcada, "Orçado R$ 4.600,00 · Usado R$ 4.300,00" e a regra do cartão', urlPath() === '/orcamento' && (await h1Name()) === 'Orçamento por categoria' && barOk(await barState()) && (await barState()).selected[0] === MOV_TAB &&
-    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga. Gastos e contas pagas contam no mês da data do pagamento.'), `${urlPath()} ${JSON.stringify(await barState())}`);
+    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga.') &&
+    t.includes('Gastos e contas pagas contam no mês da data do pagamento.'), `${urlPath()} ${JSON.stringify(await barState())}`);
   ok('F2 /orcamento Moradia: "R$ 2.500,00 de R$ 2.500,00", 100,0% e "Orçamento usado por inteiro" (o aluguel pago)',
     (await visibleCount('button', /^Moradia, R\$ 2\.500,00 de R\$ 2\.500,00, 100,0% do orçamento\. Orçamento usado por inteiro\. Alterar orçamento de Moradia\.$/)) === 1 && t.includes('Orçamento usado por inteiro'));
   ok('F2 /orcamento Mercado: "R$ 1.400,00 de R$ 1.800,00", 77,8% e "Faltam R$ 400,00"',
@@ -8590,6 +8678,16 @@ setInterval(async () => {
   await shot('03c_primeiro_passo_telegram');
   await btn('Voltar').click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
   ok('primeiro passo (D-125): do Telegram, "Voltar" leva ao Resumo da conta nova', j1Path() === '/');
+  // Revisão de 26/11/2026: numa conta sem cartão, o Orçamento mostra a regra dos gastos e contas pagas, que vale sem cartão, e não a das
+  // compras no cartão.
+  await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Orçamento por categoria,/ }).filter({ visible: true }).first().click(); await waitBudget(); await p.waitForTimeout(400);
+  {
+    const ob = await body();
+    ok('Orçamento sem cartão (revisão de 26/11/2026): a regra dos gastos e contas pagas fica no fim da tela, sem a regra das compras no cartão',
+      ob.includes('Gastos e contas pagas contam no mês da data do pagamento.') && !ob.includes('cada compra no cartão conta'), ob.slice(-600));
+  }
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
 
   // ---- 2. "Ver o tour do app" no guia: cinco cartões, "Pular" e "Próximo" (no fim, "Começar"), acessível ----
   await j1OpenGuide();
@@ -14689,6 +14787,21 @@ setInterval(async () => {
   }
   ok('Acessibilidade, letra grande (D-125): o valor do topo do Resumo fica numa linha só, sem quebrar no meio nem cortar, a 1,3 e a 2,0 vezes',
     acHero.length === 2 && acHero.every(([, h]) => h !== null && h.lines === 1 && h.sw <= h.cw + 1 && h.ws === 'nowrap' && h.right <= h.w), JSON.stringify(acHero));
+  // Revisão de 26/11/2026: os rótulos das abas continuam à vista com a letra a 2,0 vezes, também em 320 px (até 1,3 vez, encolhendo para
+  // caber, como no aparelho; antes, acima de 1,3, a barra ficava só com os ícones). No iPhone, tocar e segurar mostra o nome grande.
+  {
+    await acEnter();
+    await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(500);
+    await p.evaluate((k) => window.__acc.scale(k), 2); await p.waitForTimeout(600);
+    const tabs = await p.evaluate(() => [...document.querySelectorAll('[role=tablist] [role=tab]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => {
+      const leaf = [...e.querySelectorAll('*')].find((x) => x.children.length === 0 && (x.textContent || '').trim() && !x.closest('svg'));
+      const r = leaf ? leaf.getBoundingClientRect() : null; const tr = e.getBoundingClientRect();
+      return { label: leaf ? leaf.textContent.trim() : '', cut: leaf ? leaf.scrollWidth > leaf.clientWidth + 1 : true, inside: r !== null && r.height > 0 && r.left >= tr.left - 1 && r.right <= tr.right + 1 };
+    }));
+    ok('Acessibilidade, letra grande 2,0x em 320 px (revisão de 26/11/2026): as cinco abas mostram o rótulo inteiro, sem reticências e dentro da aba',
+      JSON.stringify(tabs.map((x) => x.label)) === JSON.stringify(['Resumo', 'Movimentos', 'Metas', 'Investir', 'Aprender']) && tabs.every((x) => !x.cut && x.inside), JSON.stringify(tabs));
+    await shot('599b_letra_grande_200_abas_320px');
+  }
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   acResetFound();
 
@@ -14842,27 +14955,25 @@ setInterval(async () => {
     ok('Assinatura: a tela /conta/assinatura com título, situação, os dois planos e os preços',
       new URL(p.url()).pathname === '/conta/assinatura' && (await h1Name()) === 'Assinatura' && t.includes('Teste grátis') &&
       t.includes('Individual') && t.includes('R$ 29,90 por mês') && t.includes('Família') && t.includes('R$ 69,90 por mês') && t.includes('até 6 pessoas'), t.slice(0, 700));
-    ok('Assinatura: como pagar, cancelar quando quiser, a compra ainda fechada e o que é "só ver e exportar"',
-      t.includes('No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.') && t.includes('Cancele quando quiser.') &&
-      t.includes('A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.') && t.includes('você vê tudo, exporta e pode excluir a conta') &&
-      (await visibleCount('button', 'Assinar')) === 0);
+    // Revisão de 26/11/2026 (diretriz 3.1.1 da App Store): o app das lojas abre esta demonstração ("Ver a demonstração"), então ela nunca
+    // mostra botão de assinar ou de pagar nem como pagar na web; fica a nota neutra.
+    ok('Assinatura na demonstração: os planos com "14 dias grátis, sem cartão" e "Cancele quando quiser", a nota "Na demonstração não há assinatura nem pagamento." no lugar de como pagar, e o que é "só ver e exportar"',
+      t.includes('Toda conta começa com 14 dias grátis, sem cartão. Cancele quando quiser.') && t.includes('Na demonstração não há assinatura nem pagamento.') &&
+      !/cartão ou Pix|App Store|Google Play|abre no lançamento/.test(t) && t.includes('você vê tudo, exporta e pode excluir a conta'), t.slice(0, 900));
+    ok('Assinatura na demonstração: nenhum botão de assinar, pagar ou restaurar compra', (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0);
     ok('Assinatura: os planos são lidos inteiros pelo leitor de tela',
       (await p.locator('[aria-label="Plano Individual, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
-    // O teste da equipe no sandbox (`?assinar=teste`, docs/39): com a compra fechada, os botões do cartão e, desde D-093 (caminho B), os de
-    // pagar um mês com Pix. Na demonstração não há Asaas: tocar diz que não está disponível, sem ir à rede.
+    // O teste da equipe no sandbox (`?assinar=teste`, docs/39) mostra os botões do cartão e do Pix numa conta de verdade. Na demonstração,
+    // nem com ele (revisão de 26/11/2026, diretriz 3.1.1): nenhum botão de compra, só a nota neutra.
     await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
-    await btn('Ver a demonstração').click(); await waitText('Ou pague um mês por vez, com Pix', 15000); await p.waitForTimeout(600);
+    await btn('Ver a demonstração').click(); await waitText('Na demonstração não há assinatura nem pagamento.', 15000); await p.waitForTimeout(600);
     t = await body(); screenTexts.push(t);
-    ok('Assinatura (teste do sandbox): os botões do cartão e os de pagar um mês com Pix, com o que muda no Pix (não renova sozinho)',
-      (await visibleCount('button', 'Assinar o plano Individual')) === 1 && (await visibleCount('button', 'Pagar um mês do plano Individual com Pix')) === 1 &&
-        (await visibleCount('button', 'Pagar um mês do plano Família com Pix')) === 1 && t.includes('Ou pague um mês por vez, com Pix') &&
-        t.includes('Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.'), t.slice(0, 900));
-    await btn('Pagar um mês do plano Individual com Pix').click(); await waitText('não está disponível agora'); await p.waitForTimeout(300);
-    ok('Assinatura (teste do sandbox): na demonstração, o Pix diz que não está disponível, e a tela continua', new URL(p.url()).pathname === '/conta/assinatura' &&
-      (await body()).includes('A assinatura pela web não está disponível agora. Tente de novo mais tarde.'));
-    await atWidths(async (w) => { await layoutChecks(`Assinatura com Pix ${w}px`); if (w === 390) await shot('616_assinatura_pix_teste'); });
+    ok('Assinatura na demonstração, mesmo com "?assinar=teste": nenhum botão de assinar ou de pagar com cartão ou Pix, sem o texto do Pix, e a nota neutra',
+      new URL(p.url()).pathname === '/conta/assinatura' && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !t.includes('Ou pague um mês por vez, com Pix') &&
+        !/cartão ou Pix/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
 
