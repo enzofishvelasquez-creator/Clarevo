@@ -12,7 +12,6 @@ import {
   PLAN_PRICE_CENTS,
   annualMonthlyEquivalentCents,
   annualSavingCents,
-  annualSavingPercent,
   planPeriodPrice,
   planPeriodPriceAmount,
   SUBSCRIBE_OPEN,
@@ -61,9 +60,8 @@ describe('assinatura paga (D-083): preços e textos', () => {
     expect(planPeriodPriceAmount('familiar', 'anual')).toBe('R$ 629,90');
     // 269,90 / 12 = 22,4916...: R$ 22,49; 629,90 / 12 = 52,4916...: R$ 52,49 (o mais próximo, sem arredondar para baixo de propósito).
     expect([annualMonthlyEquivalentCents('individual'), annualMonthlyEquivalentCents('familiar')]).toEqual([2249, 5249]);
-    // 12 × 29,90 = 358,80, menos 269,90 = 88,90 (24,8%); 12 × 69,90 = 838,80, menos 629,90 = 208,90 (24,9%): "cerca de 25%".
+    // 12 × 29,90 = 358,80, menos 269,90 = 88,90; 12 × 69,90 = 838,80, menos 629,90 = 208,90 (a tela diz o valor exato, sem porcentagem).
     expect([annualSavingCents('individual'), annualSavingCents('familiar')]).toEqual([8890, 20890]);
-    expect([annualSavingPercent('individual'), annualSavingPercent('familiar')]).toEqual([25, 25]);
     expect(PLAN_PERIOD_TEXT.equivalent('individual')).toBe('Equivale a R$ 22,49 por mês');
     expect(PLAN_PERIOD_TEXT.saving('individual')).toBe('R$ 88,90 a menos que 12 mensalidades');
     expect(PLAN_PERIOD_TEXT.saving('familiar')).toBe('R$ 208,90 a menos que 12 mensalidades');
@@ -93,7 +91,12 @@ describe('assinatura paga (D-083): preços e textos', () => {
       expect(t).not.toMatch(/fa(z|ç)er? sentido|faz sentido/i);
       expect(t).not.toMatch(/economi|aproveit|promo|só hoje|últim[oa]s? (dias|vagas)|não perca|corra|imperd|grátis por|desconto/i);
       expect(t).not.toMatch(/\bweb\b|Pix|App Store|Google Play/);
+      // Sem prometer teste grátis ao anual: o anual no cartão é cobrado no dia, as lojas não têm oferta de teste e a escolha aparece também
+      // para quem já passou do teste (o teste da conta fica em ACCESS_TEXT.plansNote).
+      expect(t).not.toMatch(/grátis|teste/i);
     }
+    expect(PLAN_PERIOD_TEXT.note).toBe('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.');
+    expect(ACCESS_TEXT.plansNote).toContain('Toda conta começa com 14 dias grátis');
   });
 
   it('a recusa do banco tem texto próprio em ERROR_TEXT (e, com ele, nos textos de cada formulário)', () => {

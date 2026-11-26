@@ -189,11 +189,6 @@ export function annualSavingCents(plan: PlanKind): number {
   return PLAN_PERIOD_PRICE_CENTS[plan].mensal * PERIOD_MONTHS.anual - PLAN_PERIOD_PRICE_CENTS[plan].anual;
 }
 
-/** A diferença em porcentagem de 12 mensalidades, arredondada ao inteiro mais próximo (24,8% e 24,9%: 25). */
-export function annualSavingPercent(plan: PlanKind): number {
-  return Math.round((annualSavingCents(plan) * 100) / (PLAN_PERIOD_PRICE_CENTS[plan].mensal * PERIOD_MONTHS.anual));
-}
-
 /**
  * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O anual vem primeiro, sem pressa e sem alarme: só os números, com o
  * equivalente por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para 12 mensalidades.
@@ -216,7 +211,11 @@ export const PLAN_PERIOD_TEXT = {
     period === 'anual'
       ? `Plano ${PLAN_NAME[plan]} anual, ${planPeriodPrice(plan, 'anual')}, equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês. No mensal, ${planPeriodPrice(plan, 'mensal')}. ${who}`
       : `Plano ${PLAN_NAME[plan]} mensal, ${planPeriodPrice(plan, 'mensal')}. No anual, ${planPeriodPrice(plan, 'anual')}. ${who}`,
-  note: 'O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos e começam com o mesmo teste grátis.',
+  /**
+   * Sem falar do teste grátis: o anual no cartão é cobrado no dia, os produtos das lojas não têm oferta de teste e a tela aparece também
+   * para quem já passou do teste (o teste da conta já está em `ACCESS_TEXT.plansNote`).
+   */
+  note: 'O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.',
 } as const;
 
 /** Os textos fixos da assinatura (Conta, tela Assinatura e avisos). */

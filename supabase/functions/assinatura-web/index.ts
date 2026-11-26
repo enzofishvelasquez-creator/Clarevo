@@ -439,6 +439,7 @@ const __mods = [
                 return applyPixEvent(clients, ev);
             const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
             let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
+            const cycleUnknown = !sub && got.status === 404 && !ev.subscription;
             if (!sub && got.status === 404)
                 sub = ev.subscription ?? goneSubscription(ev.subscriptionId);
             if (!sub) {
@@ -451,6 +452,8 @@ const __mods = [
                 log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
                 return 'sem_referencia';
             }
+            if (cycleUnknown)
+                sub = { ...sub, cycle: exports.ASAAS_CYCLE[ref.period ?? 'mensal'] };
             const since = (0, dates_1.addMonthsToDate)((0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), -paymentsLookbackMonths(sub.cycle));
             const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
             if (list.status !== 200)

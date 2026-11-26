@@ -24,6 +24,7 @@ import {
   planOfStoreProduct,
   revenueCatEventFrom,
   sha256Hex,
+  storeChangeDone,
   storeChangeIsImmediate,
   storeExternalRef,
   storeProductInfo,
@@ -168,6 +169,34 @@ describe('Assinatura pelas lojas (D-090): produtos e configuração', () => {
     expect(storeChangeIsImmediate({ plan: 'individual' }, { plan: 'familiar' })).toBe(true);
     expect(storeChangeIsImmediate({ plan: 'familiar' }, { plan: 'individual' })).toBe(false);
     expect(storeChangeIsImmediate({ plan: 'individual' }, { plan: 'individual' })).toBe(false);
+  });
+
+  it('o aviso depois da troca segue a loja (D-127): só a troca para o Família vale na hora; as outras ficam pedidas para a renovação', () => {
+    const T = STORE_SUBSCRIPTION_TEXT;
+    // Para o Família (de um Individual mensal ou anual): na hora, com "Atualizar".
+    expect(storeChangeDone({ plan: 'individual', period: 'mensal' }, { plan: 'familiar', period: 'mensal' })).toEqual({ text: T.changed, immediate: true });
+    expect(storeChangeDone({ plan: 'individual', period: 'anual' }, { plan: 'familiar', period: 'anual' })).toEqual({ text: T.changed, immediate: true });
+    // A volta para o Individual: pedida, vale na renovação, e o Família continua até lá.
+    expect(storeChangeDone({ plan: 'familiar', period: 'mensal' }, { plan: 'individual', period: 'mensal' })).toEqual({
+      text: 'A troca para o plano Individual foi pedida na loja e vale na próxima renovação. Até lá, continua o plano Família.',
+      immediate: false,
+    });
+    // Entre mensal e anual, no mesmo plano: pedida, vale na renovação; não é chamada de troca de plano nem diz que a situação já mudou.
+    const toAnnual = storeChangeDone({ plan: 'individual', period: 'mensal' }, { plan: 'individual', period: 'anual' });
+    expect(toAnnual).toEqual({
+      text: 'A mudança para o anual foi pedida na loja e vale na próxima renovação. Até lá, continua a assinatura mensal.',
+      immediate: false,
+    });
+    const toMonthly = storeChangeDone({ plan: 'familiar', period: 'anual' }, { plan: 'familiar', period: 'mensal' });
+    expect(toMonthly).toEqual({
+      text: 'A mudança para o mensal foi pedida na loja e vale na próxima renovação. Até lá, continua a assinatura anual.',
+      immediate: false,
+    });
+    for (const done of [toAnnual, toMonthly]) {
+      expect(done.text).not.toMatch(/troca de plano|em instantes|Atualizar/i);
+    }
+    // A nota abaixo dos botões explica por que a situação não muda depois do pedido (o RevenueCat não diz ao app que há troca agendada).
+    expect(T.changeNote).toMatch(/próxima renovação: até lá, continua o plano atual, e a situação aqui não muda\.$/);
   });
 
   it('só funciona com a chave secreta do RevenueCat, o token dos avisos (diferente da chave) e o banco', () => {
@@ -617,6 +646,10 @@ describe('Assinatura pelas lojas (D-090): a tela', () => {
       T.manage('google'),
       T.manageHint('apple'),
       T.changePlan('familiar'),
+      T.changePeriod('anual'),
+      T.planChangeRequested('individual', 'familiar'),
+      T.periodChangeRequested('anual', 'mensal'),
+      T.periodChangeRequested('mensal', 'anual'),
       T.deleteNote('google'),
     ];
     for (const t of all) {

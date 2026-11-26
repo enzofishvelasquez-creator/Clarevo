@@ -17,6 +17,7 @@ import {
   pixCanPayNext,
   pixNextPaymentFrom,
   planPeriodPriceAmount,
+  storeChangeDone,
   todayIn,
   type Access,
   type BillingPeriod,
@@ -31,7 +32,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { SITE_URL, openSitePage } from '@/lib/site';
-import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases } from '@/lib/store-purchases';
+import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases, type StoreChoice } from '@/lib/store-purchases';
 import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
 import { useSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -245,9 +246,9 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
 }
 
 /**
- * Quem paga com Pix (D-093, caminho B; só na web): "Pagar mais um mês com Pix" (ou, no anual, "mais um ano", D-127) nos últimos dias do
- * período pago (PIX_PAY_AHEAD_DAYS_BY_PERIOD: 10 no mensal, 30 no anual), e o outro período como segunda opção (o plano continua o
- * mesmo); antes disso, a partir de quando dá. O mesmo Checkout do Asaas, do plano em vigor. A volta da página do Asaas esconde os botões
+ * Quem paga com Pix (D-093, caminho B; só na web): "Pagar mais um mês com Pix (R$ 29,90)" (ou, no anual, "mais um ano", D-127, com o preço
+ * do ano) nos últimos dias do período pago (PIX_PAY_AHEAD_DAYS_BY_PERIOD: 10 no mensal, 30 no anual), e o outro período como segunda
+ * opção, também com o preço (o plano continua o mesmo); antes disso, a partir de quando dá. O mesmo Checkout do Asaas, do plano em vigor. A volta da página do Asaas esconde os botões
  * (`hidden`) até o aviso do Asaas chegar.
  */
 export function PixRenewCard({ access, hidden = false }: { access: Access; hidden?: boolean }) {
@@ -282,7 +283,7 @@ export function PixRenewCard({ access, hidden = false }: { access: Access; hidde
       {hidden ? null : ready ? (
         <>
           <Button
-            label={period === 'anual' ? W.payNextPixAnnual : W.payNextPix}
+            label={W.payNextPix(plan, period)}
             icon={QrCode}
             busy={busy === period}
             busyLabel={W.pixBusy}
@@ -290,7 +291,7 @@ export function PixRenewCard({ access, hidden = false }: { access: Access; hidde
             onPress={() => void pay(period)}
           />
           <Button
-            label={W.payOtherPix(other)}
+            label={W.payOtherPix(other, plan)}
             icon={QrCode}
             tone="soft"
             busy={busy === other}
@@ -318,10 +319,17 @@ export function PixRenewCard({ access, hidden = false }: { access: Access; hidde
 
 type StoreMsg = { tone: 'erro' | 'sucesso' | 'info'; text: string; refresh: boolean } | null;
 
-/** O aviso depois de tocar na compra: nada quando a pessoa cancelou na loja. */
-function purchaseMessage(r: StorePurchaseResult, changing: boolean): StoreMsg {
+/**
+ * O aviso depois de tocar na compra: nada quando a pessoa cancelou na loja. Na troca (`change`, D-127), o texto segue o que a loja faz: a
+ * troca para o Família vale na hora; as outras ficam pedidas para a próxima renovação, sem "Atualizar" (a situação só muda lá).
+ */
+function purchaseMessage(r: StorePurchaseResult, change: { from: StoreChoice; to: StoreChoice } | null = null): StoreMsg {
   if (r === 'cancelado') return null;
-  if (r === 'comprado') return { tone: 'sucesso', text: changing ? S.changed : S.purchased, refresh: true };
+  if (r === 'comprado' && change) {
+    const done = storeChangeDone(change.from, change.to);
+    return { tone: 'sucesso', text: done.text, refresh: done.immediate };
+  }
+  if (r === 'comprado') return { tone: 'sucesso', text: S.purchased, refresh: true };
   if (r === 'pendente') return { tone: 'info', text: S.pending, refresh: true };
   return { tone: 'erro', text: S.errors[r], refresh: false };
 }
@@ -393,7 +401,7 @@ function StoreSubscribeButtons({ access, period }: { access: Access; period: Bil
     setBusy(plan);
     const r = await buyPlan(user.id, { plan, period });
     if (r === 'comprado' || r === 'pendente') await followUp();
-    setMsg(purchaseMessage(r, false));
+    setMsg(purchaseMessage(r));
     setBusy(null);
   };
   const restore = async () => {
@@ -474,9 +482,10 @@ export function StoreManageCard({ access }: { access: Access }) {
     if (busy || !user || !current || !otherPlan) return;
     setMsg(null);
     setBusy(what);
-    const r = await buyPlan(user.id, what === 'plano' ? { plan: otherPlan, period } : { plan: current.plan, period: otherPeriod }, current);
+    const target: StoreChoice = what === 'plano' ? { plan: otherPlan, period } : { plan: current.plan, period: otherPeriod };
+    const r = await buyPlan(user.id, target, current);
     if (r === 'comprado' || r === 'pendente') await followUp();
-    setMsg(purchaseMessage(r, true));
+    setMsg(purchaseMessage(r, { from: current, to: target }));
     setBusy(null);
   };
   return (

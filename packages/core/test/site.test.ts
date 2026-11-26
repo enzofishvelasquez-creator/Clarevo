@@ -1065,6 +1065,8 @@ describe('site público: as páginas geradas', () => {
     }
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
     for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.notOpenYet, PLAN_PERIOD_TEXT.note]) expect(h, t).toContain(esc(t));
+    // O anual não promete teste grátis (o anual no cartão é cobrado no dia; o teste é da conta, na nota dos planos).
+    expect(h).not.toContain('mesmo teste grátis');
     // Preço só nos dois cartões; fora deles, nenhum "R$" com número.
     const foraDosCartoes = h.replace(/<section[^>]*aria-labelledby="comparar"[\s\S]*?<\/section>/, '');
     expect(foraDosCartoes).not.toBe(h);
@@ -1090,6 +1092,7 @@ describe('site público: as páginas geradas', () => {
       // D-127: o anual logo abaixo, na capa (o único lugar da página com preço).
       expect(capa, arquivo).toContain(`<p class="preco-capa-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (equivale a`);
       expect(p, arquivo).toContain(esc(PLAN_PERIOD_TEXT.note));
+      expect(p, arquivo).not.toContain('mesmo teste grátis');
       expect(p, arquivo).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       expect(capa, arquivo).toContain(`<p class="lead">${esc(ACCESS_TEXT.plans.find((x) => x.plan === plano)!.who)}</p>`);
       // Preço só na capa, e só o deste plano.

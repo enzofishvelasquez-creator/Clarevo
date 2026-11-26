@@ -2,8 +2,8 @@
  * Os planos e os preços da assinatura (D-083), sem dependências: a função do servidor da assinatura na web (D-084) importa daqui para
  * não levar o resto do núcleo. O que mais é da assinatura (acesso, textos das telas) fica em `plano.ts`, que reexporta isto.
  *
- * Desde a D-127 (27/11/2026), cada plano tem dois períodos: mensal e anual (D-125, item 2). O anual é uma cobrança só por ano, com o
- * mesmo teste grátis, os mesmos recursos e os mesmos meios de pagamento do mensal.
+ * Desde a D-127 (27/11/2026), cada plano tem dois períodos: mensal e anual (D-125, item 2). O anual é uma cobrança só por ano, com os
+ * mesmos recursos e os mesmos meios de pagamento do mensal. O teste grátis é da conta, antes de assinar: o anual não tem teste próprio.
  */
 import type { Cents } from './money';
 

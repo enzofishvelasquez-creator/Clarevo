@@ -3,7 +3,12 @@
  * aceitam app que aponte para pagamento fora da loja), então nada daqui aparece lá. A função do servidor fica em `servidor.ts` (não
  * importa este arquivo: mudar um texto da tela não muda a função).
  */
-import { PERIOD_NAME, PLAN_NAME, type BillingPeriod, type PlanKind } from '../plano-precos';
+import { formatBRL } from '../money';
+import { PERIOD_NAME, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, type BillingPeriod, type PlanKind } from '../plano-precos';
+
+/** "mês" ou "ano", e o preço do plano no período ("R$ 29,90", "R$ 269,90"), para os botões do Pix de quem já paga com Pix. */
+const pixUnit = (period: BillingPeriod) => (period === 'anual' ? 'ano' : 'mês');
+const pixPrice = (plan: PlanKind, period: BillingPeriod) => formatBRL(PLAN_PERIOD_PRICE_CENTS[plan][period]);
 
 /** O nome da função do servidor no Supabase (Edge Functions). */
 export const WEB_SUBSCRIPTION_FUNCTION = 'assinatura-web';
@@ -66,10 +71,10 @@ export const WEB_SUBSCRIPTION_TEXT = {
     'Com Pix, você paga um ano de uma vez, na página do Asaas. Não renova sozinho: perto do fim do ano pago, a Clarevo avisa aqui para você pagar o próximo.',
   /** "Pagar um mês do plano Individual com Pix" ou, no anual, "Pagar um ano do plano Individual com Pix". */
   payPix: (plan: PlanKind, period: BillingPeriod = 'mensal') => `Pagar um ${period === 'anual' ? 'ano' : 'mês'} do plano ${PLAN_NAME[plan]} com Pix`,
-  payNextPix: 'Pagar mais um mês com Pix',
-  payNextPixAnnual: 'Pagar mais um ano com Pix',
-  /** Quem paga com Pix pode trocar de período no próximo pagamento (o plano continua o mesmo). */
-  payOtherPix: (period: BillingPeriod) => (period === 'anual' ? 'Pagar um ano com Pix' : 'Pagar um mês com Pix'),
+  /** Quem paga com Pix, na janela do próximo período: "Pagar mais um mês com Pix (R$ 29,90)" ou "Pagar mais um ano com Pix (R$ 269,90)". */
+  payNextPix: (plan: PlanKind, period: BillingPeriod = 'mensal') => `Pagar mais um ${pixUnit(period)} com Pix (${pixPrice(plan, period)})`,
+  /** Quem paga com Pix pode trocar de período no próximo pagamento (o plano continua o mesmo), com o preço do outro período. */
+  payOtherPix: (period: BillingPeriod, plan: PlanKind) => `Pagar um ${pixUnit(period)} com Pix (${pixPrice(plan, period)})`,
   pixBusy: 'Abrindo a página do Pix',
   /** Quem paga com Pix, antes da janela do próximo período. */
   pixNextFrom: (date: string, period: BillingPeriod = 'mensal') => `Você pode pagar o próximo ${period === 'anual' ? 'ano' : 'mês'} a partir de ${date}.`,

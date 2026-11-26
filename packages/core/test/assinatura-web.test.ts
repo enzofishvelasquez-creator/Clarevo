@@ -93,13 +93,13 @@ const pay = (dueDate: string, status = 'CONFIRMED', extra: Partial<AsaasPayment>
 });
 
 /** A rede falsa: o Asaas e o banco, com o que cada endereço responde, e o registro do que foi mandado. */
-function fakeNet(answers: Partial<Record<string, (init: { method: string; body?: string }) => { status: number; body: unknown }>> = {}) {
+function fakeNet(answers: Partial<Record<string, (init: { method: string; body?: string }, url: string) => { status: number; body: unknown }>> = {}) {
   const sent: { method: string; url: string; headers: Record<string, string>; body: unknown; timeoutMs: number }[] = [];
   const fetcher: HttpFetch = async (url, init) => {
     sent.push({ method: init.method, url, headers: init.headers, body: init.body === undefined ? undefined : JSON.parse(init.body), timeoutMs: init.timeoutMs });
     const key = `${init.method} ${url.replace(/^https:\/\/[^/]+/, '').replace(/\?.*$/, '')}`;
     const match = Object.entries(answers).find(([k]) => k === key) ?? Object.entries(answers).find(([k]) => k.endsWith('*') && key.startsWith(k.slice(0, -1)));
-    const r = match?.[1]?.(init) ?? { status: 404, body: { errors: [{ code: 'not_found' }] } };
+    const r = match?.[1]?.(init, url) ?? { status: 404, body: { errors: [{ code: 'not_found' }] } };
     return { status: r.status, text: async () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)) };
   };
   return { sent, fetcher };
@@ -442,6 +442,78 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     expect(refund.applied[0]).toMatchObject({ p_person: ANA, p_external_ref: sha256Hex(SUB), p_valid_until: NOW.toISOString() });
     // Assinatura removida não recebe PUT.
     expect(net2.sent.some((s) => s.method === 'PUT')).toBe(false);
+  });
+
+  describe('assinatura anual removida (D-127): o aviso de cobrança não traz a assinatura e o Asaas responde 404', () => {
+    // Individual anual pago no cartão em 15/01/2027 e cancelado em 01/02/2027 (a assinatura some do Asaas). A pessoa e o período vêm da
+    // assinatura já aplicada no banco (billing_person_by_external_ref); as cobranças são filtradas pelo vencimento, como no Asaas.
+    const ANNUAL_DUE = '2027-01-15';
+    async function removedAnnual(at: string, eventName: string, status: string, found: Record<string, unknown> = { person_id: ANA, plan: 'individual', period: 'anual' }) {
+      const applied: Record<string, unknown>[] = [];
+      const net = fakeNet({
+        'GET /v3/payments': (_init, url) => {
+          const since = /dueDate%5Bge%5D=(\d{4}-\d{2}-\d{2})/.exec(url)?.[1] ?? '9999-12-31';
+          return { status: 200, body: { object: 'list', data: [pay(ANNUAL_DUE, status, { id: 'pay_anual' })].filter((p) => (p.dueDate ?? '') >= since) } };
+        },
+        'POST /rest/v1/rpc/billing_person_by_external_ref': () => ({ status: 200, body: found }),
+        'POST /rest/v1/rpc/billing_apply': (init) => {
+          applied.push(JSON.parse(init.body ?? '{}'));
+          return { status: 200, body: { result: 'aplicado', access: { status: 'assinatura' } } };
+        },
+      });
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => new Date(at) });
+      const res = await h(webhookReq(event(eventName, { payment: { id: 'pay_anual', status, subscription: SUB } })).req);
+      expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+      // A assinatura removida não recebe PUT, e o Checkout no banco não é consultado (o objeto removido não traz o Checkout).
+      expect(net.sent.some((s) => s.method === 'PUT' || s.url.endsWith('/rpc/billing_checkout_person'))).toBe(false);
+      return { applied, lookedSince: /dueDate%5Bge%5D=(\d{4}-\d{2}-\d{2})/.exec(net.sent.find((s) => s.url.includes('/payments?'))?.url ?? '')?.[1] };
+    }
+
+    it('PAYMENT_RECEIVED 32 dias depois do cartão: vale até o vencimento mais 12 meses, sem tolerância, e o banco continua com o anual', async () => {
+      const { applied, lookedSince } = await removedAnnual('2027-02-16T15:00:00.000Z', 'PAYMENT_RECEIVED', 'RECEIVED');
+      // 14 meses de cobranças, e não 4.
+      expect(lookedSince).toBe('2025-12-16');
+      expect(applied).toHaveLength(1);
+      // 15/01/2028, fim do dia em Brasília (removida: sem os 3 dias de tolerância), e não 15/02/2027.
+      expect(applied[0]).toMatchObject({ p_person: ANA, p_plan: 'individual', p_external_ref: sha256Hex(SUB), p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
+
+    it('estorno e contestação do ano: o acesso acaba na hora, e o período gravado continua anual', async () => {
+      const refund = await removedAnnual('2027-03-10T15:00:00.000Z', 'PAYMENT_REFUNDED', 'REFUNDED');
+      expect(refund.applied[0]).toMatchObject({ p_valid_until: '2027-03-10T15:00:00.000Z', p_period: 'anual' });
+      const chargeback = await removedAnnual('2027-03-10T15:00:00.000Z', 'PAYMENT_CHARGEBACK_REQUESTED', 'CHARGEBACK_REQUESTED');
+      expect(chargeback.applied[0]).toMatchObject({ p_valid_until: '2027-03-10T15:00:00.000Z', p_period: 'anual' });
+    });
+
+    it('aviso 5 meses depois da cobrança anual (a contestação vencida pela Clarevo): a cobrança paga ainda é achada e o ano continua valendo', async () => {
+      const late = await removedAnnual('2027-06-20T15:00:00.000Z', 'PAYMENT_AWAITING_CHARGEBACK_REVERSAL', 'AWAITING_CHARGEBACK_REVERSAL');
+      // Com a janela de 4 meses (desde 20/02/2027), a cobrança de 15/01/2027 ficaria de fora e o acesso acabaria agora.
+      expect(late.lookedSince).toBe('2026-04-20');
+      expect(late.applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+      const updated = await removedAnnual('2027-06-20T15:00:00.000Z', 'PAYMENT_UPDATED', 'RECEIVED');
+      expect(updated.applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
+
+    it('sem o período no banco (antes da 0047) continua mensal; o ciclo do objeto do aviso (SUBSCRIPTION_DELETED) vale mais que o banco', async () => {
+      const old = await removedAnnual('2027-02-16T15:00:00.000Z', 'PAYMENT_RECEIVED', 'RECEIVED', { person_id: ANA, plan: 'individual' });
+      expect(old.lookedSince).toBe('2026-10-16');
+      expect(old.applied[0]).toMatchObject({ p_valid_until: '2027-02-16T02:59:59.999Z' });
+      expect(old.applied[0]).not.toHaveProperty('p_period');
+      // O aviso de assinatura removida traz o objeto, com o ciclo anual e a referência: vale o ciclo dele.
+      const applied: Record<string, unknown>[] = [];
+      const net = fakeNet({
+        'GET /v3/payments': () => ({ status: 200, body: { object: 'list', data: [pay(ANNUAL_DUE, 'CONFIRMED')] } }),
+        'POST /rest/v1/rpc/billing_apply': (init) => {
+          applied.push(JSON.parse(init.body ?? '{}'));
+          return { status: 200, body: { result: 'aplicado' } };
+        },
+      });
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => new Date('2027-02-01T15:00:00.000Z') });
+      const res = await h(webhookReq(event('SUBSCRIPTION_DELETED', { subscription: sub({ cycle: 'YEARLY', deleted: true, status: 'INACTIVE' }) })).req);
+      expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+      expect(net.sent.some((s) => s.url.endsWith('/rpc/billing_person_by_external_ref'))).toBe(false);
+      expect(applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
   });
 
   it('orçamento de tempo: esgotado, responde 500 sem começar outra chamada (o Asaas entrega de novo), e nada da pessoa vai ao registro', async () => {
@@ -1036,8 +1108,10 @@ describe('Assinatura na web: o que o app usa', () => {
     const texts = [
       ...Object.values(W).flatMap((v) => (typeof v === 'string' ? [v] : typeof v === 'object' ? Object.values(v) : [])),
       ...(['individual', 'familiar'] as const).flatMap((p) => [W.subscribe(p), W.subscribe(p, 'anual'), W.subscribe(p, 'mensal'), W.payPix(p), W.payPix(p, 'anual')]),
-      W.payOtherPix('anual'),
-      W.payOtherPix('mensal'),
+      W.payOtherPix('anual', 'individual'),
+      W.payOtherPix('mensal', 'familiar'),
+      W.payNextPix('individual'),
+      W.payNextPix('familiar', 'anual'),
       W.pixNextFrom('01/12/2026'),
       W.pixNextFrom('01/12/2026', 'anual'),
     ];
@@ -1052,6 +1126,13 @@ describe('Assinatura na web: o que o app usa', () => {
     expect(WEB_SUBSCRIPTION_TEXT.payPix('individual', 'anual')).toBe('Pagar um ano do plano Individual com Pix');
     expect(WEB_SUBSCRIPTION_TEXT.payPix('individual')).toBe('Pagar um mês do plano Individual com Pix');
     expect(WEB_SUBSCRIPTION_TEXT.pixNextFrom('01/12/2026', 'anual')).toBe('Você pode pagar o próximo ano a partir de 01/12/2026.');
+    // Quem já paga com Pix vê o preço em cada botão: o do período seguinte e o do outro período, no plano em vigor (D-127).
+    expect(W.payNextPix('individual')).toBe('Pagar mais um mês com Pix (R$ 29,90)');
+    expect(W.payNextPix('individual', 'anual')).toBe('Pagar mais um ano com Pix (R$ 269,90)');
+    expect(W.payNextPix('familiar', 'mensal')).toBe('Pagar mais um mês com Pix (R$ 69,90)');
+    expect(W.payOtherPix('anual', 'individual')).toBe('Pagar um ano com Pix (R$ 269,90)');
+    expect(W.payOtherPix('anual', 'familiar')).toBe('Pagar um ano com Pix (R$ 629,90)');
+    expect(W.payOtherPix('mensal', 'familiar')).toBe('Pagar um mês com Pix (R$ 69,90)');
     expect(WEB_SUBSCRIPTION_TEXT.howItWorks).toContain('a Clarevo não vê nem guarda');
   });
 });

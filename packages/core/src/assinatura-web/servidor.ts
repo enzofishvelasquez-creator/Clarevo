@@ -187,7 +187,10 @@ export function asaasSubscriptionFrom(raw: unknown): AsaasSubscription | null {
   };
 }
 
-/** Uma assinatura que o Asaas já não devolve (removida): só o identificador; nada vale além do período pago. */
+/**
+ * Uma assinatura que o Asaas já não devolve (removida): só o identificador; nada vale além do período pago. O ciclo mensal é provisório:
+ * o aviso troca pelo do período já aplicado no banco, depois de achar a pessoa (D-127).
+ */
 export function goneSubscription(id: string): AsaasSubscription {
   return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
 }
@@ -640,6 +643,8 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     // aviso ou, sem ele, só o que já está pago.
     const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
     let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
+    // Removida e sem o objeto no aviso (os PAYMENT_* trazem só o identificador dela): o Asaas não diz o ciclo.
+    const cycleUnknown = !sub && got.status === 404 && !ev.subscription;
     if (!sub && got.status === 404) sub = ev.subscription ?? goneSubscription(ev.subscriptionId);
     if (!sub) {
       if (got.status === 200) return 'ignorado';
@@ -650,6 +655,10 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
       return 'sem_referencia';
     }
+    // Então o ciclo vem do período já aplicado no banco (billing_person_by_external_ref, D-127): numa anual removida, a consulta olha 14
+    // meses de cobranças, o período pago vai até 12 meses depois do vencimento e o banco continua com o anual (um estorno ou o
+    // PAYMENT_RECEIVED que chega 32 dias depois do cartão não a transformam em mensal). Sem o período (banco de antes da 0047), mensal.
+    if (cycleUnknown) sub = { ...sub, cycle: ASAAS_CYCLE[ref.period ?? 'mensal'] };
     const since = addMonthsToDate(todayIn(ASAAS_TIME_ZONE, now()), -paymentsLookbackMonths(sub.cycle));
     const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
     if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);

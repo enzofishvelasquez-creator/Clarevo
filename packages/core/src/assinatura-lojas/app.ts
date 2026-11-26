@@ -82,6 +82,18 @@ export function storeChangeIsImmediate(from: { plan: PlanKind }, to: { plan: Pla
   return from.plan === 'individual' && to.plan === 'familiar';
 }
 
+/**
+ * O aviso depois de a loja aceitar uma troca (D-127): para o Família, a troca vale na hora e a situação muda em instantes (`immediate`, com
+ * "Atualizar"); para o Individual ou entre mensal e anual, a loja só agenda a troca para a próxima renovação, e o aviso diz que o plano
+ * atual continua até lá (a mudança de período não é chamada de troca de plano).
+ */
+export function storeChangeDone(from: { plan: PlanKind; period: BillingPeriod }, to: { plan: PlanKind; period: BillingPeriod }): { text: string; immediate: boolean } {
+  const T = STORE_SUBSCRIPTION_TEXT;
+  if (storeChangeIsImmediate(from, to)) return { text: T.changed, immediate: true };
+  if (from.plan !== to.plan) return { text: T.planChangeRequested(to.plan, from.plan), immediate: false };
+  return { text: T.periodChangeRequested(to.period, from.period), immediate: false };
+}
+
 /** Os textos da assinatura pelas lojas (tela Assinatura e exclusão da conta). */
 export const STORE_SUBSCRIPTION_TEXT = {
   /** "Assinar o plano Individual" e, com o período (D-127), "Assinar o plano Individual anual". */
@@ -102,7 +114,14 @@ export const STORE_SUBSCRIPTION_TEXT = {
   restored: 'Assinatura encontrada e ligada a esta conta da Clarevo. Ela aparece aqui em instantes.',
   restoreNone: 'Nenhuma assinatura da Clarevo foi encontrada nesta conta da loja.',
   purchased: 'Compra feita. A assinatura aparece aqui em instantes; se não aparecer, toque em Atualizar.',
+  /** Depois da troca para o Família, que a loja faz na hora (`storeChangeIsImmediate`). */
   changed: 'Troca de plano feita na loja. A situação aparece aqui em instantes; se não aparecer, toque em Atualizar.',
+  /** Depois de pedir a volta para o Individual, que a loja só faz na próxima renovação (D-127). */
+  planChangeRequested: (to: PlanKind, from: PlanKind) =>
+    `A troca para o plano ${PLAN_NAME[to]} foi pedida na loja e vale na próxima renovação. Até lá, continua o plano ${PLAN_NAME[from]}.`,
+  /** Depois de pedir a mudança entre mensal e anual no mesmo plano, que a loja só faz na próxima renovação (D-127). */
+  periodChangeRequested: (to: BillingPeriod, from: BillingPeriod) =>
+    `A mudança para o ${PERIOD_NAME[to]} foi pedida na loja e vale na próxima renovação. Até lá, continua a assinatura ${PERIOD_NAME[from]}.`,
   pending: 'O pagamento ficou pendente na loja. Quando a loja confirmar, a assinatura aparece aqui.',
   refresh: 'Atualizar',
   manage: (store: StoreName) => `Gerenciar na ${STORE_LABEL[store]}`,
@@ -111,8 +130,12 @@ export const STORE_SUBSCRIPTION_TEXT = {
   /** Mudar entre mensal e anual no mesmo plano (D-127). */
   changePeriod: (period: BillingPeriod) => `Mudar para o ${PERIOD_NAME[period]}`,
   changeBusy: 'Abrindo a loja',
+  /**
+   * Abaixo dos botões de troca. O RevenueCat não diz ao app que há uma troca agendada, então os botões continuam: a nota explica por que a
+   * situação não muda depois de pedir a troca que vale na renovação.
+   */
   changeNote:
-    'Ao mudar para o Família, a troca vale na hora, e a loja desconta o que sobrou do período pago. Ao voltar para o Individual ou trocar entre mensal e anual, a troca vale na próxima renovação.',
+    'Ao mudar para o Família, a troca vale na hora, e a loja desconta o que sobrou do período pago. Ao voltar para o Individual ou mudar entre mensal e anual, a mudança vale na próxima renovação: até lá, continua o plano atual, e a situação aqui não muda.',
   manageFailed: 'Não foi possível abrir os ajustes da loja. Abra a loja de aplicativos e procure Assinaturas.',
   /** Excluir a conta: a assinatura da loja não é cancelada pela Clarevo. */
   deleteNote: (store: StoreName) =>

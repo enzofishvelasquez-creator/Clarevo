@@ -14995,7 +14995,7 @@ setInterval(async () => {
       t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
         t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
         t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
-        t.includes('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos e começam com o mesmo teste grátis.') &&
+        t.includes('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.') && !t.includes('mesmo teste grátis') &&
         !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
     // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
     const alarme = await p.evaluate(() => {
