@@ -43,6 +43,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 | B10 | Guarda por obrigação legal e defesa de direitos | 2 |
 | B11 | Telegram (pergunta 45), Inova Simples nas lojas (pergunta 46) e assinatura paga (pergunta 47: arrependimento nas lojas, renovação, preço, só leitura, Plano Família, tributos e nota fiscal) | 7 |
 | B12 | Tirar as frases "Rascunho preparado pela equipe... Não é parecer jurídico" depois da revisão | 3 |
+| B13 | Rodada de 20 a 26/11/2026 (`resumo-para-advogado.md`, seção m, perguntas 63 a 72): plano anual nos Termos e na Política, arrependimento e cancelamento do anual, Espaço Negócio, Plus, endereço publicado, prazo de resposta, perguntas frequentes, rodapé, Decreto do SAC e venda na web antes das lojas. **Bloqueiam a abertura da venda na web: 63, 64, 65, 67, 71 e 72**; 68, 69 e 70 vêm antes de publicar o site, com saída provisória (tirar o trecho); a 66 espera a abertura do Plus | Nenhum novo: a redação proposta está nas perguntas, e os textos publicados não mudaram |
 
 ## C. Conferência em painel (Enzo, uns 15 minutos; a equipe manda o roteiro)
 

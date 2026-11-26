@@ -22,6 +22,11 @@
  * Desde 27/11/2026 (D-127), cada cartão e cada capa mostram também o preço anual, logo abaixo do mensal, com o equivalente por mês dito
  * como equivalente ("ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)"), e a assinatura diz que o anual é uma cobrança só.
  *
+ * Desde 26/11/2026 (D-128, pedido do Enzo), antes do lançamento cada cartão de plano leva a fita vermelha "Em breve" na diagonal do canto de
+ * cima (`fitaEmBreve`, só CSS, com o "em breve" também no título do cartão para o leitor de tela) e a capa de cada plano, a etiqueta "Em
+ * breve" ao lado do preço; saíram a etiqueta "Preços no lançamento" e a frase "A assinatura pelo app abre no lançamento. Até lá, nada é
+ * cobrado.". Depois do lançamento, nada disso aparece.
+ *
  * Os nomes, os preços, o "por mês" e as frases da assinatura vêm do núcleo (`catalogo().PLANOS`, de `packages/core/src/plano.ts`), para o
  * site e o app dizerem o mesmo; o resto foi conferido no guia de uso do app (`packages/core/src/guide`), nas decisões de `docs/00` (D-083
  * para o plano Família pago pela pessoa titular, D-093 para o Pix mês a mês, D-105 para o calendário, D-113 e `docs/52` para o Espaço
@@ -33,7 +38,7 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, icone, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { avisoDaAssinatura, estadoEmVigor, rotuloDosPrecos, sistemas } = require('../estado');
+const { emBreveNoTitulo, estadoEmVigor, fitaEmBreve, sistemas } = require('../estado');
 
 const ARQUIVO = 'planos.html';
 /** "R$ 29,90" → "29.90", para os dados estruturados. */
@@ -53,8 +58,8 @@ function linhaDoAnual(plano, classe = 'preco-anual') {
  * Os dados estruturados de app (SoftwareApplication, D-125), na página inicial e em Planos: o nome, a categoria, onde funciona hoje (pelo
  * estado do produto) e, depois do lançamento, os dois planos com o preço mensal e o anual (D-127), do núcleo. Sem nota nem avaliação (a
  * Clarevo ainda não tem).
- * Antes do lançamento, sem `offers`: os preços são os do lançamento ("Preços no lançamento" na página) e ninguém consegue assinar ainda, e
- * uma oferta sem disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
+ * Antes do lançamento, sem `offers`: os planos estão "Em breve" na página e ninguém consegue assinar ainda, e uma oferta sem
+ * disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
  */
 function dadosDoApp(valores, estado, descricao) {
   const { PLANOS } = catalogo();
@@ -90,6 +95,15 @@ function dadosDoApp(valores, estado, descricao) {
         }
       : {}),
   };
+}
+
+/**
+ * A linha curta embaixo dos cartões dos planos (D-128, no lugar da frase "A assinatura pelo app abre no lançamento" e da etiqueta "Preços no
+ * lançamento"): o teste, o cancelamento e o "só ver e exportar", com o link do passo a passo da assinatura. A mesma no início e em Planos.
+ */
+function linhaDosPlanos(u) {
+  const { PLANOS } = catalogo();
+  return `<p class="nota nota-planos">${esc(`${PLANOS.diasDeTeste} dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, só ver e exportar.`)} <a href="${u('ajuda/conta.html')}#guia-assinatura">Como funciona a assinatura</a></p>`;
 }
 
 /** A página de cada plano, pelo `plan` do núcleo (`individual` e `familiar`). */
@@ -228,18 +242,14 @@ function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const nome = PLANOS.nome[plano];
   const outro = OUTRO[plano];
   const familia = plano === 'familiar';
-  // A frase da assinatura fechada segue o estado do produto (`avisoDaAssinatura`): nunca aparece no site lançado.
-  const aviso = avisoDaAssinatura(estado);
-  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
   // No fim da página: o outro plano e o resumo dos dois.
   const caminhos = `<p class="acoes"><a class="botao botao-principal" href="${u(PAGINA_DO_PLANO[outro])}">Ver o plano ${esc(PLANOS.nome[outro])}</a> <a class="botao botao-suave" href="${u(ARQUIVO)}">Comparar os planos</a></p>`;
 
   // O preço fica na capa, ao lado do nome: "R$" com número só aqui nesta página (o teste do site confere).
-  // Antes do lançamento (D-125), o preço leva a etiqueta "Preços no lançamento", como na página inicial e no resumo.
-  const rotulo = rotuloDosPrecos(estado);
+  // Antes do lançamento (D-128), o preço leva a etiqueta "Em breve", como a fita dos cartões na página inicial e no resumo.
   const capa = `<p class="migalha"><a href="${u(ARQUIVO)}">Planos</a></p>
 <h1>Plano ${esc(nome)}</h1>
-<p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${rotulo ? ` <span class="etiqueta etiqueta-capa">${esc(rotulo)}</span>` : ''}</p>
+<p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${estado.lancado ? '' : ' <span class="etiqueta etiqueta-capa">Em breve</span>'}</p>
 ${linhaDoAnual(plano, 'preco-capa-anual')}
 <p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>`;
 
@@ -251,7 +261,7 @@ ${linhaDoAnual(plano, 'preco-capa-anual')}
 <li>${esc(t.howToPay)} Com Pix, você paga um mês por vez ou o ano de uma vez.</li>
 <li>${esc(t.benefitNote)} <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</li>
 </ul>
-${aindaNao}<p class="nota">Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`;
+<p class="nota">Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`;
 
   const brutas = [
     bloco(
@@ -327,15 +337,14 @@ function paginaPlanos({ valores, estado = estadoEmVigor() }) {
   const u = (d) => rel(ARQUIVO, d);
   const { PLANOS } = catalogo();
   const t = PLANOS.texto;
-  const aviso = avisoDaAssinatura(estado);
-  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
-  const rotulo = rotuloDosPrecos(estado);
+  const fita = fitaEmBreve(estado);
 
-  // Um link só por cartão, que cobre o cartão inteiro (como na página inicial): nada interativo dentro de outro.
+  // Um link só por cartão, que cobre o cartão inteiro (como na página inicial): nada interativo dentro de outro. Antes do lançamento, a fita
+  // "Em breve" no canto de cima (D-128).
   const cartoes = t.plans
     .map(
-      (p) => `<article class="cartao plano plano-link">
-<h3>${esc(PLANOS.nome[p.plan])}</h3>
+      (p) => `<article class="cartao plano plano-link${fita ? ' com-fita' : ''}">
+${fita ? `${fita}\n` : ''}<h3>${esc(PLANOS.nome[p.plan])}${emBreveNoTitulo(estado)}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
 ${linhaDoAnual(p.plan)}
 <p>${esc(p.who)}</p>
@@ -351,10 +360,11 @@ ${linhaDoAnual(p.plan)}
   const brutas = [
     bloco(
       `<h2 id="comparar">Os dois planos</h2>
-${rotulo ? `<p class="etiqueta-precos"><span class="etiqueta">${esc(rotulo)}</span></p>\n` : ''}<div class="grade">
+<div class="grade">
 ${cartoes}
 </div>
-${aindaNao}<p class="nota">${esc(t.plansNote)} ${esc(PLANOS.notaDoAnual)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
+${linhaDosPlanos(u)}
+<p class="nota">${esc(PLANOS.notaDoAnual)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a>.</p>`,
       { rotulo: 'comparar' },
     ),
   ];
@@ -377,4 +387,4 @@ function paginasPlanos(ctx) {
   return [paginaPlanos(ctx), paginaDoPlano('individual', ctx), paginaDoPlano('familiar', ctx)];
 }
 
-module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, linhaDoAnual, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };
+module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, linhaDoAnual, linhaDosPlanos, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };

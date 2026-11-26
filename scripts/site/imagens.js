@@ -63,6 +63,10 @@ const IMAGENS = [
   // só nela, o tema escuro mostrava um celular escuro entre os claros).
   { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela do negócio Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
+  // A versão web no computador (D-128: o bloco "Use no navegador ou no celular" do início e a página `web.html`): as telas que o roteiro de
+  // telas grava a 1280 px (`scripts/e2e-web.js`, "Computador"), com o menu ao lado.
+  { id: 'computador-resumo', origem: `${TELAS}/630_computador_resumo.png`, largura: LARGURA_LARGA, alt: 'A Clarevo no navegador do computador: o menu ao lado, com Anotar gasto, Resumo, Movimentos, Metas, Investir e Aprender, e o Resumo de outubro com a diferença do mês, o recebido, o pago, as contas a pagar, as metas e o orçamento por categoria.' },
+  { id: 'computador-movimentos', origem: `${TELAS}/631_computador_movimentos.png`, largura: LARGURA_LARGA, alt: 'Movimentos no navegador do computador: o menu ao lado, os atalhos Buscar, Seu mês em 30 segundos, Evolução e Análises, o recebido e o pago de outubro e a tabela dos lançamentos com data, descrição, categoria, conta e valor.' },
 ];
 
 /**

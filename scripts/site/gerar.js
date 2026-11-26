@@ -20,6 +20,7 @@ const { paginaComece } = require('./paginas/comece');
 const { paginaMei } = require('./paginas/mei');
 const { estadoDoProduto, usarEstado } = require('./estado');
 const { paginaApp } = require('./paginas/app');
+const { paginaWeb } = require('./paginas/web');
 const { paginaEmpresas } = require('./paginas/empresas');
 const { paginasAprender } = require('./paginas/aprender');
 const { paginasCalculadoras, scriptsDasCalculadoras } = require('./paginas/calculadoras');
@@ -186,6 +187,8 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
   juntar(paginaInicial(ctx));
   juntar(paginaComece(ctx));
   juntar(paginaApp(ctx));
+  // A versão web (D-128): no navegador, sem instalar nada, com a mesma conta e o pagamento com cartão ou Pix.
+  juntar(paginaWeb(ctx));
   // Planos: o resumo (planos.html) e uma página por plano (planos/individual.html e planos/familia.html, desde 19/11/2026).
   paginasPlanos(ctx).forEach(juntar);
   // A porta de quem trabalha por conta e MEI (D-125): o Espaço Negócio que já está no plano.

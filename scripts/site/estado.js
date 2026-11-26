@@ -1,21 +1,24 @@
 'use strict';
 /**
- * O estado do produto (D-125, 25/11/2026): um só lugar decide o que as páginas dizem sobre o acesso, para o início, Comece aqui, O app,
- * Planos, a página do MEI, as calculadoras, o kit de imprensa e o menu contarem a mesma história. O interruptor fica em `ESTADO_DO_PRODUTO`
- * (`scripts/site/config.js`) e pode ser trocado numa geração com `--estado <arquivo.json>` (os testes usam). Documentado em
- * `docs/22_SITE.md`, seção 19.
+ * O estado do produto (D-125, 25/11/2026): um só lugar decide o que as páginas dizem sobre o acesso e aonde levam as chamadas, para o início,
+ * Comece aqui, O app, Use no navegador (`web.html`), Planos, a página do MEI, as calculadoras, o kit de imprensa e o menu contarem a mesma
+ * história. O interruptor fica em `ESTADO_DO_PRODUTO` (`scripts/site/config.js`) e pode ser trocado numa geração com `--estado
+ * <arquivo.json>` (os testes usam). Documentado em `docs/22_SITE.md`, seção 19.
  *
- * Pré-lançamento (`lancado: false`, o padrão): "fase de testes", o acesso de pessoas e famílias abre no lançamento, os planos são os preços
- * do lançamento (sem oferta nos dados estruturados) e as chamadas levam à demonstração e a "Como ter acesso". Nenhum convite a criar conta e
- * nenhum link para a tela inicial do app web, que convida a criar conta (D-064 e `docs/44`, seção 2): o botão do menu é "Entrar (quem
- * testa)", para a tela de entrar.
- * Lançado (`lancado: true`): nenhum texto de fase de testes; "Testar 14 dias grátis" leva à tela de criar conta do app web; os selos das
- * lojas aparecem só com o endereço de cada uma.
+ * Desde 26/11/2026 (D-128, pedido do Enzo), nenhum dos dois estados fala de fase de testes, piloto, "quem testa" ou do acesso que "abre no
+ * lançamento", e a chamada principal de todas as páginas é "Assine aqui":
+ *   - pré-lançamento (`lancado: false`, o padrão): "Assine aqui" leva aos planos (a seção Planos da página inicial, ou `planos.html` das
+ *     outras páginas), que mostram a fita "Em breve" em cada cartão; o botão do menu é "Entrar", para a tela de entrar do app web. Nenhum
+ *     convite a criar conta e nenhum link para a tela inicial do app web, que convida a criar conta (D-064: ninguém se cadastra antes do
+ *     plano pago do banco de dados; a venda continua fechada, `SUBSCRIBE_OPEN`);
+ *   - lançado (`lancado: true`): "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas
+ *     aparecem só com o endereço de cada uma.
+ * A demonstração (dados fictícios) não é mais chamada: fica só como um link de texto discreto em O app e em Use no navegador
+ * (`linkDaDemonstracao`).
  *
- * A assinatura pelo app (`SUBSCRIBE_OPEN` do núcleo) não é um segundo interruptor do site: enquanto ela está fechada, as páginas de planos
- * dizem "A assinatura pelo app abre no lançamento", e o estado recusa `lancado: true` (o site diria "Testar 14 dias grátis" ao lado dessa
- * frase). Para ver o site lançado antes de a assinatura abrir, só o JSON do `--estado` aceita `simularAssinaturaAberta: true`, e a geração
- * avisa e o `--final` recusa (`gerar.js`).
+ * A assinatura pelo app (`SUBSCRIBE_OPEN` do núcleo) não é um segundo interruptor do site: o estado recusa `lancado: true` enquanto ela está
+ * fechada (o site lançado mandaria "Assine aqui" para criar conta com a compra fechada). Para ver o site lançado antes de a assinatura abrir,
+ * só o JSON do `--estado` aceita `simularAssinaturaAberta: true`, e a geração avisa e o `--final` recusa (`gerar.js`).
  */
 const { ESTADO_DO_PRODUTO, URL_APP, URL_CRIAR_CONTA, URL_DEMO, URL_ENTRAR } = require('./config');
 const { esc } = require('./texto');
@@ -58,7 +61,7 @@ function estadoDoProduto(sobrescrever = {}) {
   if (estado.lancado && !estado.assinaturaAberta) {
     throw new Error(
       'estado do produto: "lancado: true" com a assinatura pelo app ainda fechada (SUBSCRIBE_OPEN = false em packages/core/src/plano.ts). ' +
-        'O site lançado diria "Testar 14 dias grátis" ao lado de "A assinatura pelo app abre no lançamento". Abra a assinatura no núcleo ' +
+        'O site lançado mandaria "Assine aqui" para a tela de criar conta com a compra ainda fechada. Abra a assinatura no núcleo ' +
         '(SUBSCRIBE_OPEN = true, com a compra pelas lojas e pela web funcionando) e só depois mude "lancado" para true em scripts/site/config.js.',
     );
   }
@@ -99,84 +102,117 @@ function ondeEstaAberta(estado) {
 }
 
 /**
- * O estado do acesso, numa frase completa (Comece aqui e o fim da página inicial). Antes do lançamento, o texto que as peças das redes
- * podem repetir (a bio e a peça P03, `docs/44`): mudou em 25/11/2026 de "abre no piloto" para "abre no lançamento", a mesma palavra da
- * seção Planos ("A assinatura pelo app abre no lançamento").
+ * O acesso, numa frase, só no site lançado (o fim do início e do MEI): onde a Clarevo está aberta e o teste grátis. Antes do lançamento, nada
+ * (D-128: nenhuma frase de fase de testes nem de "abre no lançamento"; os planos dizem "Em breve").
  */
 function textoDoAcesso(estado) {
-  if (!estado.lancado) return 'A Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play. Até lá, veja a demonstração e acompanhe as Novidades. Empresas já podem pedir uma apresentação.';
+  if (!estado.lancado) return '';
   return `A Clarevo está aberta para todas as pessoas ${ondeEstaAberta(estado)}. Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.`;
 }
 
 /**
- * "Onde usar", nos fatos do kit de imprensa: antes do lançamento, a fase de testes e onde o acesso vai abrir; depois, onde a Clarevo está
- * aberta (a web e cada loja com endereço). Sem "em breve": depois do lançamento, a loja sem endereço simplesmente não aparece.
+ * "Onde usar", nos fatos do kit de imprensa: antes do lançamento, a web e as lojas em breve; depois, onde a Clarevo está aberta (a web e cada
+ * loja com endereço). Depois do lançamento, a loja sem endereço simplesmente não aparece.
  */
 function ondeUsar(estado) {
-  if (!estado.lancado) return 'a Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play.';
+  if (!estado.lancado) return 'na web, no navegador do computador ou do celular. O app para iPhone e Android chega em breve à App Store e ao Google Play.';
   return `${ondeEstaAberta(estado)}.`;
 }
 
-/** A linha curta embaixo das chamadas da capa (início e página do MEI). */
+/**
+ * O celular, numa frase (o bloco "Use no navegador ou no celular" do início, Use no navegador e Comece aqui): antes do lançamento, o navegador
+ * e o app das lojas em breve; depois, o navegador e o app de cada loja com endereço.
+ */
+function noCelular(estado) {
+  const lojas = lojasPublicadas(estado);
+  if (!estado.lancado) return 'No celular, use o navegador. O app para iPhone e Android chega em breve à App Store e ao Google Play.';
+  if (!lojas.length) return 'No celular, use o navegador do aparelho.';
+  return `No celular, use o navegador ou o app para ${lojas.map((l) => (l.id === 'appStore' ? 'iPhone, na App Store' : 'Android, no Google Play')).join(', ou para ')}.`;
+}
+
+/**
+ * A linha curta embaixo das chamadas da capa (início, Comece aqui, MEI e Use no navegador). Antes do lançamento, a assinatura em breve, com
+ * as condições do teste; depois, só as condições.
+ */
 function linhaDaCapa(estado) {
   const dias = diasDeTeste();
-  // Depois do lançamento, o botão já diz "Testar 14 dias grátis": a linha não repete os dias.
-  return estado.lancado ? 'Sem cartão. Cancele quando quiser.' : `Em fase de testes: o acesso abre no lançamento, com ${dias} dias grátis, sem cartão.`;
-}
-
-/** A etiqueta acima dos preços, antes do lançamento: os planos são os preços do lançamento. */
-function rotuloDosPrecos(estado) {
-  return estado.lancado ? '' : 'Preços no lançamento';
+  return estado.lancado ? `${dias} dias grátis, sem cartão. Cancele quando quiser.` : `Assinatura em breve, com ${dias} dias grátis, sem cartão. Cancele quando quiser.`;
 }
 
 /**
- * A frase da tela Assinatura do app enquanto a assinatura está fechada ("A assinatura pelo app abre no lançamento. Até lá, nada é
- * cobrado.", `ACCESS_TEXT.notOpenYet`), nas páginas de planos e na seção Planos do início; vazia com a assinatura aberta. Segue o mesmo
- * estado: como `lancado: true` exige a assinatura aberta (`estadoDoProduto`), ela nunca aparece no site lançado.
+ * A fita "Em breve" de cada cartão de plano (D-128), antes do lançamento: um selo vermelho na diagonal do canto de cima, só desenho
+ * (`aria-hidden`), com o mesmo "Em breve" no título do cartão para o leitor de tela (`emBreveNoTitulo`). Depois do lançamento, nada.
  */
-function avisoDaAssinatura(estado) {
-  return estado.assinaturaAberta ? '' : require('./catalogo').catalogo().PLANOS.texto.notOpenYet;
+function fitaEmBreve(estado) {
+  return estado.lancado ? '' : '<span class="fita-em-breve" aria-hidden="true">Em breve</span>';
+}
+function emBreveNoTitulo(estado) {
+  return estado.lancado ? '' : '<span class="so-leitor"> (em breve)</span>';
 }
 
 /**
- * As duas chamadas da capa, que dizem aonde levam (NN/g, "Get Started"): depois do lançamento, "Testar 14 dias grátis" (a tela de criar
- * conta do app web) e "Ver a demonstração"; antes, "Ver a demonstração" e "Como ter acesso" (o estado do acesso, em Comece aqui).
- * `arquivo`: a página, para o caminho relativo.
+ * A chamada principal de todas as páginas (D-128): "Assine aqui". Antes do lançamento, leva aos planos (a seção Planos da página inicial ou
+ * `planos.html`), que mostram "Em breve"; depois, à tela de criar conta do app web. `arquivo`: a página, para o caminho relativo.
  */
-function chamadas(arquivo, estado, { cenario = null } = {}) {
-  const externo = (href, classe, texto) => `<a class="botao ${classe}" href="${esc(href)}" rel="noopener noreferrer">${esc(texto)}</a>`;
-  // `cenario`: um cenário fictício da demonstração (`?cenario=negocio`, o "Sacolé da Maria", na página do MEI). Não é rastreamento: a
-  // demonstração só escolhe os dados fictícios que mostra (`apps/app/src/lib/demo-auth.ts`).
-  const enderecoDaDemo = cenario ? `${URL_DEMO}/?cenario=${encodeURIComponent(cenario)}` : URL_DEMO;
-  const demo = (classe) => externo(enderecoDaDemo, classe, 'Ver a demonstração');
-  if (estado.lancado) return `<div class="acoes">\n${externo(URL_CRIAR_CONTA, 'botao-principal', `Testar ${diasDeTeste()} dias grátis`)}\n${demo('botao-suave')}\n</div>`;
-  return `<div class="acoes">\n${demo('botao-principal')}\n<a class="botao botao-suave" href="${rel(arquivo, 'comece.html')}#acesso">Como ter acesso</a>\n</div>`;
+function assineAqui(arquivo, estado) {
+  if (estado.lancado) return { href: URL_CRIAR_CONTA, texto: 'Assine aqui', externo: true };
+  return { href: arquivo === 'index.html' ? '#planos' : rel(arquivo, 'planos.html'), texto: 'Assine aqui', externo: false };
+}
+
+/** As chamadas secundárias (D-128): a página O app ou a página da versão web. A demonstração não é chamada. */
+const SECUNDARIAS = {
+  app: { pagina: 'app/index.html', texto: 'Conheça o app' },
+  web: { pagina: 'web.html', texto: 'Use no navegador' },
+};
+
+/**
+ * As chamadas de uma capa ou de uma chamada final, no máximo dois botões (D-128): "Assine aqui" e, se pedida, a secundária (`secundaria`:
+ * `app`, "Conheça o app", ou `web`, "Use no navegador"). `arquivo`: a página, para o caminho relativo.
+ */
+function chamadas(arquivo, estado, { secundaria = null } = {}) {
+  const principal = assineAqui(arquivo, estado);
+  const botoes = [`<a class="botao botao-principal" href="${esc(principal.href)}"${principal.externo ? ' rel="noopener noreferrer"' : ''}>${esc(principal.texto)}</a>`];
+  if (secundaria) {
+    const s = SECUNDARIAS[secundaria];
+    if (!s) throw new Error(`a chamada secundária "${secundaria}" não existe (use app ou web)`);
+    if (s.pagina !== arquivo) botoes.push(`<a class="botao botao-suave" href="${rel(arquivo, s.pagina)}">${esc(s.texto)}</a>`);
+  }
+  return `<div class="acoes">\n${botoes.join('\n')}\n</div>`;
 }
 
 /**
- * A chamada do cabeçalho: depois do lançamento, "Testar grátis" (a tela de criar conta); antes, "Entrar (quem testa)", que leva à tela de
- * entrar do app web e diz para quem é. Até 25/11/2026 era "Abrir a versão web", para a tela inicial do app, que começa com "14 dias grátis,
- * sem cartão" e "Criar conta" enquanto o site diz que o acesso abre no lançamento (D-064).
+ * A demonstração (dados fictícios), só como link de texto discreto (D-128), e só em O app e em Use no navegador. Igual nos dois estados: a
+ * demonstração abre sem conta e não grava nada fora do aparelho.
+ */
+function linkDaDemonstracao() {
+  return `<p class="link-demo"><a href="${esc(URL_DEMO)}" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>`;
+}
+
+/**
+ * A chamada do cabeçalho: antes do lançamento, "Entrar", que leva à tela de entrar do app web (até 26/11/2026, "Entrar (quem testa)"; D-128);
+ * depois, "Assine aqui", para a tela de criar conta, como a chamada principal das páginas. Nunca a tela inicial do app web antes do
+ * lançamento: ela começa com "14 dias grátis, sem cartão" e "Criar conta" (D-064).
  */
 function chamadaDoMenu(estado) {
-  return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Testar grátis' } : { href: URL_ENTRAR, texto: 'Entrar (quem testa)' };
+  return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Assine aqui' } : { href: URL_ENTRAR, texto: 'Entrar' };
 }
 
 /**
  * O link para a versão web no meio de um texto (O app, "Onde usar"), em HTML: depois do lançamento, "Abrir a versão web" (a tela inicial do
- * app web, com criar conta e entrar); antes, só a tela de entrar, para quem já testa.
+ * app web, com criar conta e entrar); antes, só a tela de entrar, para quem já tem conta.
  */
 function linkDaVersaoWeb(estado) {
   const link = (href, texto) => `<a href="${esc(href)}" rel="noopener noreferrer">${esc(texto)}</a>`;
-  return estado.lancado ? `${link(URL_APP, 'Abrir a versão web')}.` : `Para quem já testa a Clarevo: ${link(URL_ENTRAR, 'Entrar na versão web')}.`;
+  return estado.lancado ? `${link(URL_APP, 'Abrir a versão web')}.` : `Já tem conta? ${link(URL_ENTRAR, 'Entrar na versão web')}.`;
 }
 
 /**
- * O app que qualquer pessoa pode abrir agora, para a nota das calculadoras ("ou use a ... da Clarevo"): depois do lançamento, a versão web;
- * antes, a demonstração, que abre sem conta (a tela inicial do app web convida a criar conta, D-064).
+ * O app que qualquer pessoa pode abrir agora, para a nota das calculadoras ("ou use a versão web da Clarevo"): só depois do lançamento.
+ * Antes, nenhum (D-128: a demonstração não é mais oferecida fora de O app e de Use no navegador, e a tela inicial do app web convida a
+ * criar conta, D-064).
  */
 function appParaUsar(estado) {
-  return estado.lancado ? { href: URL_APP, texto: 'versão web' } : { href: URL_DEMO, texto: 'demonstração' };
+  return estado.lancado ? { href: URL_APP, texto: 'versão web' } : null;
 }
 
 /**
@@ -203,10 +239,13 @@ module.exports = {
   lojasPublicadas,
   textoDoAcesso,
   ondeUsar,
+  noCelular,
   linhaDaCapa,
-  rotuloDosPrecos,
-  avisoDaAssinatura,
+  fitaEmBreve,
+  emBreveNoTitulo,
+  assineAqui,
   chamadas,
+  linkDaDemonstracao,
   chamadaDoMenu,
   linkDaVersaoWeb,
   appParaUsar,

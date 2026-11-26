@@ -52,7 +52,7 @@ function paginaMei({ valores, img, estado }) {
 <p class="sobretitulo">Para quem trabalha por conta e MEI</p>
 <h1>O dinheiro do negócio separado do da casa.</h1>
 <p class="lead">No Espaço Negócio, você anota o que entra e o que sai do trabalho, vê quanto sobrou no mês e leva para o Pessoal o que é seu, sem misturar as contas. Incluído na assinatura, sem custo a mais.</p>
-${chamadas(ARQUIVO, estado, { cenario: 'negocio' })}
+${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
 ${selosDasLojas(estado)}
 </div>
@@ -90,9 +90,9 @@ ${lista(LEVE_E_SO_SEU)}
     ),
     bloco(
       `<div class="chamada-final">
-<h2 id="comecar">${estado.lancado ? 'Comece pelo mês do negócio' : 'Veja um negócio de exemplo'}</h2>
-<p>${esc(estado.lancado ? `Crie a conta e, em Conta, crie o Espaço Negócio só com o nome. As telas de sempre passam a valer para ele. ${textoDoAcesso(estado)}` : 'A demonstração tem um negócio fictício, o Sacolé da Maria, com entradas, saídas e retiradas. Nada é gravado fora do seu aparelho. O acesso para pessoas e famílias abre no lançamento.')}</p>
-${chamadas(ARQUIVO, estado, { cenario: 'negocio' })}
+<h2 id="comecar">Comece pelo mês do negócio</h2>
+<p>${esc(`Escolha o plano e, em Conta, crie o Espaço Negócio só com o nome. As telas de sempre passam a valer para ele, no navegador ou no celular.${estado.lancado ? ` ${textoDoAcesso(estado)}` : ''}`)}</p>
+${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
 <p class="pequeno"><a href="${u('ajuda/negocio.html')}#guia-negocio">Como usar o Espaço Negócio, na Ajuda</a> · <a href="${u('planos.html')}">Ver os planos</a></p>
 </div>`,
       { rotulo: 'comecar' },

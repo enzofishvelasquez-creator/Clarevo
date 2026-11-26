@@ -143,6 +143,8 @@ const PAGINAS_BASE = [
   'index.html',
   'comece.html',
   'app/index.html',
+  // A versão web (D-128, 26/11/2026).
+  'web.html',
   'planos.html',
   'planos/individual.html',
   'planos/familia.html',
@@ -188,9 +190,9 @@ const SEM_INDEXAR = ['404.html', 'noticias/materia.html'];
 const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...PAGINAS_DE_MERCADO, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /**
  * As páginas do menu principal (a página atual é marcada com aria-current). Desde 25/11/2026 (D-125), Planos e a página do MEI entraram;
- * "Início" saiu (o logotipo leva ao início) e Novidades ficou no rodapé.
+ * "Início" saiu (o logotipo leva ao início) e Novidades ficou no rodapé. Desde 26/11/2026 (D-128), "Na web" (`web.html`).
  */
-const NO_MENU = ['app/index.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html', 'seguranca.html'];
+const NO_MENU = ['app/index.html', 'web.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html', 'seguranca.html'];
 
 const VAZIOS = Object.fromEntries(MARCADORES.map((m) => [m, '']));
 const PREENCHIDOS: Record<string, string> = {
@@ -390,7 +392,7 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     else if (/^novidades\//.test(nome)) expect(cabecalho, `${nome}: Novidades fora do menu`).not.toMatch(/secao-atual|aria-current/);
     // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of ['index.html', 'comece.html', 'app/index.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+    for (const p of ['index.html', 'comece.html', 'app/index.html', 'web.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
@@ -819,31 +821,41 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  // D-125 (25/11/2026, estudo "Clarevo frente ao mercado"): o título diz numa frase o que o app faz; a mensagem central de antes virou a
-  // assinatura pequena acima dele; seis blocos (capa, três portas, como funciona, "Você decide o que entra", Planos e a chamada final); as
-  // chamadas seguem o estado do produto (antes do lançamento, a demonstração e "Como ter acesso", sem criar conta); a faixa de confiança
-  // começa por "Você decide o que entra". O que saiu da página foi para as páginas próprias (Segurança, Para empresas, Sobre, indicadores).
-  it('a página inicial diz numa frase o que o app faz, com a frase de marca como assinatura, seis blocos, as chamadas do estado do produto, a faixa "Você decide o que entra", os dois vídeos e nada de selo nem número de uso', () => {
+  // D-125 (25/11/2026, estudo "Clarevo frente ao mercado") e D-128 (26/11/2026, pedido do Enzo): o título é de novo a frase da marca, sem
+  // frase pequena acima, e o benefício concreto é a primeira frase do subtítulo; blocos curtos (capa, três portas, como funciona, "Você
+  // decide o que entra", Planos, "Use no navegador ou no celular", as perguntas frequentes e a chamada final); as chamadas são "Assine aqui"
+  // (antes do lançamento, para a seção Planos) e "Conheça o app", sem a demonstração; a faixa de confiança começa por "Você decide o que
+  // entra". O que saiu da página foi para as páginas próprias (Segurança, Para empresas, Sobre, indicadores).
+  it('a página inicial: a frase da marca como título, o benefício no subtítulo, os blocos na ordem, "Assine aqui" para os planos, a faixa "Você decide o que entra", os dois vídeos e nada de selo nem número de uso', () => {
     const h = html('index.html');
-    const titulo = '<h1>Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.</h1>';
+    const titulo = '<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>';
     expect(h).toContain(titulo);
-    expect(h).not.toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
-    // A frase de marca, pequena, logo acima do título.
-    expect(h).toContain(`<p class="assinatura-marca">Cuidar da vida financeira faz parte de cuidar de você.</p>\n${titulo}`);
-    expect(h).not.toContain('Organize seu mês e aprenda');
+    // D-128: nenhuma frase pequena acima do título, e o benefício concreto abrindo o subtítulo, logo abaixo.
+    expect(h).toContain(`<div class="capa-grade">\n<div>\n${titulo}\n<p class="lead">Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Veja o que entrou, o que saiu e o que ainda vai vencer.</p>`);
+    expect(h).not.toContain('class="assinatura-marca"');
+    expect(h).not.toContain('Organize as contas');
     expect(h).not.toContain('class="frase-apoio"');
-    // Os seis blocos, na ordem.
-    expect([...h.matchAll(/<section class="bloco[^"]*" aria-labelledby="([^"]+)"/g)].map((m) => m[1])).toEqual(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'comecar']);
-    // Antes do lançamento (o padrão em config.js): a demonstração e "Como ter acesso"; nenhum link para criar conta; a linha do acesso.
+    // Os blocos, na ordem.
+    expect([...h.matchAll(/<section class="bloco[^"]*" aria-labelledby="([^"]+)"/g)].map((m) => m[1])).toEqual(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'na-web', 'perguntas', 'comecar']);
+    // Antes do lançamento (o padrão em config.js): "Assine aqui" para a seção Planos e "Conheça o app"; nada de demonstração, de criar conta
+    // nem de fase de testes; a linha curta da assinatura em breve.
     const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
-    expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver a demonstração</a>\n<a class="botao botao-suave" href="comece.html#acesso">Como ter acesso</a>\n</div>');
-    expect(capa).toContain('<p class="estado-produto">Em fase de testes: o acesso abre no lançamento, com 14 dias grátis, sem cartão.</p>');
+    expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="#planos">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
+    expect(capa).toContain('<p class="estado-produto">Assinatura em breve, com 14 dias grátis, sem cartão. Cancele quando quiser.</p>');
+    expect(h).toContain('<h2 id="planos">');
+    expect(h).not.toMatch(/demo\.clarevo|Ver a demonstração|Como ter acesso|fase de testes|comece\.html#acesso/);
     expect(h).not.toContain('/criar-conta');
     expect(h).not.toContain('class="selo-loja"');
-    // O botão do menu, antes do lançamento, leva só à tela de entrar de quem já testa (D-064: a tela inicial do app web convida a criar
-    // conta). Todas as páginas, nos dois estados, em site-estado.test.ts.
-    expect(h).toContain('<a class="menu-cta" href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar (quem testa)</a>');
+    // O botão do menu, antes do lançamento, é "Entrar", para a tela de entrar (D-128; D-064: a tela inicial do app web convida a criar conta).
+    // Todas as páginas, nos dois estados, em site-estado.test.ts.
+    expect(h).toContain('<a class="menu-cta" href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar</a>');
     expect(h).not.toContain('href="https://app.clarevo.app.br"');
+    // A chamada final: "Assine aqui" e "Use no navegador".
+    const final = /<div class="chamada-final">[\s\S]*?<\/div>\n<\/div>/.exec(h)![0];
+    expect(final).toContain('<h2 id="comecar">Comece pelo seu mês</h2>');
+    expect(final).toContain('<a class="botao botao-principal" href="#planos">Assine aqui</a>\n<a class="botao botao-suave" href="web.html">Use no navegador</a>');
+    // Nenhum bloco de chamadas com mais de dois botões.
+    for (const m of h.matchAll(/<(?:div|p) class="acoes">([\s\S]*?)<\/(?:div|p)>/g)) expect(m[1]!.match(/class="botao /g)?.length ?? 0).toBeLessThanOrEqual(2);
     // A faixa de confiança: um link só para Segurança e privacidade, com "Você decide o que entra" (era "Sem conexão com o seu banco").
     expect(h).not.toContain('Sem conexão com o seu banco');
     const faixa = /<p class="confianca"><a href="seguranca\.html">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
@@ -866,36 +878,80 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
     expect(h).not.toContain('não é atendimento de saúde');
     expect(h).not.toContain('eficácia clínica');
-    // Os dois vídeos: o Resumo na capa e a fatura por print em "Como funciona"; nenhuma captura parada.
+    // Os dois vídeos: o Resumo na capa e a fatura por print em "Como funciona"; nenhuma captura de celular parada. A tela do computador do
+    // bloco "Use no navegador ou no celular" é a terceira tela com a legenda da demonstração.
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(2);
     expect(h).not.toMatch(/<figure class="celular">/);
-    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(2);
-    for (const alvo of ['app/index.html', 'empresas/index.html', 'mei.html', 'planos.html', 'seguranca.html', 'sobre.html']) expect(h, alvo).toContain(`href="${alvo}"`);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(3);
+    for (const alvo of ['app/index.html', 'web.html', 'empresas/index.html', 'mei.html', 'planos.html', 'seguranca.html', 'sobre.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. "R$" com número só na seção Planos; "grátis" só na
-    // seção Planos, na linha do acesso da capa e na chamada final (o teste grátis faz parte do estado do produto).
+    // seção Planos, na linha curta da capa e nas perguntas (o teste grátis é uma condição do plano).
     const foraDosPlanos = h.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
     expect(foraDosPlanos).not.toBe(h);
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(foraDosPlanos).not.toMatch(/R\$\s?\d/);
-    expect(foraDosPlanos.replace(/<p class="estado-produto">[^<]*<\/p>/, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')).not.toMatch(/gr[áa]tis/i);
+    expect(
+      foraDosPlanos
+        .replace(/<p class="estado-produto">[^<]*<\/p>/, '')
+        .replace(/<section[^>]*aria-labelledby="perguntas"[\s\S]*?<\/section>/, '')
+        .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, ''),
+    ).not.toMatch(/gr[áa]tis/i);
     expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes|Clarevo Plus/i);
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
-    // Os dados estruturados: Organization (com a frase de marca) e SoftwareApplication (sem nota nem avaliação). Antes do lançamento, sem
-    // oferta: os preços são os do lançamento e ninguém assina ainda (os dois planos mensais com preço, no site lançado, em site-estado.test.ts).
+    // Os dados estruturados: Organization (com a frase de marca), SoftwareApplication (sem nota nem avaliação) e FAQPage (D-128). Antes do
+    // lançamento, sem oferta: os planos estão "Em breve" e ninguém assina ainda (os planos com preço, no site lançado, em site-estado.test.ts).
     const dados = [...h.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]!));
-    expect(dados.map((d) => d['@type'])).toEqual(['Organization', 'SoftwareApplication']);
+    expect(dados.map((d) => d['@type'])).toEqual(['Organization', 'SoftwareApplication', 'FAQPage']);
     expect(dados[0].slogan).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
     expect(dados[1]).toMatchObject({ name: 'Clarevo', applicationCategory: 'FinanceApplication', operatingSystem: 'Web' });
     expect(dados[1]).not.toHaveProperty('offers');
     expect(JSON.stringify(dados[1])).not.toMatch(/aggregateRating|ratingValue/);
   });
 
-  // Planos (16/11/2026, pedido do Enzo): no início, com os nomes, os preços e as frases do núcleo; enquanto a assinatura não abre, a frase
-  // da tela Assinatura diz que nada é cobrado até o lançamento.
-  it('Planos: os dois planos com os textos do núcleo e, com a assinatura fechada, o aviso de que nada é cobrado até o lançamento', () => {
+  // D-128 (pedido do Enzo, 26/11/2026): entre os Planos e a chamada final, "Use no navegador ou no celular" (com o link para web.html) e as
+  // perguntas frequentes, com respostas curtas e verdadeiras e os dados estruturados FAQPage com o mesmo texto.
+  it('a página inicial tem "Use no navegador ou no celular" e seis perguntas frequentes, com FAQPage igual ao texto e sem prometer recurso futuro', () => {
+    const h = html('index.html');
+    const web = /<section[^>]*aria-labelledby="na-web"[\s\S]*?<\/section>/.exec(h)![0];
+    expect(web).toContain('<h2 id="na-web">Use no navegador ou no celular</h2>');
+    for (const t of ['A mesma conta na web e no celular, com os mesmos dados', 'nada para instalar', 'o menu ao lado', 'cartão ou Pix, pelo serviço de pagamento, com os mesmos preços das lojas', 'chega em breve à App Store e ao Google Play']) expect(web, t).toContain(t);
+    expect(web).toContain('<a class="botao botao-suave" href="web.html">Ver como é usar no navegador</a>');
+    expect(web).toMatch(/<figure class="larga so-tela-larga"><div class="larga-moldura"><img src="imagens\/computador-resumo\.[0-9a-f]{10}\.png" alt="A Clarevo no navegador do computador[^"]+" width="960" height="\d+" loading="lazy"/);
+    expect(web).not.toMatch(/desconto|mais barato|R\$\s?\d/i);
+    const perguntas = /<section[^>]*aria-labelledby="perguntas"[\s\S]*?<\/section>/.exec(h)![0];
+    const resumos = [...perguntas.matchAll(/<summary>([^<]+)<\/summary>/g)].map((m) => m[1]);
+    expect(resumos).toEqual([
+      'Posso cancelar quando quiser?',
+      'Quem vê os meus dados?',
+      'A Clarevo se conecta ao meu banco?',
+      'Como funciona o plano Família?',
+      'Tenho MEI ou trabalho por conta. Serve para mim?',
+      'O que acontece depois dos 14 dias grátis?',
+    ]);
+    // Recolhidas (sem JavaScript), no desenho das de Segurança.
+    expect(perguntas.match(/<details class="duvida" id="pergunta-[a-z-]+">/g)?.length).toBe(6);
+    expect(perguntas).not.toMatch(/<details[^>]*\sopen/);
+    // Respostas verdadeiras: o Pessoal só da pessoa, a empresa sem finanças, sem conexão com banco, a Família de até 6 pessoas, o Espaço
+    // Negócio incluído e o "só ver e exportar". Nada de Open Finance, de recurso futuro nem de nome de banco.
+    for (const t of ['O seu Pessoal é só seu', 'nunca os seus valores, categorias ou metas', 'não se conecta a bancos e não pede senha bancária', 'Até 6 pessoas na mesma assinatura', 'O Espaço Negócio vem nos dois planos, sem custo a mais', 'só para ver e exportar', 'Nada é cobrado sem você assinar.']) expect(perguntas, t).toContain(t);
+    expect(perguntas).not.toMatch(/Open Finance|em breve|futur|ainda não|por enquanto|\bhoje\b|Telegram|WhatsApp/i);
+    const faq = [...h.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]!)).find((d) => d['@type'] === 'FAQPage');
+    expect(faq.mainEntity.map((q: { name: string }) => q.name)).toEqual(resumos);
+    for (const q of faq.mainEntity as { '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }[]) {
+      expect(q['@type']).toBe('Question');
+      expect(q.acceptedAnswer['@type']).toBe('Answer');
+      expect(perguntas).toContain(`<p>${q.acceptedAnswer.text}</p>`);
+    }
+  });
+
+  // Planos (16/11/2026, pedido do Enzo): no início, com os nomes, os preços e as frases do núcleo. Desde 26/11/2026 (D-128), antes do
+  // lançamento cada cartão leva a fita "Em breve" (com o "em breve" também no título, para o leitor de tela), e a frase "A assinatura pelo app
+  // abre no lançamento" e a etiqueta "Preços no lançamento" saíram; embaixo dos cartões, uma linha só com o teste e o "só ver e exportar".
+  it('Planos: os dois planos com os textos do núcleo, a fita "Em breve" só antes do lançamento e uma linha só com o teste, sem nada de "lançamento"', () => {
     const h = html('index.html');
     expect(h).toContain('<h2 id="planos">');
-    expect(h).toContain(ACCESS_TEXT.notOpenYet);
+    expect(h).not.toContain(ACCESS_TEXT.notOpenYet);
+    expect(h).not.toContain('Preços no lançamento');
     expect(SUBSCRIBE_OPEN).toBe(false);
     const { conteudoPlanos } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as {
       conteudoPlanos: (planos: unknown, u: (d: string) => string, estado?: { lancado: boolean; assinaturaAberta: boolean }) => string;
@@ -907,7 +963,8 @@ describe('site público: as páginas geradas', () => {
     expect(secao).toContain(`<h2 id="planos">${ACCESS_TEXT.plansTitle}</h2>`);
     expect(secao.match(/<h3>/g)?.length).toBe(2);
     for (const plano of ['individual', 'familiar'] as const) {
-      expect(secao).toContain(`<h3>${PLAN_NAME[plano]}</h3>`);
+      // A fita no canto, só desenho, e o "em breve" no título para o leitor de tela.
+      expect(secao).toContain(`<article class="cartao plano plano-link com-fita">\n<span class="fita-em-breve" aria-hidden="true">Em breve</span>\n<h3>${PLAN_NAME[plano]}<span class="so-leitor"> (em breve)</span></h3>`);
       // O site junta "R$" e o número com espaço sem quebra (esc), para o preço não partir entre linhas.
       expect(secao).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace("R$ ", "R$\u00a0")}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
       // D-127: o preço anual logo abaixo do mensal, com o equivalente por mês dito como equivalente, do núcleo.
@@ -915,18 +972,18 @@ describe('site público: as páginas geradas', () => {
         `<p class="preco-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (${PLAN_PERIOD_TEXT.equivalent(plano).replace(/^E/, 'e').replace('R$ ', 'R$\u00a0')})</p>`,
       );
     }
+    expect(secao.match(/class="fita-em-breve"/g)?.length).toBe(2);
     expect(secao).toContain('R$\u00a0269,90</span> por ano (equivale a R$\u00a022,49 por mês)');
     expect(secao).toContain('R$\u00a0629,90</span> por ano (equivale a R$\u00a052,49 por mês)');
     for (const p of ACCESS_TEXT.plans) expect(secao).toContain(p.who);
-    expect(secao).toContain(ACCESS_TEXT.plansNote);
-    // Os Termos sem âncora: o texto jurídico muda com o advogado, e a página de exemplo dos testes não tem o item 12.
-    expect(secao).toContain('href="termos.html"');
-    expect(secao).toContain('href="ajuda/conta.html#guia-assinatura"');
+    // Uma linha só embaixo dos cartões: o teste, o cancelamento e o "só ver e exportar", com o passo a passo da assinatura na Ajuda.
+    expect(secao).toContain('<p class="nota nota-planos">14 dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, só ver e exportar. <a href="ajuda/conta.html#guia-assinatura">Como funciona a assinatura</a></p>');
     expect(html('ajuda/conta.html')).toContain('id="guia-assinatura"');
-    expect(secao).not.toMatch(/[\u2013\u2014]/);
-    // Com a assinatura aberta (no estado do produto, que a lê do SUBSCRIBE_OPEN), o aviso sai.
-    expect(conteudoPlanos(PLANOS, (d) => d, { lancado: false, assinaturaAberta: false })).toContain(ACCESS_TEXT.notOpenYet);
-    expect(conteudoPlanos(PLANOS, (d) => d, { lancado: false, assinaturaAberta: true })).not.toContain(ACCESS_TEXT.notOpenYet);
+    expect(secao).not.toMatch(/[\u2013\u2014]|\b(?:no|até o|antes do|para o) lançamento\b/);
+    // Lançado, a fita some (e o título fica só com o nome).
+    const lancado = conteudoPlanos(PLANOS, (d) => d, { lancado: true, assinaturaAberta: true });
+    expect(lancado).not.toMatch(/fita-em-breve|em breve|com-fita/i);
+    for (const plano of ['individual', 'familiar'] as const) expect(lancado).toContain(`<article class="cartao plano plano-link">\n<h3>${PLAN_NAME[plano]}</h3>`);
   });
 
   // Espaço Negócio no site (D-115, a partir de D-113 e docs/52): o recurso em O app, com a tela da demonstração e o link da Ajuda, o
@@ -968,7 +1025,11 @@ describe('site público: as páginas geradas', () => {
     expect(textoMei).not.toMatch(/Plus|sóci|ajudante|compartilh|vários negócios|Contabilidade|contador/);
     // O limite do MEI sem o valor (o app mantém o número e a data da regra).
     expect(/<main[\s\S]*<\/main>/.exec(mei)![0]).not.toMatch(/R\$/);
-    expect(mei).toContain('href="https://demo.clarevo.app.br/?cenario=negocio"');
+    // D-128: a demonstração saiu da página do MEI (só fica como link de texto em O app e em Use no navegador); as chamadas são "Assine aqui",
+    // para os planos, e "Conheça o app" na capa e "Use no navegador" no fim.
+    expect(mei).not.toContain('demo.clarevo.app.br');
+    expect(mei).toContain('<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>');
+    expect(mei).toContain('<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="web.html">Use no navegador</a>');
     expect(mei).toContain('href="ajuda/negocio.html#guia-negocio"');
     for (const p of ['planos/individual.html', 'planos/familia.html']) expect(html(p), p).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
     for (const p of ['index.html', 'app/index.html', 'planos.html', 'planos/individual.html', 'planos/familia.html', 'mei.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
@@ -1044,7 +1105,7 @@ describe('site público: as páginas geradas', () => {
     const inicio = html('index.html');
     const secao = /<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/.exec(inicio)![0];
     for (const plano of ['individual', 'familiar'] as const) {
-      const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(secao)?.[0] ?? '';
+      const cartao = new RegExp(`<article class="cartao plano plano-link com-fita">\\n<span class="fita-em-breve" aria-hidden="true">Em breve</span>\\n<h3>${PLAN_NAME[plano]}<span class="so-leitor"> \\(em breve\\)</span></h3>[\\s\\S]*?</article>`).exec(secao)?.[0] ?? '';
       expect(cartao, plano).toContain(`<a href="${PAGINAS_DOS_PLANOS[plano]}">Ver o que o plano ${PLAN_NAME[plano]} inclui</a>`);
       expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
     }
@@ -1056,7 +1117,8 @@ describe('site público: as páginas geradas', () => {
     expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['comparar']);
     expect(h).not.toMatch(/id="recursos"|O que os dois planos incluem|grupos-recursos|recursos-plano/);
     for (const plano of ['individual', 'familiar'] as const) {
-      const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(h)?.[0] ?? '';
+      // Antes do lançamento (D-128), a fita "Em breve" no canto de cada cartão.
+      const cartao = new RegExp(`<article class="cartao plano plano-link com-fita">\\n<span class="fita-em-breve" aria-hidden="true">Em breve</span>\\n<h3>${PLAN_NAME[plano]}<span class="so-leitor"> \\(em breve\\)</span></h3>[\\s\\S]*?</article>`).exec(h)?.[0] ?? '';
       expect(cartao, plano).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
       expect(cartao, plano).toContain(`<span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano`);
       expect(cartao, plano).toContain(ACCESS_TEXT.plans.find((p) => p.plan === plano)!.who);
@@ -1064,7 +1126,11 @@ describe('site público: as páginas geradas', () => {
       expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
     }
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
-    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.notOpenYet, PLAN_PERIOD_TEXT.note]) expect(h, t).toContain(esc(t));
+    // D-128: uma linha só com o teste, o cancelamento e o "só ver e exportar"; nada de "Preços no lançamento" nem da frase da assinatura fechada.
+    expect(h).toContain('<p class="nota nota-planos">14 dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, só ver e exportar. <a href="ajuda/conta.html#guia-assinatura">Como funciona a assinatura</a></p>');
+    expect(h).toContain(esc(PLAN_PERIOD_TEXT.note));
+    expect(h).not.toContain(esc(ACCESS_TEXT.notOpenYet));
+    expect(h).not.toMatch(/Preços no lançamento|\b(?:no|até o|antes do|para o) lançamento\b/);
     // O anual não promete teste grátis (o anual no cartão é cobrado no dia; o teste é da conta, na nota dos planos).
     expect(h).not.toContain('mesmo teste grátis');
     // Preço só nos dois cartões; fora deles, nenhum "R$" com número.
@@ -1087,8 +1153,8 @@ describe('site público: as páginas geradas', () => {
       const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(p)![0];
       expect(capa, arquivo).toContain('<p class="migalha"><a href="../planos.html">Planos</a></p>');
       expect(capa, arquivo).toContain(`<h1>Plano ${PLAN_NAME[plano]}</h1>`);
-      // Antes do lançamento (D-125, o estado do produto em config.js), o preço leva a etiqueta "Preços no lançamento".
-      expect(capa, arquivo).toContain(`<p class="preco-capa"><span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth} <span class="etiqueta etiqueta-capa">Preços no lançamento</span></p>`);
+      // Antes do lançamento (D-128, o estado do produto em config.js), o preço leva a etiqueta "Em breve", como a fita dos cartões.
+      expect(capa, arquivo).toContain(`<p class="preco-capa"><span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth} <span class="etiqueta etiqueta-capa">Em breve</span></p>`);
       // D-127: o anual logo abaixo, na capa (o único lugar da página com preço).
       expect(capa, arquivo).toContain(`<p class="preco-capa-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (equivale a`);
       expect(p, arquivo).toContain(esc(PLAN_PERIOD_TEXT.note));
@@ -1125,7 +1191,9 @@ describe('site público: as páginas geradas', () => {
       expect(p).not.toMatch(/negócio (da|com a|em) Família|compartilh|sócio/i);
       // Como funciona a assinatura, com os textos do núcleo.
       const assinatura = /<h2 id="assinatura">[\s\S]*?<\/section>/.exec(p)![0];
-      for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet]) expect(assinatura, `${arquivo}: ${t}`).toContain(esc(t));
+      for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote]) expect(assinatura, `${arquivo}: ${t}`).toContain(esc(t));
+      // D-128: sem a frase da assinatura fechada ("abre no lançamento").
+      expect(p, arquivo).not.toContain(esc(ACCESS_TEXT.notOpenYet));
       expect(assinatura).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       // No fim: o outro plano e o resumo.
       const fim = PAGINAS_DOS_PLANOS[outro].replace('planos/', '');
@@ -1154,27 +1222,30 @@ describe('site público: as páginas geradas', () => {
     for (const loc of ['/planos', '/planos/individual', '/planos/familia']) expect(texto(g.arquivos.get('sitemap.xml')), loc).toContain(`<loc>https://exemplo.test${loc}</loc>`);
   });
 
-  it('Comece aqui (o link da bio, D-067): o que é a Clarevo, o estado real do acesso (o do estado do produto, D-125) e os oito caminhos, sem espera, sem data, sem script e sem rastreamento', () => {
+  // Desde 26/11/2026 (D-128, pedido do Enzo), Comece aqui deixou de explicar a fase de testes: é uma página neutra de como começar, igual nos
+  // dois estados do produto (só as chamadas e o celular seguem o estado), no mesmo endereço (a bio e os links que já circulam continuam).
+  it('Comece aqui (o link da bio, D-067): o que é a Clarevo, "Assine aqui", três passos para começar e oito caminhos, sem fase de testes, sem espera, sem data, sem demonstração, sem script e sem rastreamento', () => {
     const h = html('comece.html');
     const principal = /<main[\s\S]*<\/main>/.exec(h)![0];
     expect(h).toContain('<h1>Comece aqui</h1>');
-    // Desde 25/11/2026 (D-125): a promessa concreta, com a frase de marca pequena acima do título.
-    expect(h).toContain('<p class="assinatura-marca">Cuidar da vida financeira faz parte de cuidar de você.</p>\n<h1>Comece aqui</h1>');
+    expect(h).not.toContain('class="assinatura-marca"');
     const lead = /<p class="lead">([^<]+)<\/p>/.exec(h)![1]!;
     expect(lead).toContain('A Clarevo é um app para organizar as contas, os cartões e os gastos do mês, com o pessoal, a família e o negócio separados.');
     expect(lead).toContain('Não é banco, não movimenta dinheiro e não recomenda produtos financeiros.');
-    // O estado do acesso de hoje vem do estado do produto (scripts/site/estado.js): antes do lançamento, fase de testes, sem lista de
-    // espera nem data. Até 25/11/2026 dizia "abre no piloto"; agora "abre no lançamento", a mesma palavra de Planos.
-    const { textoDoAcesso, estadoDoProduto } = require(join(ROOT, 'scripts', 'site', 'estado.js')) as { textoDoAcesso: (e: unknown) => string; estadoDoProduto: () => { lancado: boolean } };
-    expect(estadoDoProduto().lancado).toBe(false);
-    expect(textoDoAcesso(estadoDoProduto())).toBe('A Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play. Até lá, veja a demonstração e acompanhe as Novidades. Empresas já podem pedir uma apresentação.');
-    expect(h).toContain('A Clarevo está em fase de testes. Para pessoas e famílias, o acesso abre no lançamento, na web, na App Store e no Google Play. Até lá, veja a demonstração e acompanhe as <a href="novidades/index.html">Novidades</a>. Empresas já podem <a href="empresas/index.html#apresentacao">pedir uma apresentação</a>.');
-    expect(principal).not.toMatch(/piloto|lista de espera|cadastre-se|inscreva|em breve|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|gr[áa]tis|teste gratuito|criar-conta/i);
-    // Os oito caminhos, nesta ordem; a demonstração é o endereço combinado, com noopener, e nenhum link leva parâmetro de rastreamento.
+    const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
+    // Os três passos, na ordem, cada um com o link dele; a âncora de antes (#acesso) deu lugar a #passos.
+    expect(h).not.toContain('id="acesso"');
+    const passos = /<h2 id="passos">Três passos para começar<\/h2>\n<ol class="passos">[\s\S]*?<\/ol>/.exec(h)![0];
+    expect([...passos.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1])).toEqual(['Escolha o plano', 'Use no navegador ou no celular', 'Dê os primeiros passos']);
+    expect([...passos.matchAll(/<p class="passo-link"><a href="([^"]+)">/g)].map((m) => m[1])).toEqual(['planos.html', 'web.html', 'ajuda/comecar.html']);
+    expect(passos).toContain('No celular, use o navegador. O app para iPhone e Android chega em breve à App Store e ao Google Play.');
+    expect(principal).not.toMatch(/fase de testes|em testes|piloto|quem (?:já )?testa|lançamento|Até lá|lista de espera|cadastre-se|inscreva|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|teste gratuito|criar-conta|demo\.clarevo|Ver a demonstração/i);
+    // Os oito caminhos, nesta ordem, sem a demonstração (D-128), e nenhum link leva parâmetro de rastreamento.
     const links = [...h.matchAll(/<a class="cartao" href="([^"]+)"[^>]*><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
     expect(links).toEqual([
-      ['Ver a demonstração', 'https://demo.clarevo.app.br'],
       ['O app', 'app/index.html'],
+      ['Use no navegador', 'web.html'],
       ['Planos', 'planos.html'],
       ['Para quem trabalha por conta e MEI', 'mei.html'],
       ['Para empresas', 'empresas/index.html'],
@@ -1182,8 +1253,6 @@ describe('site público: as páginas geradas', () => {
       ['Calculadoras', 'calculadoras/index.html'],
       ['Ajuda', 'ajuda/index.html'],
     ]);
-    expect(h).toContain('<a class="cartao" href="https://demo.clarevo.app.br" rel="noopener noreferrer">');
-    expect(h).toContain('Abra o app com dados fictícios, no navegador. Nada é gravado fora do seu aparelho.');
     for (const m of h.matchAll(/\s(?:href|src)="([^"]*)"/g)) expect(m[1], `link com parâmetro: ${m[1]}`).not.toMatch(/[?&]|utm_|fbclid|gclid|igshid/i);
     // Nenhum script (só dados estruturados, se houver, e o tema do site, que toda página tem desde D-115), nenhum formulário e nenhum
     // recurso de fora.
@@ -1213,13 +1282,19 @@ describe('site público: as páginas geradas', () => {
     const mais = /<h2 id="mais">E mais<\/h2>[\s\S]*?<\/section>/.exec(h)![0];
     expect(mais).toMatch(/^<h2 id="mais">E mais<\/h2>\n<div class="grade grade-texto">\n<article class="cartao sem-captura">\n<h3>Lembretes<\/h3>/);
     expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(mais)![0].match(/<article class="cartao">/g)?.length).toBe(3);
-    // Antes do lançamento (o estado do produto, D-125), a web aparece "em fase de testes", e as chamadas da capa são as do estado.
-    expect(h).toContain('Na web, em fase de testes');
-    // O link da versão web, antes do lançamento, só para a tela de entrar de quem já testa (D-064), e nenhum para a tela inicial do app.
-    expect(h).toContain('<p>A versão web da Clarevo funciona no navegador do celular ou do computador. Para quem já testa a Clarevo: <a href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar na versão web</a>.</p>');
+    // D-128: nada de fase de testes; a web com o link para Use no navegador e, antes do lançamento, só a tela de entrar de quem já tem conta
+    // (D-064), nenhum link para a tela inicial do app.
+    expect(h).toContain('<h3>Na web</h3>');
+    expect(h).not.toMatch(/fase de testes|quem (?:já )?testa/);
+    expect(h).toContain('<p>A versão web da Clarevo funciona no navegador do computador ou do celular, sem instalar nada, com a mesma conta do app para celular. <a href="../web.html">Use a Clarevo no navegador</a>. Já tem conta? <a href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar na versão web</a>.</p>');
     expect(h).not.toContain('href="https://app.clarevo.app.br"');
     expect(h).not.toContain('Abrir a versão web');
-    expect(h).toContain('<a class="botao botao-principal" href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver a demonstração</a>');
+    // As chamadas da capa: "Assine aqui" (para os planos, antes do lançamento) e "Use no navegador"; a demonstração só como link de texto
+    // discreto logo abaixo (D-128), nunca como botão.
+    const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="../planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="../web.html">Use no navegador</a>\n</div>\n<p class="link-demo"><a href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>');
+    expect(h.match(/demo\.clarevo\.app\.br/g)?.length).toBe(1);
+    expect(h).not.toMatch(/class="botao[^"]*" href="https:\/\/demo\./);
     expect(h).toContain('tocar num vídeo pausa ou toca de novo');
     expect(h).not.toContain('botão redondo');
     // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
@@ -1236,6 +1311,57 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(h).not.toMatch(/gr[áa]tis|R\$\s?\d+,\d{2}\s*(por|\/)\s*m[eê]s/i);
+  });
+
+  // D-128 (pedido do Enzo, 26/11/2026): a página da versão web, para incentivar o uso no navegador. Só o que o app faz hoje: sem instalar,
+  // a mesma conta, o desenho largo com o menu ao lado (as telas de verdade do computador) e o pagamento na web pelo serviço de pagamento, com
+  // os mesmos preços das lojas (sem desconto na web). A demonstração só como link de texto discreto.
+  it('Use a Clarevo no navegador (web.html): sem instalar, a mesma conta, as telas do computador, cartão ou Pix pelo serviço de pagamento, os mesmos preços, "Assine aqui" e a demonstração como link de texto', () => {
+    const h = html('web.html');
+    expect(h).toContain('<h1>Use a Clarevo no navegador</h1>');
+    const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
+    expect(capa).toContain('<p class="link-demo"><a href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>');
+    expect(h.match(/demo\.clarevo\.app\.br/g)?.length).toBe(1);
+    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['no-navegador', 'no-computador', 'pagar', 'comecar']);
+    for (const t of ['Nada para instalar', 'A mesma conta do celular', 'A tela larga do computador', 'o menu fica ao lado']) expect(h, t).toContain(t);
+    // As telas de verdade do computador, gravadas da demonstração (docs/telas/630 e 631), com a legenda de sempre.
+    expect(h).toMatch(/<img src="imagens\/computador-resumo\.[0-9a-f]{10}\.png" alt="A Clarevo no navegador do computador[^"]+" width="960" height="\d+"/);
+    expect(h).toMatch(/<img src="imagens\/computador-movimentos\.[0-9a-f]{10}\.png" alt="Movimentos no navegador do computador[^"]+" width="960" height="\d+"/);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(2);
+    // O pagamento na web: cartão (renova sozinho, mês ou ano, cancela na tela Assinatura) e Pix (um mês ou um ano por vez, com o aviso do
+    // Resumo), pelo serviço de pagamento, sem dado do cartão na Clarevo, e os mesmos preços das lojas; antes do lançamento, "Em breve".
+    const pagar = /<h2 id="pagar">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(pagar).toContain('<h2 id="pagar">Assinar na web <span class="etiqueta">Em breve</span></h2>');
+    for (const t of ['renova sozinha a cada mês ou a cada ano', 'use a tela Assinatura do app', 'Com Pix, você paga um mês ou um ano de cada vez.', 'O Pix não renova sozinho', 'pelo serviço de pagamento', 'nunca na Clarevo', 'Os preços são os mesmos na web, na App Store e no Google Play']) expect(pagar, t).toContain(t);
+    expect(h).not.toMatch(/desconto|mais barat|economi|R\$\s?\d|Open Finance|fase de testes|Clarevo Plus/i);
+    // Nenhum nome de serviço de pagamento, banco ou concorrente.
+    expect(h).not.toMatch(/asaas|stripe|mercado pago|pagseguro|nubank|ita[uú]|bradesco|santander|picpay/i);
+    // No menu ("Na web"), no rodapé ("Use no navegador"), na página inicial, em O app e em Comece aqui.
+    expect(h).toContain('<li><a href="web.html" aria-current="page">Na web</a></li>');
+    for (const p of ['index.html', 'app/index.html', 'comece.html', 'mei.html']) expect(html(p), p).toMatch(/href="(?:\.\.\/)?web\.html"/);
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
+    expect(texto(g.arquivos.get('sitemap.xml'))).toContain('<loc>https://exemplo.test/web</loc>');
+  });
+
+  // D-128 (pedido do Enzo: o seletor de tema estava em evidência demais): três ícones num grupo só, na linha de baixo do rodapé, com o nome
+  // do grupo e de cada opção para o leitor de tela e na dica do mouse; e o texto logo embaixo dos botões com o respiro de cima deles.
+  it('o tema do site é um controle discreto na linha de baixo do rodapé, com nomes acessíveis, e o texto embaixo dos botões tem respiro', () => {
+    const h = html('index.html');
+    const fim = /<div class="rodape-fim">([\s\S]*?)<\/div>\n<\/div>\n<\/footer>/.exec(h)![1]!;
+    expect(fim).toMatch(/^<div class="rodape-linha"><p>[^<]*(?:<mark[^>]*>[^<]*<\/mark>[^<]*)*<\/p><fieldset class="tema-site" data-tema-site hidden><legend class="so-leitor">Tema do site<\/legend>/);
+    const opcoes = [...fim.matchAll(/<label class="tema-opcao" title="([^"]+)"><input type="radio" name="tema-site" value="([a-z]+)"><span class="tema-icone"><svg[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg><span class="so-leitor">([^<]+)<\/span><\/span><\/label>/g)].map((m) => [m[1], m[2], m[3]]);
+    expect(opcoes).toEqual([
+      ['Igual ao aparelho', 'aparelho', 'Igual ao aparelho'],
+      ['Claro', 'claro', 'Claro'],
+      ['Escuro', 'escuro', 'Escuro'],
+    ]);
+    const css = html('estilo.css');
+    expect(css).toContain('.tema-icone{display:flex;align-items:center;justify-content:center;width:44px;height:44px;');
+    expect(css).not.toMatch(/\.tema-site legend\{/);
+    expect(css).toContain('.acoes+:is(p,.selos-lojas){margin-top:1rem}');
+    expect(css).toContain('@media (min-width:48rem){.acoes+:is(p,.selos-lojas){margin-top:1.25rem}}');
+    expect(css).toContain('.fita-em-breve{position:absolute;');
   });
 
   it('Para empresas abre com a proposta de bem-estar financeiro, diz o que não está incluído, traz o bloco da NR-1 e explica o benefício, o que a empresa vê e nunca vê (como no código e nos textos jurídicos), o painel só na web, o fim do benefício e a apresentação, sem preço', () => {
@@ -1544,17 +1670,19 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(guardamos.match(/<article class="cartao">/g)).toHaveLength(8);
   });
 
-  // Desde 25/11/2026 (D-125), o título da página inicial já diz o que o app faz: a linha de cima é a frase de marca, e a grade de atalhos
-  // (Aprender, Agenda, Calculadoras, Novidades, Ajuda e Segurança) saiu da página; os mesmos destinos estão no menu e no rodapé.
-  it('a página inicial tem a frase de marca acima do título, sem a linha "App de finanças...", e os atalhos de antes ficam no menu e no rodapé', () => {
+  // Desde 25/11/2026 (D-125), a grade de atalhos (Aprender, Agenda, Calculadoras, Novidades, Ajuda e Segurança) saiu da página inicial; os
+  // mesmos destinos estão no menu e no rodapé. Desde 26/11/2026 (D-128), nenhuma frase pequena acima do título (o estilo dela saiu).
+  it('a página inicial não tem frase pequena acima do título nem a linha "App de finanças...", e os atalhos de antes ficam no menu e no rodapé', () => {
     const h = html('index.html');
     expect(h).not.toContain('<p class="sobretitulo">App de finanças pessoais e da família</p>');
     expect(h).not.toContain('<h2 id="mais">');
-    expect(html('estilo.css')).toContain('.assinatura-marca{');
+    expect(html('estilo.css')).not.toContain('.assinatura-marca');
+    for (const p of ['index.html', 'comece.html', 'sobre.html']) expect(html(p), p).not.toContain('assinatura-marca');
     const menu = /<ul class="menu-lista">[\s\S]*?<\/ul>/.exec(h)![0];
     const rodape = /<footer class="rodape">[\s\S]*?<\/footer>/.exec(h)![0];
     for (const alvo of ['aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html', 'seguranca.html']) expect(menu, alvo).toContain(`href="${alvo}"`);
-    for (const alvo of ['aprender/agenda.html', 'novidades/index.html', 'indicadores/index.html', 'mei.html', 'planos.html']) expect(rodape, alvo).toContain(`href="${alvo}"`);
+    for (const alvo of ['aprender/agenda.html', 'novidades/index.html', 'indicadores/index.html', 'mei.html', 'planos.html', 'web.html']) expect(rodape, alvo).toContain(`href="${alvo}"`);
+    expect(menu).toContain('<li><a href="web.html">Na web</a></li>');
   });
 
   it('títulos e descrições: O app e Sobre têm assunto no título, e as descrições mais longas foram encurtadas sem perder a mensagem', () => {
@@ -1564,10 +1692,11 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(tituloDe('index.html')).toBe('Clarevo: controle de gastos, contas e cartões do mês');
     expect(tituloDe('planos.html')).toBe('Planos e preços: Individual e Família · Clarevo');
     expect(tituloDe('mei.html')).toBe('App para MEI e quem trabalha por conta · Clarevo');
-    expect(tituloDe('comece.html')).toBe('Comece aqui: o que é a Clarevo e como ter acesso · Clarevo');
+    expect(tituloDe('comece.html')).toBe('Comece aqui: como começar a usar a Clarevo · Clarevo');
+    expect(tituloDe('web.html')).toBe('Use a Clarevo no navegador: controle de gastos na web · Clarevo');
     expect(descricaoDe('index.html')).toBe('Controle de gastos sem planilha: contas, cartões e gastos do mês num app, com o pessoal, a família e o negócio separados. Você decide o que entra.');
     expect(descricaoDe('empresas/index.html')).toBe('Bem-estar financeiro também faz parte do cuidado com sua equipe. A Clarevo entra no programa de bem-estar, e a empresa nunca vê as finanças das pessoas.');
-    expect(descricaoDe('comece.html')).toMatch(/^O que é a Clarevo, como está o acesso e por onde começar/);
+    expect(descricaoDe('comece.html')).toMatch(/^Como começar na Clarevo: escolha o plano, use no navegador ou no celular/);
     // Um resumo de post maior que 160 caracteres é cortado no fim de uma palavra, com reticências; o resumo inteiro continua na página.
     const conheca = 'novidades/2026-10-23-conheca-a-clarevo.html';
     expect(descricaoDe(conheca).length).toBeLessThanOrEqual(160);

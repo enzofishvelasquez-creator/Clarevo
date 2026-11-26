@@ -33,8 +33,8 @@ function menuHtml(arquivo) {
     return `<li><a href="${rel(arquivo, p.arquivo)}"${attrs}>${esc(p.rotulo)}</a></li>`;
   };
   const lista = MENU.map(item).join('');
-  // A chamada do cabeçalho segue o estado do produto (D-125): "Entrar (quem testa)", para a tela de entrar do app web, antes do lançamento;
-  // "Testar grátis", para a tela de criar conta, depois.
+  // A chamada do cabeçalho segue o estado do produto (D-125 e D-128): "Entrar", para a tela de entrar do app web, antes do lançamento;
+  // "Assine aqui", para a tela de criar conta, depois.
   const { estadoEmVigor, chamadaDoMenu } = require('./estado');
   const cta = chamadaDoMenu(estadoEmVigor());
   return `<nav class="menu" aria-label="Principal">
@@ -62,10 +62,13 @@ function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
     (c) => `<div><h2>${esc(c.titulo)}</h2><ul>${c.links.map((l) => `<li><a href="${rel(arquivo, l.arquivo)}">${esc(l.rotulo)}</a></li>`).join('')}</ul></div>`,
   ).join('\n');
   const legal = marcadoresEmHtml(esc(RODAPE_LEGAL), valores);
-  // O tema do site (D-115): começa escondido e só aparece com o script do tema (js/tema.js); sem ele, o site segue o tema do aparelho.
+  // O tema do site (D-115): começa escondido e só aparece com o script do tema (js/tema.js); sem ele, o site segue o tema do aparelho. Desde
+  // 26/11/2026 (D-128, pedido do Enzo: "muito em evidência"), um controle discreto na linha de baixo do rodapé, ao lado da razão social:
+  // três ícones num grupo de opções, com o nome de cada opção e o do grupo ("Tema do site") só para o leitor de tela e na dica do mouse
+  // (`title`). Continua um grupo de opções de verdade: as setas do teclado trocam a opção, e o foco aparece no lima do rodapé.
   const icone = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
-  const opcao = (valor, rotulo, desenho) => `<label class="tema-opcao"><input type="radio" name="tema-site" value="${valor}"><span>${icone(desenho)}${esc(rotulo)}</span></label>`;
-  const tema = `<fieldset class="tema-site" data-tema-site hidden><legend>Tema do site</legend><div class="tema-opcoes">${[
+  const opcao = (valor, rotulo, desenho) => `<label class="tema-opcao" title="${esc(rotulo)}"><input type="radio" name="tema-site" value="${valor}"><span class="tema-icone">${icone(desenho)}<span class="so-leitor">${esc(rotulo)}</span></span></label>`;
+  const tema = `<fieldset class="tema-site" data-tema-site hidden><legend class="so-leitor">Tema do site</legend><div class="tema-opcoes">${[
     opcao('aparelho', 'Igual ao aparelho', '<rect x="4" y="4" width="16" height="11" rx="2"/><path d="M8 20h8M12 15v5"/>'),
     opcao('claro', 'Claro', '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),
     opcao('escuro', 'Escuro', '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
@@ -76,7 +79,7 @@ function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
 <div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 ${colunas}
 </nav>
-<div class="rodape-fim">${tema}${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
+<div class="rodape-fim">${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<div class="rodape-linha"><p>${legal}</p>${tema}</div></div>
 </div>
 </footer>`;
 }
@@ -252,6 +255,10 @@ const ICONES = {
   ocultar: '<path d="M3.5 3.5l17 17"/><path d="M10.4 5.6A9.4 9.4 0 0 1 12 5.5c4.8 0 8 4.2 9 6.5a12.6 12.6 0 0 1-2.5 3.6M6.4 7.1C4.6 8.3 3.5 10.2 3 12c1 2.3 4.2 6.5 9 6.5 1.6 0 3-.4 4.2-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   exportar: '<path d="M12 4v10.5M7.75 10.25 12 14.5l4.25-4.25"/><path d="M4.5 17v1.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V17"/>',
   seta: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  // Use no navegador (D-128): a janela do navegador, o celular e o computador.
+  navegador: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18M6.5 6.75h.01M9.5 6.75h.01"/>',
+  celular: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>',
+  computador: '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/>',
 };
 
 /** Um ícone de `ICONES`, decorativo (`aria-hidden`), no tamanho pedido. */

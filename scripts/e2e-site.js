@@ -43,7 +43,6 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const { servir } = require('./site/servir');
 const { catalogo } = require('./site/catalogo');
-const { estadoDoProduto, textoDoAcesso } = require('./site/estado');
 
 const RAIZ = path.join(__dirname, '..');
 const HOJE = '2026-10-23';
@@ -627,19 +626,24 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7. Comece aqui (D-067): a página do link da bio abre sem violação da política de segurança, com os oito caminhos (desde D-125, também
-    // Planos e a página do MEI), o estado do acesso do estado do produto (`scripts/site/estado.js`), a demonstração como link de texto (a
-    // navegação para fora é bloqueada e só conferida) e nenhum parâmetro de rastreamento em link nenhum.
+    // 7. Comece aqui (D-067): a página do link da bio abre sem violação da política de segurança. Desde 26/11/2026 (D-128), uma página neutra
+    // de como começar, sem fase de testes nem demonstração: "Assine aqui" e "Conheça o app", três passos (o plano, o navegador ou o celular e
+    // os primeiros passos) e os oito caminhos, e nenhum parâmetro de rastreamento em link nenhum.
     {
       const p = await pagina();
       await p.goto(`${origem}/comece`);
-      ok('comece aqui: título, estado do acesso (o mesmo do estado do produto) e oito caminhos', (await p.textContent('h1')) === 'Comece aqui' &&
-        (await p.textContent('#acesso + p')) === textoDoAcesso(estadoDoProduto()) &&
-        (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'Ver a demonstração|O app|Planos|Para quem trabalha por conta e MEI|Para empresas|Aprender|Calculadoras|Ajuda');
-      const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
+      const corpo = await p.textContent('main');
+      ok('comece aqui: título, "Assine aqui" e "Conheça o app", três passos e oito caminhos, sem fase de testes nem demonstração', (await p.textContent('h1')) === 'Comece aqui' &&
+        JSON.stringify(await p.$$eval('.capa .acoes a', (as) => as.map((a) => [a.textContent, a.getAttribute('href')]))) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
+        (await p.$$eval('#passos + ol > li > h3', (hs) => hs.map((h) => h.textContent))).join('|') === 'Escolha o plano|Use no navegador ou no celular|Dê os primeiros passos' &&
+        (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'O app|Use no navegador|Planos|Para quem trabalha por conta e MEI|Para empresas|Aprender|Calculadoras|Ajuda' &&
+        !/fase de testes|piloto|quem testa|lançamento|Ver a demonstração/i.test(corpo) && (await p.$$('a[href*="demo.clarevo"]')).length === 0);
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
-      ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
+      ok('comece aqui: nenhum link leva parâmetro', comParametro.length === 0, JSON.stringify(comParametro));
       ok('comece aqui: sem script (só dados estruturados, se houver, e o tema do site) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json' && !x.src.endsWith('/js/tema.js')).length)) === 0 && (await p.$$('form')).length === 0);
+      // "Assine aqui", antes do lançamento, leva aos planos, que mostram a fita "Em breve".
+      await Promise.all([p.waitForURL(/\/planos(\.html)?$/), p.click('.capa .acoes a.botao-principal')]);
+      ok('comece aqui: "Assine aqui" leva aos planos, com a fita "Em breve" nos dois cartões', (await p.$$('.plano .fita-em-breve')).length === 2, p.url());
       await p.close();
     }
 
@@ -1068,7 +1072,8 @@ function varrerPagina() {
       const anuais = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => [a.querySelector('.preco').textContent, a.querySelector('.preco-anual')?.textContent ?? ''].map((t) => t.replace(/\u00a0/g, ' '))));
       ok('planos: cada cartão da página inicial com o mensal e o anual (com o equivalente por mês), do núcleo',
         JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)']]), JSON.stringify(anuais));
-      // Clicar no cartão (fora do texto do link) abre a página do plano.
+      // Clicar no cartão (fora do texto do link) abre a página do plano. O clique é no canto de cima, à direita, em cima da fita "Em breve"
+      // (D-128), que é só desenho e não pega o clique.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
       await familia.scrollIntoViewIfNeeded();
       const caixa = await familia.boundingBox();
@@ -1083,7 +1088,7 @@ function varrerPagina() {
         cartoes: [...document.querySelectorAll('article.plano-link')].map((a) => ({ titulo: a.querySelector('h3').textContent, links: a.querySelectorAll('a').length, href: a.querySelector('a').getAttribute('href') })),
       }));
       ok('planos: planos.html é um resumo curto, com os dois cartões (um link só cada, para a página do plano) e sem a lista de recursos',
-        JSON.stringify(resumo.secoes) === JSON.stringify(['comparar']) && resumo.recursos === 0 && JSON.stringify(resumo.cartoes) === JSON.stringify([{ titulo: 'Individual', links: 1, href: 'planos/individual.html' }, { titulo: 'Família', links: 1, href: 'planos/familia.html' }]), JSON.stringify(resumo));
+        JSON.stringify(resumo.secoes) === JSON.stringify(['comparar']) && resumo.recursos === 0 && JSON.stringify(resumo.cartoes) === JSON.stringify([{ titulo: 'Individual (em breve)', links: 1, href: 'planos/individual.html' }, { titulo: 'Família (em breve)', links: 1, href: 'planos/familia.html' }]), JSON.stringify(resumo));
       const individual = p.locator('article.plano-link').nth(0);
       const caixaInd = await individual.boundingBox();
       await p.mouse.click(caixaInd.x + caixaInd.width - 20, caixaInd.y + 20);
@@ -1117,8 +1122,8 @@ function varrerPagina() {
         const familiaPg = nome === 'Família';
         // D-127: na capa, o mensal e, logo abaixo, o anual com o equivalente por mês (três valores, todos na capa).
         const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)';
-        ok(`planos: a página do plano ${nome} tem o nome, o preço mensal e o anual só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
-          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês( Preços no lançamento)?$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
+        ok(`planos: a página do plano ${nome} tem o nome, o preço mensal (com "Em breve" antes do lançamento) e o anual só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, sem a frase de "abre no lançamento", D-128) e o Espaço Negócio incluído, sem negócio compartilhado`,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
         const outroHref = familiaPg ? 'individual.html' : 'familia.html';
@@ -1371,13 +1376,28 @@ function varrerPagina() {
           plus: /Plus|sóci|ajudante|compartilh|contador|Contabilidade|vários negócios/.test(texto),
           semImposto: /não calcula imposto/.test(texto),
           tela: (() => { const i = document.querySelector('.capa figure.celular img'); return i ? i.complete && i.naturalWidth > 0 && /^Tela do negócio/.test(i.alt) : false; })(),
-          demo: document.querySelector('.capa .acoes a[href^="https://demo."]')?.getAttribute('href'),
+          // D-128: nada de demonstração na página do MEI; "Assine aqui" (para os planos, antes do lançamento) e "Conheça o app".
+          demo: document.querySelectorAll('a[href*="demo.clarevo"]').length,
+          chamadas: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
           ajuda: document.querySelector('a[href="ajuda/negocio.html#guia-negocio"]') !== null,
         };
       });
-      ok('página do MEI: o título, os seis cartões do que o Espaço Negócio faz hoje (sem link), o limite e os lembretes do MEI, "Incluído na assinatura", a demonstração do negócio e a Ajuda, sem nada do Plus nem cálculo de imposto',
+      ok('página do MEI: o título, os seis cartões do que o Espaço Negócio faz hoje (sem link), o limite e os lembretes do MEI, "Incluído na assinatura", "Assine aqui" e "Conheça o app" (sem demonstração, D-128) e a Ajuda, sem nada do Plus nem cálculo de imposto',
         mei.h1 === 'O dinheiro do negócio separado do da casa.' && JSON.stringify(mei.cartoes) === JSON.stringify(['O negócio no espaço dele', 'Categorias de quem vende e presta serviço', 'Quanto entrou, saiu e sobrou', 'Retirada para o Pessoal', 'A receber', 'Nota e quem pagou']) &&
-        mei.links === 0 && mei.mei && mei.incluido && !mei.plus && mei.semImposto && mei.tela && mei.demo === 'https://demo.clarevo.app.br/?cenario=negocio' && mei.ajuda, JSON.stringify(mei));
+        mei.links === 0 && mei.mei && mei.incluido && !mei.plus && mei.semImposto && mei.tela && mei.demo === 0 && JSON.stringify(mei.chamadas) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) && mei.ajuda, JSON.stringify(mei));
+      // D-128 (pedido do Enzo): os links de texto embaixo dos botões da chamada final ("Como usar o Espaço Negócio, na Ajuda · Ver os
+      // planos") com o respiro da escala do site, no celular (16 px) e no computador (20 px), nunca colados nos botões.
+      const respiros = [];
+      for (const largura of [390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        respiros.push(await p.evaluate(() => {
+          const acoes = document.querySelector('.chamada-final .acoes');
+          const abaixo = acoes.nextElementSibling;
+          return Math.round(abaixo.getBoundingClientRect().top - acoes.getBoundingClientRect().bottom);
+        }));
+      }
+      await p.setViewportSize({ width: 390, height: 900 });
+      ok('página do MEI: os links de texto embaixo dos botões da chamada final têm 16 px de respiro no celular e 20 px no computador', respiros[0] >= 16 && respiros[1] >= 20, JSON.stringify(respiros));
       await p.goto(`${origem}/app/#negocio`);
       const recurso = await p.evaluate(() => {
         const a = document.querySelector('#negocio');
@@ -1462,6 +1482,8 @@ function varrerPagina() {
     }
 
     // 7c8. Tema do site (D-115): no rodapé de todas as páginas, "Igual ao aparelho" (o padrão), "Claro" e "Escuro", com nomes acessíveis
+    // (desde 26/11/2026, D-128, discreto: três ícones na linha de baixo do rodapé, sem texto à vista, com os nomes para o leitor de tela e na
+    // dica do mouse)
     // e pelo teclado. A escolha muda o tema na hora, vale depois de recarregar e marca o <html> antes de a página aparecer (já no
     // DOMContentLoaded); "Igual ao aparelho" segue o aparelho nos dois sentidos; com o armazenamento bloqueado, nada quebra; só a chave do
     // tema fica no navegador; nada passa da largura da tela e o cabeçalho continua numa linha em 320, 390, 768, 1024, 1120 e 1280 px.
@@ -1481,11 +1503,33 @@ function varrerPagina() {
         return { visivel: f && !f.hidden, legenda: f && f.querySelector('legend').textContent, opcoes: f ? [...f.querySelectorAll('input[type="radio"][name="tema-site"]')].map((i) => ({ valor: i.value, nome: i.closest('label').textContent.trim() })) : [] };
       });
       const padrao = await estado();
+      // D-128: discreto. Um grupo pequeno de três ícones (44 px de área de toque cada), na linha de baixo do rodapé, ao lado da razão social
+      // no computador, sem nenhum texto à vista; os nomes ficam para o leitor de tela e na dica do mouse (title).
+      const discreto = [];
+      for (const largura of [390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        discreto.push(await p.evaluate(() => {
+          const f = document.querySelector('footer fieldset.tema-site');
+          const r = f.getBoundingClientRect();
+          const legal = document.querySelector('.rodape-linha > p').getBoundingClientRect();
+          const aVista = (e) => { const b = e.getBoundingClientRect(); return b.width > 1 && b.height > 1; };
+          return {
+            largura: Math.round(r.width), altura: Math.round(r.height), naLinha: f.closest('.rodape-linha') !== null,
+            aoLado: Math.abs((r.top + r.height / 2) - (legal.top + legal.height / 2)) < 12 && r.left > legal.right,
+            textoAVista: [...f.querySelectorAll('legend, .so-leitor')].some(aVista),
+            dicas: [...f.querySelectorAll('label')].map((l) => l.title),
+            alvos: [...f.querySelectorAll('.tema-icone')].every((x) => { const b = x.getBoundingClientRect(); return b.width >= 44 && b.height >= 44; }),
+          };
+        }));
+      }
+      await p.setViewportSize({ width: 390, height: 900 });
+      ok('tema (D-128): discreto, três ícones num grupo pequeno na linha de baixo do rodapé (ao lado da razão social no computador), sem texto à vista, com a dica de cada opção e 44 px de área de toque',
+        discreto.every((d) => d.naLinha && d.largura <= 150 && d.altura <= 52 && !d.textoAVista && JSON.stringify(d.dicas) === JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro']) && d.alvos) && discreto[1].aoLado, JSON.stringify(discreto));
       ok('tema: o grupo "Tema do site" no rodapé, com "Igual ao aparelho" (marcado), "Claro" e "Escuro", e o site no tema do aparelho', grupo.visivel && grupo.legenda === 'Tema do site' && JSON.stringify(grupo.opcoes.map((o) => o.nome)) === JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro']) && padrao.tema === 'aparelho' && padrao.escolhida === 'aparelho' && padrao.fundo === FUNDO_CLARO && padrao.guardado === null, JSON.stringify({ grupo, padrao }));
-      // Nomes acessíveis pelo papel: cada opção é um botão de opção com o nome visível.
+      // Nomes acessíveis pelo papel: cada opção é um botão de opção com o nome (escondido da tela desde D-128, lido pelo leitor de tela).
       const nomes = [];
       for (const n of ['Igual ao aparelho', 'Claro', 'Escuro']) nomes.push(await p.getByRole('radio', { name: n, exact: true }).count());
-      ok('tema: cada opção tem o papel de opção e o nome acessível visível', nomes.every((n) => n === 1), JSON.stringify(nomes));
+      ok('tema: cada opção tem o papel de opção e o nome acessível, e o grupo se chama "Tema do site"', nomes.every((n) => n === 1) && (await p.getByRole('group', { name: 'Tema do site' }).count()) === 1, JSON.stringify(nomes));
       await p.getByRole('radio', { name: 'Escuro', exact: true }).check();
       const escuro = await estado();
       await p.reload();
@@ -1580,30 +1624,36 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7c10. O estado do produto (D-125, `scripts/site/estado.js`): um só interruptor para todas as páginas. Antes do lançamento (o padrão),
-    // a capa do início leva à demonstração e a "Como ter acesso" (nada de criar conta), as páginas dizem "fase de testes" e os preços levam
-    // "Preços no lançamento", sem selo de loja. Lançado (um site gerado à parte com --estado), "Testar 14 dias grátis" leva à tela de criar
-    // conta do app web, nenhuma página fala em fase de testes, "em breve", "abre no lançamento" nem "Preços no lançamento", o selo aparece só
-    // para a loja com endereço e o menu diz "Testar grátis". O botão do menu e o link da versão web em O app são SEGUIDOS nos dois estados
-    // (clique de verdade, no computador e no menu do celular), com o app web respondido por uma página falsa deste teste (`route`): o
-    // clique chega aonde o botão diz e nada sai para a rede. Antes do lançamento, nenhuma página leva à tela inicial do app web, que convida a
-    // criar conta (D-064): só à tela de entrar, de quem já testa.
+    // 7c10. O estado do produto (D-125, `scripts/site/estado.js`): um só interruptor para todas as páginas. Desde 26/11/2026 (D-128, pedido do
+    // Enzo), nenhum dos dois estados fala de fase de testes, piloto, "quem testa", "Preços no lançamento" ou "abre no lançamento", e a chamada
+    // principal de todas as capas é "Assine aqui", com no máximo dois botões; a demonstração só aparece como link de texto em O app e em Use
+    // no navegador. Antes do lançamento (o padrão), "Assine aqui" leva aos planos (a seção Planos no início, `planos.html` nas outras
+    // páginas), que mostram a fita "Em breve" em cada cartão; o menu diz "Entrar" e leva à tela de entrar; nenhuma página convida a criar conta
+    // nem leva à tela inicial do app web (D-064). Lançado (um site gerado à parte com --estado), "Assine aqui" e o menu levam à tela de criar
+    // conta do app web, a fita some e o selo aparece só para a loja com endereço. Os botões (o menu, no computador e no menu do celular,
+    // "Assine aqui" das capas e o link da versão web em O app) são SEGUIDOS nos dois estados, com clique de verdade e o app web respondido por
+    // uma página falsa deste teste (`route`): o clique chega aonde o botão diz e nada sai para a rede.
     {
       const URL_APP = 'https://app.clarevo.app.br';
-      const PAGINAS_DO_ESTADO = ['', 'comece', 'app/', 'mei', 'planos', 'planos/individual', 'planos/familia', 'sobre', 'imprensa', 'calculadoras/reserva'];
+      const CRIAR = `${URL_APP}/criar-conta`;
+      const PAGINAS_DO_ESTADO = ['', 'comece', 'app/', 'web', 'mei', 'planos', 'planos/individual', 'planos/familia', 'sobre', 'imprensa', 'calculadoras/reserva'];
       const lerEstado = async (q, base) => {
         const r = {};
         for (const c of PAGINAS_DO_ESTADO) {
           await q.goto(`${base}/${c}`);
           r[c || 'início'] = await q.evaluate(() => {
-            const main = document.querySelector('main').innerText.replace(/ /g, ' ');
+            const main = document.querySelector('main').innerText.replace(/\u00a0/g, ' ');
+            const pagina = document.body.innerText;
             return {
-              testes: /fase de testes/i.test(main), piloto: /piloto/i.test(main), precosNoLancamento: /Preços no lançamento/.test(main),
-              breve: /em breve/i.test(main), abreNoLancamento: /abre no lançamento/i.test(main),
+              testes: /fase de testes?|em testes/i.test(pagina), piloto: /piloto/i.test(pagina), quemTesta: /quem (já )?testa/i.test(pagina), precosNoLancamento: /Preços no lançamento/.test(pagina),
+              breve: /em breve/i.test(main), abreNoLancamento: /abre no lançamento|acesso abre/i.test(pagina),
+              fita: document.querySelectorAll('.fita-em-breve').length,
+              demo: [...document.querySelectorAll('a[href*="demo.clarevo"]')].map((a) => [a.textContent, a.className, a.closest('.botao, .acoes') ? 'botão' : a.parentElement.className]),
               criarConta: document.querySelectorAll('a[href*="/criar-conta"]').length, selos: [...document.querySelectorAll('.selo-loja')].map((a) => [a.textContent, a.getAttribute('href')]),
               // Links para a tela inicial do app web (o endereço sem caminho), na página toda: o menu, o texto e o aviso sem JavaScript.
               raizDoApp: [...document.querySelectorAll('a')].filter((a) => a.href === 'https://app.clarevo.app.br/').length,
               capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+              botoesPorBloco: [...document.querySelectorAll('.acoes')].map((b) => b.querySelectorAll('a.botao').length),
               menu: [document.querySelector('.menu-cta')?.textContent, document.querySelector('.menu-cta')?.getAttribute('href')],
               // O plano anual existe desde a D-127 (o preço por ano nos planos); o Plus continua fora do site.
               plus: /Clarevo Plus/i.test(main),
@@ -1616,10 +1666,11 @@ function varrerPagina() {
       /**
        * Segue os botões: num contexto à parte (sem o registro de "pedido para fora" do resto do roteiro), o app web é respondido por uma
        * página falsa e qualquer outro endereço de fora é recusado e anotado. Clica no botão do cabeçalho (1280 px, no início e numa
-       * calculadora), no do menu do celular (390 px) e no link da versão web em O app, e devolve aonde cada clique chegou, o que foi pedido
-       * ao app web e o que foi recusado.
+       * calculadora), no do menu do celular (390 px), no link da versão web em O app e, no site lançado (`assineNoApp`), em "Assine aqui" das
+       * capas do início, de O app, de Use no navegador e do MEI, e devolve aonde cada clique chegou, o que foi pedido ao app web e o que foi
+       * recusado.
        */
-      const seguirBotoes = async (base, textoDoLink) => {
+      const seguirBotoes = async (base, textoDoLink, { assineNoApp = false } = {}) => {
         const contexto = await navegador.newContext({ locale: 'pt-BR' });
         const aoApp = [];
         const recusados = [];
@@ -1653,25 +1704,53 @@ function varrerPagina() {
           await q.goto(`${base}/app/`);
           await Promise.all([q.waitForURL(noApp), q.click(`#onde ~ .grade a:text-is("${textoDoLink}")`)]);
           chegou['O app, onde usar'] = [q.url(), await q.title()];
+          if (assineNoApp) {
+            for (const c of ['', 'app/', 'web', 'mei']) {
+              await q.goto(`${base}/${c}`);
+              await Promise.all([q.waitForURL(noApp), q.click('.capa .acoes a.botao-principal')]);
+              chegou[`Assine aqui de ${c || 'início'}`] = [q.url(), await q.title()];
+            }
+          }
         } finally {
           await contexto.close();
         }
         return { chegou, aoApp, recusados };
       };
+      /** A demonstração, nos dois estados: só em O app e em Use no navegador, um link de texto só em cada, nunca botão. */
+      const demoCerta = (r) => Object.entries(r).every(([c, x]) => (c === 'app/' || c === 'web' ? JSON.stringify(x.demo) === JSON.stringify([['Ver uma demonstração com dados fictícios', '', 'link-demo']]) : x.demo.length === 0));
+      const semFaseDeTestes = (x) => !x.testes && !x.piloto && !x.quemTesta && !x.precosNoLancamento && !x.abreNoLancamento && !x.plus;
       const p = await pagina();
       const pre = await lerEstado(p, origem);
-      await p.close();
       const v = Object.values(pre);
-      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Entrar (quem testa)" e aponta para a tela de entrar; nada do Plus',
-        v.every((x) => x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && !x.plus && x.menu[0] === 'Entrar (quem testa)' && x.menu[1] === `${URL_APP}/entrar` && !x.piloto) &&
-        JSON.stringify(pre['início'].capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br'], ['Como ter acesso', 'comece.html#acesso']]) &&
-        JSON.stringify(pre.mei.capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio'], ['Como ter acesso', 'comece.html#acesso']]), JSON.stringify(pre));
-      ok('estado do produto, antes do lançamento: "fase de testes" no início, em Comece aqui, em O app e na página do MEI; "Preços no lançamento" e o preço anual (D-127) no início e nas três páginas de planos',
-        ['início', 'comece', 'app/', 'mei', 'imprensa'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento && pre[c].anual), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento, x.anual]]))));
-      // Antes do lançamento, os cliques levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
+      ok('estado do produto, antes do lançamento: nenhuma página fala de fase de testes, piloto, "quem testa", "Preços no lançamento" nem "abre no lançamento" (D-128); nenhuma convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; o menu diz "Entrar" e aponta para a tela de entrar; nada do Plus',
+        v.every((x) => semFaseDeTestes(x) && x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && x.menu[0] === 'Entrar' && x.menu[1] === `${URL_APP}/entrar` && x.botoesPorBloco.every((n) => n <= 2)), JSON.stringify(pre));
+      ok('estado do produto, antes do lançamento: "Assine aqui" é a chamada principal das capas (para os planos: a seção Planos no início, planos.html nas outras), com "Conheça o app" ou "Use no navegador" ao lado, e a demonstração só como link de texto em O app e em Use no navegador',
+        JSON.stringify(pre['início'].capa) === JSON.stringify([['Assine aqui', '#planos'], ['Conheça o app', 'app/index.html']]) &&
+        JSON.stringify(pre.comece.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
+        JSON.stringify(pre['app/'].capa) === JSON.stringify([['Assine aqui', '../planos.html'], ['Use no navegador', '../web.html']]) &&
+        JSON.stringify(pre.web.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
+        JSON.stringify(pre.mei.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) && demoCerta(pre), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.capa, x.demo]]))));
+      ok('estado do produto, antes do lançamento: a fita "Em breve" nos dois cartões de plano do início e de planos.html, e o preço anual (D-127) no início e nas três páginas de planos',
+        pre['início'].fita === 2 && pre.planos.fita === 2 && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].anual), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.fita, x.anual]]))));
+      // "Assine aqui", antes do lançamento, clicado: no início, a seção Planos na tela; nas outras páginas, planos.html, com a fita nos cartões.
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.goto(`${origem}/`);
+      await p.click('.capa .acoes a.botao-principal');
+      await p.waitForFunction(() => location.hash === '#planos' && Math.abs(document.getElementById('planos').getBoundingClientRect().top) < 120, null, { timeout: 5000 }).catch(() => {});
+      const naSecao = await p.evaluate(() => ({ hash: location.hash, topo: Math.round(document.getElementById('planos').getBoundingClientRect().top), fitas: document.querySelectorAll('#planos ~ .grade .fita-em-breve').length }));
+      const chegadas = [];
+      for (const c of ['app/', 'web', 'mei', 'comece']) {
+        await p.goto(`${origem}/${c}`);
+        await Promise.all([p.waitForURL(/\/planos(\.html)?$/), p.click('.capa .acoes a.botao-principal')]);
+        chegadas.push([c, await p.textContent('h1'), (await p.$$('.plano .fita-em-breve')).length]);
+      }
+      ok('estado do produto, antes do lançamento: "Assine aqui" clicado leva à seção Planos no início e a planos.html em O app, Use no navegador, MEI e Comece aqui, sempre com a fita "Em breve" nos dois cartões',
+        naSecao.hash === '#planos' && Math.abs(naSecao.topo) < 120 && naSecao.fitas === 2 && chegadas.every(([, h1, fitas]) => h1 === 'Planos da Clarevo' && fitas === 2), JSON.stringify({ naSecao, chegadas }));
+      await p.close();
+      // Antes do lançamento, os cliques do menu e de O app levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
       const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web');
       const destinosPre = Object.values(seguidosPre.chegou);
-      ok('estado do produto, antes do lançamento: o botão do menu (no computador e no celular) e o link "Entrar na versão web" de O app, clicados, chegam à tela de entrar do app web, e nada sai para a rede',
+      ok('estado do produto, antes do lançamento: o botão "Entrar" do menu (no computador e no celular) e o link "Entrar na versão web" de O app, clicados, chegam à tela de entrar do app web, e nada sai para a rede',
         destinosPre.length === 4 && destinosPre.every(([url, titulo]) => url === `${URL_APP}/entrar` && titulo === 'App falso do teste') &&
           seguidosPre.aoApp.length === 4 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar`) && seguidosPre.recusados.length === 0,
         JSON.stringify(seguidosPre));
@@ -1702,59 +1781,133 @@ function varrerPagina() {
         q.on('pageerror', (e) => erros.push(e.message));
         const pos = await lerEstado(q, lancado.url);
         const w = Object.values(pos);
-        ok('estado do produto, lançado: nenhuma página fala em fase de testes, "em breve", "abre no lançamento" nem "Preços no lançamento" (inclusive o kit de imprensa); o menu diz "Testar grátis" e aponta para a tela de criar conta',
-          w.every((x) => !x.testes && !x.piloto && !x.precosNoLancamento && !x.breve && !x.abreNoLancamento && !x.plus && x.menu[0] === 'Testar grátis' && x.menu[1] === 'https://app.clarevo.app.br/criar-conta') && erros.length === 0, JSON.stringify({ pos, erros }));
-        // Lançado, os cliques do menu levam à tela de criar conta, e o link de O app, à tela inicial do app web (aberta a todas as pessoas).
-        const seguidosPos = await seguirBotoes(lancado.url, 'Abrir a versão web');
+        ok('estado do produto, lançado: nenhuma página fala de fase de testes, piloto, "quem testa", "em breve", "abre no lançamento" nem "Preços no lançamento" (inclusive o kit de imprensa), e a fita some; o menu diz "Assine aqui" e aponta para a tela de criar conta',
+          w.every((x) => semFaseDeTestes(x) && !x.breve && x.fita === 0 && x.menu[0] === 'Assine aqui' && x.menu[1] === CRIAR && x.botoesPorBloco.every((n) => n <= 2)) && demoCerta(pos) && erros.length === 0, JSON.stringify({ pos, erros }));
+        // Lançado, os cliques do menu e de "Assine aqui" levam à tela de criar conta, e o link de O app, à tela inicial do app web.
+        const seguidosPos = await seguirBotoes(lancado.url, 'Abrir a versão web', { assineNoApp: true });
         const destinosPos = Object.entries(seguidosPos.chegou);
-        ok('estado do produto, lançado: o botão do menu (no computador e no celular), clicado, chega à tela de criar conta; "Abrir a versão web" de O app, à tela inicial do app web; nada sai para a rede',
-          destinosPos.length === 4 && destinosPos.every(([onde, [url, titulo]]) => titulo === 'App falso do teste' && url === (onde === 'O app, onde usar' ? `${URL_APP}/` : `${URL_APP}/criar-conta`)) &&
+        ok('estado do produto, lançado: o botão do menu (no computador e no celular) e "Assine aqui" das capas do início, de O app, de Use no navegador e do MEI, clicados, chegam à tela de criar conta; "Abrir a versão web" de O app, à tela inicial do app web; nada sai para a rede',
+          destinosPos.length === 8 && destinosPos.every(([onde, [url, titulo]]) => titulo === 'App falso do teste' && url === (onde === 'O app, onde usar' ? `${URL_APP}/` : CRIAR)) &&
             seguidosPos.recusados.length === 0,
           JSON.stringify(seguidosPos));
-        ok('estado do produto, lançado: a capa do início e a do MEI com "Testar 14 dias grátis" (criar conta) e "Ver a demonstração", e o selo só da App Store, que tem endereço',
-          JSON.stringify(pos['início'].capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br']]) &&
-          JSON.stringify(pos.mei.capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio']]) &&
+        ok('estado do produto, lançado: a capa do início e a do MEI com "Assine aqui" (criar conta) e "Conheça o app", e o selo só da App Store, que tem endereço',
+          JSON.stringify(pos['início'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
+          JSON.stringify(pos.mei.capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
+          JSON.stringify(pos['app/'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Use no navegador', '../web.html']]) &&
           JSON.stringify(pos['início'].selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]) && JSON.stringify(pos.comece.selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]),
           JSON.stringify({ inicio: pos['início'], mei: pos.mei.capa, comece: pos.comece.selos }));
-        await q.goto(`${lancado.url}/comece`);
-        const acesso = await q.textContent('#acesso + p');
-        ok('estado do produto, lançado: Comece aqui diz que a Clarevo está aberta, na web e na App Store, com o teste grátis', acesso === 'A Clarevo está aberta para todas as pessoas na web e na App Store. Toda conta começa com 14 dias grátis, sem cartão.', acesso);
+        await q.goto(`${lancado.url}/`);
+        const fim = await q.textContent('.chamada-final p');
+        ok('estado do produto, lançado: a chamada final do início diz que a Clarevo está aberta, na web e na App Store, com o teste grátis', fim.endsWith('A Clarevo está aberta para todas as pessoas na web e na App Store. Toda conta começa com 14 dias grátis, sem cartão.'), fim);
         const largas = [];
         for (const largura of [320, 1280]) {
           await q.setViewportSize({ width: largura, height: 900 });
-          for (const c of ['', 'mei', 'comece', 'app/']) {
+          for (const c of ['', 'mei', 'comece', 'app/', 'web']) {
             await q.goto(`${lancado.url}/${c}`);
             if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
           }
         }
-        ok('estado do produto, lançado: nada passa da largura da tela em 320 e 1280 px (início, MEI, Comece aqui e O app)', largas.length === 0, largas.join(' | '));
+        ok('estado do produto, lançado: nada passa da largura da tela em 320 e 1280 px (início, MEI, Comece aqui, O app e Use no navegador)', largas.length === 0, largas.join(' | '));
       } finally {
         await outro.close();
         await lancado.fechar();
       }
     }
 
-    // 7c11. A página inicial em seis blocos (D-125): a capa, as três portas, como funciona, "Você decide o que entra", os planos e a chamada
-    // final, nessa ordem; o título com o benefício e a frase de marca como assinatura acima dele; os dados estruturados de app e de
-    // organização; e a página do MEI no menu e no rodapé.
+    // 7c11. A página inicial (D-125 e D-128): a capa, as três portas, como funciona, "Você decide o que entra", os planos, "Use no navegador ou
+    // no celular", as perguntas frequentes e a chamada final, nessa ordem; o título "Cuidar da vida financeira faz parte de cuidar de você.",
+    // sem frase pequena acima, com o benefício concreto abrindo o subtítulo; os dados estruturados de organização, de app e das perguntas;
+    // o respiro do texto embaixo dos botões; "Na web" e "Para MEI" no menu, que continua numa linha a 1120 px; e a página do MEI no rodapé.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
       const inicio = await p.evaluate(() => ({
         secoes: [...document.querySelectorAll('main > section.bloco')].map((s) => s.getAttribute('aria-labelledby')),
         h1: document.querySelector('h1').textContent,
-        assinatura: document.querySelector('.capa .assinatura-marca')?.textContent,
-        assinaturaAntes: document.querySelector('.capa .assinatura-marca')?.nextElementSibling?.tagName,
+        primeiro: document.querySelector('.capa-grade > div').firstElementChild.tagName,
+        lead: document.querySelector('.capa .lead').textContent,
+        assinatura: document.querySelectorAll('.assinatura-marca').length,
         tipos: [...document.querySelectorAll('script[type="application/ld+json"]')].map((x) => JSON.parse(x.textContent)['@type']),
         menu: [...document.querySelectorAll('.menu-lista a')].map((a) => a.textContent),
         rodapeMei: document.querySelector('.rodape a[href="mei.html"]')?.textContent || null,
-        h1Tamanho: parseFloat(getComputedStyle(document.querySelector('h1')).fontSize), assinaturaTamanho: parseFloat(getComputedStyle(document.querySelector('.capa .assinatura-marca')).fontSize),
+        rodapeWeb: document.querySelector('.rodape a[href="web.html"]')?.textContent || null,
+        perguntas: [...document.querySelectorAll('#perguntas ~ .duvidas details')].map((d) => [d.querySelector('summary').textContent, d.open]),
       }));
-      ok('início: seis blocos na ordem (capa, para quem é, como funciona, você decide o que entra, planos e a chamada final), o título com o benefício e a frase de marca pequena acima dele, dados de app e de organização, "Planos" e "Para MEI" no menu e a página do MEI no rodapé',
-        JSON.stringify(inicio.secoes) === JSON.stringify(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'comecar']) &&
-        inicio.h1 === 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.' && inicio.assinatura === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.assinaturaAntes === 'H1' && inicio.assinaturaTamanho < inicio.h1Tamanho / 1.5 &&
-        JSON.stringify(inicio.tipos) === JSON.stringify(['Organization', 'SoftwareApplication']) &&
-        JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda', 'Segurança']) && inicio.rodapeMei === 'Por conta e MEI', JSON.stringify(inicio));
+      ok('início: os blocos na ordem (capa, para quem é, como funciona, você decide o que entra, planos, use no navegador ou no celular, perguntas e a chamada final), o título da marca sem frase acima, o benefício no subtítulo, dados de organização, de app e das perguntas, "Na web" e "Para MEI" no menu e as páginas do MEI e da web no rodapé',
+        JSON.stringify(inicio.secoes) === JSON.stringify(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'na-web', 'perguntas', 'comecar']) &&
+        inicio.h1 === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.primeiro === 'H1' && inicio.assinatura === 0 &&
+        inicio.lead.startsWith('Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.') &&
+        JSON.stringify(inicio.tipos) === JSON.stringify(['Organization', 'SoftwareApplication', 'FAQPage']) &&
+        JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Na web', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda', 'Segurança']) && inicio.rodapeMei === 'Por conta e MEI' && inicio.rodapeWeb === 'Use no navegador' &&
+        inicio.perguntas.length === 6 && inicio.perguntas.every(([, aberta]) => !aberta), JSON.stringify(inicio));
+      // As perguntas abrem pelo teclado (foco no resumo e Enter), uma por vez.
+      await p.locator('#pergunta-banco > summary').focus();
+      await p.keyboard.press('Enter');
+      const aberta = await p.evaluate(() => ({ banco: document.querySelector('#pergunta-banco').open, texto: document.querySelector('#pergunta-banco .duvida-corpo').innerText, outras: [...document.querySelectorAll('#perguntas ~ .duvidas details:not(#pergunta-banco)')].every((d) => !d.open) }));
+      ok('início: Enter no resumo abre "A Clarevo se conecta ao meu banco?", com a resposta verdadeira, e as outras continuam fechadas', aberta.banco && aberta.outras && aberta.texto.startsWith('Não. A Clarevo não se conecta a bancos e não pede senha bancária.') && !/Open Finance|em breve|futur/i.test(aberta.texto), JSON.stringify(aberta));
+      // O respiro do texto embaixo dos botões (D-128): a linha curta da capa e, no fim, nada colado nos botões; o cabeçalho numa linha a 1120 px.
+      const medidas = [];
+      for (const largura of [390, 1120, 1440]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        await p.goto(`${origem}/`);
+        medidas.push(await p.evaluate((l) => {
+          const acoes = document.querySelector('.capa .acoes');
+          const linha = acoes.nextElementSibling;
+          const marca = document.querySelector('.marca').getBoundingClientRect();
+          const menu = document.querySelector(l >= 1120 ? '.menu-lista' : '.menu-movel').getBoundingClientRect();
+          return { largura: l, respiro: Math.round(linha.getBoundingClientRect().top - acoes.getBoundingClientRect().bottom), topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), folga: Math.round(menu.left - marca.right), largo: document.documentElement.scrollWidth > window.innerWidth + 1 };
+        }, largura));
+      }
+      await p.setViewportSize({ width: 390, height: 900 });
+      ok('início: a linha embaixo dos botões da capa com 16 px de respiro no celular e 20 px no computador; o cabeçalho numa linha (com "Na web" no menu) a 1120 e 1440 px, com folga entre o logotipo e o menu, e nada passa da largura',
+        medidas[0].respiro >= 16 && medidas[1].respiro >= 20 && medidas[2].respiro >= 20 && medidas.every((m) => m.topo <= 80 && m.folga >= 16 && !m.largo), JSON.stringify(medidas));
+      // "Ver como é usar no navegador" leva a Use no navegador.
+      await p.goto(`${origem}/`);
+      await Promise.all([p.waitForURL(/\/web(\.html)?$/), p.click('#na-web ~ .acoes a, section[aria-labelledby="na-web"] .acoes a')]);
+      ok('início: "Ver como é usar no navegador" abre Use a Clarevo no navegador', (await p.textContent('h1')) === 'Use a Clarevo no navegador', p.url());
+      await p.close();
+    }
+
+    // 7c12. Use a Clarevo no navegador (web.html, D-128): a página da versão web, com "Assine aqui" e "Conheça o app", a demonstração como link
+    // de texto discreto, as duas telas de verdade do computador (carregadas, do próprio site), o pagamento na web com cartão ou Pix pelo
+    // serviço de pagamento e os mesmos preços, no menu ("Na web", também no menu do celular) e nada passando da largura da tela.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/web`);
+      const web = await p.evaluate(async () => {
+        for (const i of document.images) i.loading = 'eager';
+        await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));
+        const main = document.querySelector('main').innerText;
+        const demo = document.querySelector('a[href*="demo.clarevo"]');
+        return {
+          h1: document.querySelector('h1').textContent,
+          secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
+          capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+          demo: demo ? { texto: demo.textContent, botao: demo.classList.contains('botao'), rel: demo.rel, fonte: parseFloat(getComputedStyle(demo).fontSize) } : null,
+          telas: [...document.querySelectorAll('.telas-web img')].map((i) => ({ ok: i.complete && i.naturalWidth > 0, local: i.src.startsWith(location.origin + '/imagens/computador-'), alt: i.alt.length > 40 })),
+          pagar: /cartão/.test(main) && /Pix/.test(main) && /serviço de pagamento/.test(main) && /mesmos na web, na App Store e no Google Play/.test(main),
+          proibido: /desconto|mais barat|Open Finance|fase de testes|Clarevo Plus/i.test(main),
+          menuAtual: document.querySelector('.menu-lista a[aria-current="page"]')?.textContent,
+        };
+      });
+      ok('web: o título, as seções, "Assine aqui" (para os planos) e "Conheça o app", a demonstração como link de texto menor (não botão, com noopener), as duas telas do computador carregadas, cartão ou Pix pelo serviço de pagamento com os mesmos preços, sem desconto, e "Na web" marcado no menu',
+        web.h1 === 'Use a Clarevo no navegador' && JSON.stringify(web.secoes) === JSON.stringify(['no-navegador', 'no-computador', 'pagar', 'comecar']) &&
+        JSON.stringify(web.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
+        web.demo && web.demo.texto === 'Ver uma demonstração com dados fictícios' && !web.demo.botao && /noopener/.test(web.demo.rel) && web.demo.fonte <= 16 &&
+        web.telas.length === 2 && web.telas.every((t) => t.ok && t.local && t.alt) && web.pagar && !web.proibido && web.menuAtual === 'Na web', JSON.stringify(web));
+      // No menu do celular, "Na web" leva à página.
+      await p.goto(`${origem}/`);
+      await p.click('details.menu-movel > summary');
+      await Promise.all([p.waitForURL(/\/web(\.html)?$/), p.click('details.menu-movel a:text-is("Na web")')]);
+      ok('web: "Na web" no menu do celular abre a página', (await p.textContent('h1')) === 'Use a Clarevo no navegador', p.url());
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        await p.goto(`${origem}/web`);
+        if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${largura} px`);
+      }
+      ok('web: nada passa da largura da tela em 320, 390 e 1280 px', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
     }
 

@@ -15,8 +15,8 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
  * Boas-vindas (D-125, estudo de 25/11/2026, sinal 19): o que o app faz, o teste grátis ("14 dias grátis, sem cartão") e um caminho
  * principal ("Criar conta") com um segundo à vista ("Ver a demonstração"). "Entrar" e o convite da empresa (D-078 E) continuam, como links
  * menores. No build de demonstração, "Ver a demonstração" entra na conta de demonstração; na versão publicada, abre a demonstração da web
- * no navegador (`DEMO_URL`), com dados fictícios. Desde a D-126, o título é o mesmo do site, e a frase central da marca fica pequena acima
- * dele, como a assinatura da marca no site.
+ * no navegador (`DEMO_URL`), com dados fictícios. O título é o mesmo do site: desde a D-128 (Enzo, 26/11/2026, revisão da D-126), de novo
+ * "Cuidar da vida financeira faz parte de cuidar de você.", sem frase pequena acima, com o benefício concreto no subtítulo logo abaixo.
  */
 export default function BoasVindas() {
   const { auth } = useSession();
@@ -47,10 +47,7 @@ export default function BoasVindas() {
   };
   return (
     <AuthShell art={<View style={{ alignItems: 'center' }}><WelcomeArt width={220} /></View>}>
-      {/* A assinatura da marca, pequena, acima do título (D-126, como no site). */}
-      <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
-        {WELCOME_TEXT.brand}
-      </Txt>
+      {/* D-128: o título é a frase da marca, sem frase pequena acima dele, e o benefício concreto fica logo abaixo, como no site. */}
       <Txt variant="hero" style={{ fontSize: 26, lineHeight: 34 }} accessibilityRole="header">
         {WELCOME_TEXT.title}
       </Txt>

@@ -36,10 +36,15 @@ export const MODULOS = {
 // --------------------------------------------------------------------------------------------------------------------
 // Início da página
 
-/** Sem o módulo da calculadora (rede fora do ar, por exemplo), a mensagem de "carregando" passa a dizer isso. */
+/**
+ * Sem o módulo da calculadora (rede fora do ar, por exemplo), a mensagem de "carregando" passa a dizer isso. Com o link para a versão web
+ * (só no site lançado, D-128), o texto antes dele termina em "Você também pode usar a "; sem o link, a frase termina no ponto.
+ */
 function avisarFalha(raiz) {
   const aviso = raiz.querySelector('.calc-carregando');
-  if (aviso && aviso.firstChild) aviso.firstChild.textContent = 'Não foi possível carregar a calculadora. Recarregue a página. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a ';
+  if (!aviso || !aviso.firstChild) return;
+  const comLink = aviso.querySelector('a') !== null;
+  aviso.firstChild.textContent = `Não foi possível carregar a calculadora. Recarregue a página. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site.${comLink ? ' Você também pode usar a ' : ''}`;
 }
 
 async function iniciar(raiz) {

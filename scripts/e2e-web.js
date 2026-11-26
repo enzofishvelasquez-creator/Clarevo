@@ -378,25 +378,33 @@ setInterval(async () => {
       bv.includes('14 dias grátis, sem cartão') && bv.includes('Depois, sem assinar, você continua vendo e exportando o que anotou.') && bvLayout.trial !== null && bvLayout.trial < bvLayout.criar, JSON.stringify(bvLayout));
     ok('Boas-vindas (D-125): dois botões grandes, "Criar conta" (o principal, azul) e "Ver a demonstração" (o segundo, suave, logo abaixo), com "Com dados fictícios, sem criar conta."',
       bvLayout.bigButtons === 2 && bvLayout.criar !== null && bvLayout.demo !== null && bvLayout.demo > bvLayout.criar && bvLayout.criarBg === 'rgb(36, 87, 245)' && bvLayout.demoBg !== bvLayout.criarBg && bv.includes('Com dados fictícios, sem criar conta.'), JSON.stringify(bvLayout));
-    // D-126: o título das boas-vindas é o mesmo do site, e a frase central da marca fica pequena logo acima dele, como a assinatura da marca
-    // no site.
+    // D-128 (Enzo, 26/11/2026, revisão da D-126): o título das boas-vindas é o mesmo do site, de novo a frase da marca, sem nenhuma frase
+    // pequena acima dele; o benefício concreto fica no subtítulo, logo abaixo e menor.
     const bvTitle = await p.evaluate(() => {
       const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const TITULO = 'Cuidar da vida financeira faz parte de cuidar de você.';
+      const SUB = 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.';
       const headings = [...document.querySelectorAll('[role=heading]')].filter(shown);
-      const h = headings.find((e) => e.textContent === 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.');
-      const marca = [...document.querySelectorAll('div,span')].filter(shown).find((e) => e.textContent === 'Cuidar da vida financeira faz parte de cuidar de você.' && e.children.length === 0);
+      const h = headings.find((e) => e.textContent === TITULO);
+      const folhas = [...document.querySelectorAll('div,span')].filter(shown).filter((e) => e.children.length === 0 && (e.textContent || '').trim() !== '');
+      const sub = folhas.find((e) => e.textContent === SUB);
+      const topo = h ? h.getBoundingClientRect().top : 0;
       return {
         titulo: h ? h.textContent : headings.map((e) => e.textContent).join(' | '),
-        tituloY: h ? Math.round(h.getBoundingClientRect().top) : null,
-        marcaY: marca ? Math.round(marca.getBoundingClientRect().bottom) : null,
+        tituloY: h ? Math.round(h.getBoundingClientRect().bottom) : null,
+        subY: sub ? Math.round(sub.getBoundingClientRect().top) : null,
         tituloFonte: h ? parseFloat(getComputedStyle(h).fontSize) : null,
-        marcaFonte: marca ? parseFloat(getComputedStyle(marca).fontSize) : null,
-        marcaHeading: marca ? marca.closest('[role=heading]') !== null : null,
+        subFonte: sub ? parseFloat(getComputedStyle(sub).fontSize) : null,
+        // Nenhuma frase acima do título (a arte e o logotipo são desenho; no build de demonstração, só o selo "Demonstração"): a frase
+        // pequena de antes saiu.
+        acima: folhas.filter((e) => e.getBoundingClientRect().bottom <= topo + 1).map((e) => e.textContent.trim()),
+        // O título aparece uma vez só (o elemento mais de dentro com o texto inteiro).
+        vezes: [...document.querySelectorAll('body *')].filter(shown).filter((e) => e.textContent === TITULO && ![...e.children].some((c) => c.textContent === TITULO)).length,
       };
     });
-    ok('Boas-vindas (D-126): o título é o do site ("Organize as contas, os cartões e os gastos do mês, ..."), e "Cuidar da vida financeira faz parte de cuidar de você." fica pequena acima dele, fora do título',
-      bvTitle.tituloY !== null && bvTitle.marcaY !== null && bvTitle.marcaY <= bvTitle.tituloY + 1 && bvTitle.marcaFonte < bvTitle.tituloFonte / 1.5 && bvTitle.marcaHeading === false &&
-        bv.includes('Veja o que entrou, o que saiu e o que ainda vai vencer no mês.'), JSON.stringify(bvTitle));
+    ok('Boas-vindas (D-128): o título é "Cuidar da vida financeira faz parte de cuidar de você.", sem frase pequena acima dele, e o benefício concreto ("Contas, cartões e gastos do mês em ordem, ...") logo abaixo, menor',
+      bvTitle.tituloY !== null && bvTitle.subY !== null && bvTitle.subY >= bvTitle.tituloY - 1 && bvTitle.subFonte < bvTitle.tituloFonte / 1.3 && bvTitle.acima.filter((t) => t.split(/\s+/).length >= 3).length === 0 && bvTitle.vezes === 1 &&
+        !bv.includes('Organize as contas') && !bv.includes('Veja o que entrou, o que saiu e o que ainda vai vencer no mês.'), JSON.stringify(bvTitle));
     ok('Boas-vindas (D-125): "Já tem conta? Entrar" e "Tenho um convite da empresa" continuam, como links menores, depois dos dois botões',
       bv.includes('Já tem conta?') && bvLayout.entrar !== null && bvLayout.entrar > bvLayout.demo && bvLayout.convite !== null && bvLayout.convite > bvLayout.entrar && bvLayout.entrarH < bvLayout.criarH, JSON.stringify(bvLayout));
     for (const w of [320, 360]) {

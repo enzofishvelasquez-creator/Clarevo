@@ -26,6 +26,14 @@ function campos(): Campo[] {
   return [...md.matchAll(re)].map((m) => ({ nome: m[1]!, limite: Number(m[2]), unidade: m[3] as Campo['unidade'], texto: m[4]! }));
 }
 
+/**
+ * O título e o benefício concreto da página inicial do site (D-128, `scripts/site/paginas/inicio.js`): o título é a mensagem central, e o
+ * benefício é a primeira frase do subtítulo, a mesma do subtítulo das boas-vindas do app e da primeira linha das descrições das lojas.
+ */
+const INICIO = ler('scripts/site/paginas/inicio.js');
+const TITULO_DO_INICIO = /const TITULO = '([^']+)';/.exec(INICIO)![1]!;
+const BENEFICIO = /const BENEFICIO = '([^']+)';/.exec(INICIO)![1]!;
+
 const tamanho = (c: Campo) => (c.unidade === 'bytes' ? Buffer.byteLength(c.texto, 'utf8') : [...c.texto].length);
 
 // Termos proibidos (spec2 §5, como em copy.test.ts e no roteiro web) e travessões; a expressão proibida é montada por partes.
@@ -120,6 +128,9 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
   // preço com o teste; a mensagem central de antes (D-068) continua como assinatura no fim das descrições e nas imagens.
   it('a promessa é concreta (D-125): subtítulo com palavra de busca, nome alternativo, descrição curta, as três primeiras linhas e a frase de marca, e a marca no feminino', () => {
     const campo = (n: string) => todos.find((c) => c.nome === n)!.texto;
+    // D-128: o texto promocional também começa pelo benefício concreto, sem o título longo de antes.
+    expect(campo('apple-promocional').startsWith(`${BENEFICIO} `)).toBe(true);
+    for (const c of todos) expect(c.texto, c.nome).not.toContain('Organize as contas');
     expect(campo('apple-subtitulo')).toBe('Controle de gastos e contas');
     expect(campo('apple-nome-alternativo')).toBe('Clarevo: controle de gastos');
     expect(campo('google-descricao-curta')).toBe('Controle de gastos e contas do mês, com pessoal, família e negócio separados.');
@@ -130,7 +141,9 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const nome of ['apple-descricao', 'google-descricao-completa']) {
       const d = campo(nome);
       const [promessa, privacidade, preco] = d.split('\n');
-      expect(promessa, nome).toBe('Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.');
+      // D-128: a primeira linha é o benefício concreto e curto (o mesmo subtítulo da página inicial e das boas-vindas), e não mais o título
+      // longo "Organize as contas, ...".
+      expect(promessa, nome).toBe(BENEFICIO);
       expect(privacidade, nome).toMatch(/^Você decide o que entra/);
       expect(preco, nome).toMatch(/R\$ 29,90 por mês.*R\$ 69,90 por mês.*14 dias grátis/);
       expect(d.trimEnd().endsWith('Cuidar da vida financeira faz parte de cuidar de você.'), nome).toBe(true);
@@ -143,18 +156,23 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const c of todos) expect(c.texto, c.nome).not.toMatch(/\b(?:o|O|do|no|ao|pelo|um)\s+Clarevo\b|NO CLAREVO/);
   });
 
-  it('a tela de boas-vindas do app tem o título do site (D-126), a mensagem central da ficha pequena acima dele, o teste grátis e "Ver a demonstração" à vista (D-125)', () => {
+  it('a tela de boas-vindas do app tem o título do site, a mensagem central da ficha (D-128), sem frase pequena acima, o benefício concreto logo abaixo, o teste grátis e "Ver a demonstração" à vista (D-125)', () => {
     const tela = ler('apps/app/src/app/boas-vindas.tsx');
     const central = todos.find((c) => c.nome === 'mensagem-central')!.texto;
-    // D-126: o título é WELCOME_TEXT.title, o mesmo título do site (e a promessa das descrições das lojas, sem o "no mesmo app"); a
-    // mensagem central fica como assinatura da marca, pequena, logo acima, como no site.
+    // D-128 (Enzo, 26/11/2026, revisão da D-126): o título é WELCOME_TEXT.title, de novo a mensagem central, o mesmo título da página inicial
+    // do site; o benefício concreto é o subtítulo (a primeira frase do subtítulo do site e a primeira linha das descrições das lojas).
     expect(tela).toMatch(/accessibilityRole="header">\s*\{WELCOME_TEXT\.title\}\s*<\/Txt>/);
-    const TITULO_DO_INICIO = /const TITULO = '([^']+)';/.exec(ler('scripts/site/paginas/inicio.js'))![1]!;
-    expect(ler('packages/core/src/welcome.ts')).toContain(`title: '${TITULO_DO_INICIO}'`);
-    expect(ler('packages/core/src/welcome.ts')).toContain(`brand: '${central}'`);
-    expect(todos.find((c) => c.nome === 'apple-descricao')!.texto.split('\n')[0]).toBe(TITULO_DO_INICIO.replace(/\.$/, ', no mesmo app.'));
-    expect(tela.indexOf('{WELCOME_TEXT.brand}')).toBeGreaterThan(-1);
-    expect(tela.indexOf('{WELCOME_TEXT.brand}')).toBeLessThan(tela.indexOf('{WELCOME_TEXT.title}'));
+    expect(TITULO_DO_INICIO).toBe(central);
+    const welcome = ler('packages/core/src/welcome.ts');
+    expect(welcome).toContain(`title: '${central}'`);
+    expect(welcome).toContain(`subtitle: '${BENEFICIO}'`);
+    // Nenhuma frase pequena acima do título: a assinatura de antes saiu do núcleo e da tela, e o título é o primeiro texto da tela.
+    expect(welcome).not.toMatch(/\bbrand:/);
+    expect(tela).not.toContain('WELCOME_TEXT.brand');
+    const corpo = tela.slice(tela.indexOf('<AuthShell'));
+    expect(corpo.indexOf('<Txt')).toBe(corpo.indexOf('<Txt variant="hero"'));
+    expect(tela.indexOf('{WELCOME_TEXT.subtitle}')).toBeGreaterThan(tela.indexOf('{WELCOME_TEXT.title}'));
+    expect(todos.find((c) => c.nome === 'apple-descricao')!.texto.split('\n')[0]).toBe(BENEFICIO);
     // Estudo de 25/11/2026 (sinal 19): o teste grátis escrito na tela e a demonstração como segunda opção.
     expect(tela).toContain('{WELCOME_TEXT.trial}');
     expect(tela).toContain('WELCOME_TEXT.demo');

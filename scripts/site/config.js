@@ -17,30 +17,31 @@ const TELAS = path.join(RAIZ, 'docs', 'telas');
 /** O app web, no endereço oficial desde 27/10/2026 (D-070); `clarevo.pages.dev` continua respondendo. Troque aqui e em `docs/07`. */
 const URL_APP = 'https://app.clarevo.app.br';
 const HOST_APP = 'app.clarevo.app.br';
-/** A demonstração do app (dados fictícios, nada é gravado fora do aparelho): o destino de "Ver a demonstração" na página Comece aqui. */
+/**
+ * A demonstração do app (dados fictícios, nada é gravado fora do aparelho). Desde 26/11/2026 (D-128), só como link de texto discreto em O app
+ * e em Use no navegador ("Ver uma demonstração com dados fictícios", `linkDaDemonstracao` em `estado.js`).
+ */
 const URL_DEMO = 'https://demo.clarevo.app.br';
 const HOST_DEMO = 'demo.clarevo.app.br';
-/** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Testar 14 dias grátis" depois do lançamento. */
+/** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Assine aqui" depois do lançamento (D-128). */
 const URL_CRIAR_CONTA = `${URL_APP}/criar-conta`;
 /**
- * A tela de entrar do app web (`apps/app/src/app/entrar.tsx`): o destino de "Entrar (quem testa)" antes do lançamento. A tela inicial do app
- * web começa com "14 dias grátis, sem cartão" e "Criar conta", e o cadastro de pessoas reais só abre no lançamento (D-064): antes dele, o
- * site nunca leva à tela inicial do app, só à de entrar, para quem já testa.
+ * A tela de entrar do app web (`apps/app/src/app/entrar.tsx`): o destino de "Entrar" no menu antes do lançamento (até 26/11/2026, "Entrar
+ * (quem testa)"; D-128). A tela inicial do app web começa com "14 dias grátis, sem cartão" e "Criar conta", e o cadastro de pessoas reais só
+ * abre no lançamento (D-064): antes dele, o site nunca leva à tela inicial do app, só à de entrar, para quem já tem conta.
  */
 const URL_ENTRAR = `${URL_APP}/entrar`;
 
 /**
  * O estado do produto (D-125, 25/11/2026): UM interruptor para todas as páginas contarem a mesma história (`scripts/site/estado.js`,
- * `docs/22_SITE.md`, seção 19).
- *   - `lancado: false` (o padrão, pré-lançamento): as páginas dizem que a Clarevo está em fase de testes e que o acesso para pessoas e
- *     famílias abre no lançamento; os planos aparecem como os preços do lançamento, sem oferta nos dados estruturados; as chamadas levam à
- *     demonstração e a "Como ter acesso" (Comece aqui), sem convidar a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais
- *     abre por decisão do Enzo); o botão do menu é "Entrar (quem testa)" e leva à tela de entrar do app web (`URL_ENTRAR`).
- *   - `lancado: true`: some todo texto de fase de testes; a chamada principal vira "Testar 14 dias grátis" (a tela de criar conta do app
- *     web) e os selos das lojas aparecem, cada um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto
- *     a assinatura pelo app estiver fechada (`SUBSCRIBE_OPEN` em `packages/core/src/plano.ts`): primeiro abre a assinatura, depois o site.
- * A frase "A assinatura pelo app abre no lançamento" não é um segundo interruptor: segue o mesmo `SUBSCRIBE_OPEN`, e como o lançamento
- * exige a assinatura aberta, ela nunca aparece no site lançado.
+ * `docs/22_SITE.md`, seção 19). Desde 26/11/2026 (D-128), nenhum dos dois estados fala de fase de testes, e a chamada principal é "Assine
+ * aqui" em todas as páginas.
+ *   - `lancado: false` (o padrão, pré-lançamento): "Assine aqui" leva aos planos, que mostram a fita "Em breve" em cada cartão, sem oferta nos
+ *     dados estruturados; nada convida a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais abre por decisão do Enzo); o
+ *     botão do menu é "Entrar" e leva à tela de entrar do app web (`URL_ENTRAR`).
+ *   - `lancado: true`: "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas aparecem, cada
+ *     um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto a assinatura pelo app estiver fechada
+ *     (`SUBSCRIBE_OPEN` em `packages/core/src/plano.ts`): primeiro abre a assinatura, depois o site.
  * `lojas`: os endereços das páginas do app (só `https://apps.apple.com/...` e `https://play.google.com/...`), vazios até a publicação.
  * `prazoDeResposta`: o prazo de resposta do atendimento que a equipe consegue cumprir sempre (por exemplo, "até 1 dia útil, de segunda a
  * sexta"). Vazio, nenhuma página promete prazo; preenchido, entra em Sobre e em Suporte. Decisão do Enzo (pergunta do estudo de 25/11).
@@ -86,6 +87,8 @@ const DOCUMENTOS_DO_PACOTE = ['resumo-para-advogado.md', 'pendencias-do-lancamen
  */
 const MENU = [
   { arquivo: 'app/index.html', rotulo: 'O app', pasta: 'app' },
+  // D-128: a versão web (`web.html`), para incentivar o uso no navegador.
+  { arquivo: 'web.html', rotulo: 'Na web', pasta: null },
   { arquivo: 'planos.html', rotulo: 'Planos', pasta: 'planos' },
   { arquivo: 'mei.html', rotulo: 'Para MEI', pasta: null },
   { arquivo: 'empresas/index.html', rotulo: 'Para empresas', pasta: 'empresas' },
@@ -102,6 +105,7 @@ const RODAPE_COLUNAS = [
       { arquivo: 'index.html', rotulo: 'Início' },
       { arquivo: 'comece.html', rotulo: 'Comece aqui' },
       { arquivo: 'app/index.html', rotulo: 'O app' },
+      { arquivo: 'web.html', rotulo: 'Use no navegador' },
       { arquivo: 'planos.html', rotulo: 'Planos' },
       { arquivo: 'mei.html', rotulo: 'Por conta e MEI' },
       { arquivo: 'empresas/index.html', rotulo: 'Para empresas' },

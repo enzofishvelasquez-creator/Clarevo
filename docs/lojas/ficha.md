@@ -1,6 +1,6 @@
 # Ficha das lojas (pt-BR)
 
-19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"), em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão) em 25/11/2026 (D-125, estudo "Clarevo frente ao mercado": subtítulo com palavra de busca, primeiras linhas com a promessa, a privacidade e o preço, e a lista de recursos mais curta) e em 26/11/2026 (D-127, plano anual: os preços por ano nas descrições e os quatro produtos nas notas para a revisão). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
+19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"), em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão) em 25/11/2026 (D-125, estudo "Clarevo frente ao mercado": subtítulo com palavra de busca, primeiras linhas com a promessa, a privacidade e o preço, e a lista de recursos mais curta) em 26/11/2026 (D-127, plano anual: os preços por ano nas descrições e os quatro produtos nas notas para a revisão) e de novo em 26/11/2026 (D-128, revisão da D-126 pelo Enzo: a primeira linha das descrições e o começo do texto promocional passam a ser o benefício concreto, curto, "Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.", o mesmo subtítulo da página inicial do site e das boas-vindas do app, cujo título voltou a ser a mensagem central). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
 
 **Limites.** Apple, conferidos em 19/10/2026 em `developer.apple.com/help/app-store-connect/reference/app-information/app-information` e `.../platform-version-information`: nome 30 caracteres, subtítulo 30, texto promocional 170, descrição 4000, palavras-chave 100 **bytes** (letra acentuada vale 2), notas para a revisão 4000 bytes. Google Play: título 30, descrição curta 80 e descrição completa 4000 caracteres são os limites que a página de ajuda do Play Console costuma trazer, **a conferir**: a rede desta sessão não abriu `support.google.com`, e esses valores não foram lidos da fonte oficial.
 
@@ -15,11 +15,11 @@
 | Subtítulo (Apple) | 27 caracteres | 30 |
 | Mensagem central (gráfico e imagem do site) | 54 caracteres | 60 |
 | Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
-| Texto promocional (Apple) | 156 caracteres | 170 |
+| Texto promocional (Apple) | 142 caracteres | 170 |
 | Palavras-chave (Apple) | 97 bytes | 100 bytes |
-| Descrição (Apple) | 3439 caracteres | 4000 |
+| Descrição (Apple) | 3400 caracteres | 4000 |
 | Descrição curta (Google) | 77 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 3392 caracteres | 4000 (a conferir) |
+| Descrição completa (Google) | 3353 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 162 caracteres | 500 (a conferir) |
 | Notas para a revisão (Apple) | 2069 bytes | 4000 bytes |
 
@@ -30,10 +30,12 @@
 | Nome | Apple e Google | 30 | Clarevo | 7 |
 | Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: controle de gastos | 27 |
 | Subtítulo | Apple | 30 | Controle de gastos e contas | 27 |
-| Mensagem central, hoje a assinatura da marca (não vai à loja) | Gráfico do Google Play e imagem do site | 60 | Cuidar da vida financeira faz parte de cuidar de você. | 54 |
+| Mensagem central, de novo o título do site e das boas-vindas do app desde 26/11/2026 (D-128; não vai à loja) | Gráfico do Google Play e imagem do site | 60 | Cuidar da vida financeira faz parte de cuidar de você. | 54 |
 | Frase de apoio (não vai à loja) | Gráfico do Google Play e imagem do site | 30 | Mais clareza para decidir | 25 |
 | Categoria principal | Apple e Google | | Finanças | |
 | Categoria secundária (opcional) | Apple | | Educação | |
+
+**Benefício concreto na primeira linha (26/11/2026, D-128).** O título longo "Organize as contas, os cartões e os gastos do mês, ..." (D-126) saiu do começo das descrições e do texto promocional: a primeira linha é a frase curta do benefício, "Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.", a mesma que vem logo abaixo do título no site e nas boas-vindas do app. O título do site e das boas-vindas voltou a ser a mensagem central, "Cuidar da vida financeira faz parte de cuidar de você.", e por isso o gráfico do Google Play e a imagem de compartilhamento, que já usam a mensagem central, não precisam ser refeitos.
 
 **Promessa concreta (25/11/2026, D-125).** O estudo "Clarevo frente ao mercado" mostrou que "Bem-estar financeiro" não é termo de busca e não diz o que o app faz. Agora o subtítulo da Apple junta a palavra de busca e o benefício ("Controle de gastos e contas"), a descrição curta do Google diz o que o app faz e o diferencial (pessoal, família e negócio separados), e as três primeiras linhas das descrições trazem a promessa, a privacidade ("Você decide o que entra") e o preço com o teste grátis. A frase "Cuidar da vida financeira faz parte de cuidar de você." continua como assinatura da marca (no fim das descrições, no rodapé do site e acima do título da página inicial), e "bem-estar financeiro" fica com a página Para empresas, que é o vocabulário que o RH compra. A lista de recursos passou de 15 itens para 10, mais curta, e cita o Espaço Negócio. O gráfico do Google Play e a imagem de compartilhamento do site ainda usam a mensagem central e a frase de apoio (campos abaixo, que não mudaram): refazer quando o Enzo escolher o título do site (o gráfico fica em `apps/app/assets/loja/` e é gerado por `node scripts/gerar-grafico-loja.js`).
 
@@ -70,7 +72,7 @@ Pode ser trocado a qualquer momento, sem nova versão.
 
 <!-- campo: apple-promocional | limite: 170 | unidade: caracteres -->
 ```
-Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar. Você decide o que entra. 14 dias grátis, sem cartão.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Você decide o que entra. 14 dias grátis, sem cartão.
 ```
 
 ## 3. Palavras-chave (Apple, até 100 bytes)
@@ -88,7 +90,7 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 
 <!-- campo: apple-descricao | limite: 4000 | unidade: caracteres -->
 ```
-Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
 Individual por R$ 29,90 por mês ou R$ 269,90 por ano; Família por R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
@@ -140,7 +142,7 @@ Controle de gastos e contas do mês, com pessoal, família e negócio separados.
 
 <!-- campo: google-descricao-completa | limite: 4000 | unidade: caracteres -->
 ```
-Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
 Individual por R$ 29,90 por mês ou R$ 269,90 por ano; Família por R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 

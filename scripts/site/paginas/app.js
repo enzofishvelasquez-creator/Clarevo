@@ -2,11 +2,12 @@
 /**
  * O app: um passeio pelos recursos, cada um com o vídeo de uso ou a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada
  * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível segue
- * o estado do produto (`estado.js`, D-125): antes do lançamento, a web em fase de testes (o link só para a tela de entrar, de quem já
- * testa) e as lojas "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 18/11/2026 (D-115), cada vídeo fica no
+ * o estado do produto (`estado.js`, D-125): antes do lançamento, a web (o link só para a tela de entrar, de quem já tem conta) e as lojas
+ * "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 26/11/2026 (D-128), as chamadas da capa são "Assine aqui"
+ * e "Use no navegador" (`web.html`), e a demonstração fica só como um link de texto discreto, logo abaixo delas. Desde 18/11/2026 (D-115), cada vídeo fica no
  * lugar da captura do recurso que ele mostra e toca sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
  */
-const { chamadas, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
+const { chamadas, linkDaDemonstracao, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
@@ -210,11 +211,13 @@ ${figura}
   const comTela = MAIS.filter((m) => m.video || m.imagem).map(cartaoMais).join('\n');
   const mais = `${semTela ? `<div class="grade grade-texto">\n${semTela}\n</div>\n` : ''}<div class="mini">\n${comTela}\n</div>`;
 
-  // As chamadas e as lojas seguem o estado do produto (D-125, `estado.js`): antes do lançamento, a demonstração e "Como ter acesso", e as
-  // lojas "em breve"; depois, "Testar 14 dias grátis" e os selos de cada loja com endereço.
+  // As chamadas e as lojas seguem o estado do produto (`estado.js`): "Assine aqui" (antes do lançamento, para os planos, que dizem "Em
+  // breve"; depois, para criar conta) e "Use no navegador" (D-128); a demonstração, só como link de texto; as lojas "em breve" antes do
+  // lançamento e, depois, os selos de cada loja com endereço.
   const capa = `<h1>A Clarevo por dentro</h1>
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
-${chamadas(ARQUIVO, estado)}
+${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
+${linkDaDemonstracao()}
 ${estado.lancado ? selosDasLojas(estado) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
 ${faixaDeConfianca(ARQUIVO)}`;
   const lojas = lojasPublicadas(estado);
@@ -234,8 +237,8 @@ ${selosDasLojas(estado)}
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">
 <article class="cartao">
-<h3>${estado.lancado ? 'Na web' : 'Na web, em fase de testes'}</h3>
-<p>A versão web da Clarevo funciona no navegador do celular ou do computador. ${linkDaVersaoWeb(estado)}</p>
+<h3>Na web</h3>
+<p>A versão web da Clarevo funciona no navegador do computador ou do celular, sem instalar nada, com a mesma conta do app para celular. <a href="${u('web.html')}">Use a Clarevo no navegador</a>. ${linkDaVersaoWeb(estado)}</p>
 </article>
 ${noCelular}
 <article class="cartao">
