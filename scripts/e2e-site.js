@@ -1743,7 +1743,7 @@ function varrerPagina() {
       }));
       ok('início: seis blocos na ordem (capa, para quem é, como funciona, você decide o que entra, planos e a chamada final), o título com o benefício e a frase de marca pequena acima dele, dados de app e de organização, "Planos" e "Para MEI" no menu e a página do MEI no rodapé',
         JSON.stringify(inicio.secoes) === JSON.stringify(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'comecar']) &&
-        inicio.h1 === 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.' && inicio.assinatura === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.assinaturaAntes === 'H1' && inicio.assinaturaTamanho < inicio.h1Tamanho / 1.5 &&
+        inicio.h1 === 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.' && inicio.assinatura === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.assinaturaAntes === 'H1' && inicio.assinaturaTamanho < inicio.h1Tamanho / 1.5 &&
         JSON.stringify(inicio.tipos) === JSON.stringify(['Organization', 'SoftwareApplication']) &&
         JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda', 'Segurança']) && inicio.rodapeMei === 'Por conta e MEI', JSON.stringify(inicio));
       await p.close();

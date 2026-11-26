@@ -30,7 +30,7 @@ const ARQUIVO = 'index.html';
  * O título da página (D-125): o benefício concreto, numa frase. As duas alternativas para o Enzo escolher estão em `docs/22_SITE.md`,
  * seção 19.
  */
-const TITULO = 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.';
+const TITULO = 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.';
 /** A mensagem central de antes (Manual v2.2, seção 19), agora a assinatura da marca, pequena, acima do título. A mesma da ficha das lojas. */
 const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você.';
 /** A frase de apoio (D-067): continua na ficha das lojas e nas imagens de compartilhamento, e saiu da capa. */

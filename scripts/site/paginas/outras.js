@@ -24,7 +24,7 @@ function paginaSobre({ valores, estado = { prazoDeResposta: '' } }) {
   const capa = `<p class="assinatura-marca">Cuidar da vida financeira faz parte de cuidar de você.</p>
 <h1>Sobre a Clarevo</h1>
 <p class="lead">Uma empresa brasileira que faz um app para organizar o dinheiro do mês com clareza, sem julgamento e com respeito aos dados de quem usa.</p>`;
-  const prazo = estado.prazoDeResposta ? `<li>Respondemos ${esc(estado.prazoDeResposta)}.</li>\n` : '';
+  const prazo = estado.prazoDeResposta ? `<li>Respondemos em ${esc(estado.prazoDeResposta)}.</li>\n` : '';
   const brutas = [
     bloco(
       `<h2 id="por-que">Por que a Clarevo existe</h2>

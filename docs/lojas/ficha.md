@@ -70,7 +70,7 @@ Pode ser trocado a qualquer momento, sem nova versão.
 
 <!-- campo: apple-promocional | limite: 170 | unidade: caracteres -->
 ```
-Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Você decide o que entra, sem anúncios. 14 dias grátis, sem cartão.
+Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar. Você decide o que entra. 14 dias grátis, sem cartão.
 ```
 
 ## 3. Palavras-chave (Apple, até 100 bytes)
@@ -88,7 +88,7 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 
 <!-- campo: apple-descricao | limite: 4000 | unidade: caracteres -->
 ```
-Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados no mesmo app.
+Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
 Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
@@ -140,7 +140,7 @@ Controle de gastos e contas do mês, com pessoal, família e negócio separados.
 
 <!-- campo: google-descricao-completa | limite: 4000 | unidade: caracteres -->
 ```
-Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados no mesmo app.
+Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
 Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 

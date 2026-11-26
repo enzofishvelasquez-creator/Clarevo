@@ -825,7 +825,7 @@ describe('site público: as páginas geradas', () => {
   // começa por "Você decide o que entra". O que saiu da página foi para as páginas próprias (Segurança, Para empresas, Sobre, indicadores).
   it('a página inicial diz numa frase o que o app faz, com a frase de marca como assinatura, seis blocos, as chamadas do estado do produto, a faixa "Você decide o que entra", os dois vídeos e nada de selo nem número de uso', () => {
     const h = html('index.html');
-    const titulo = '<h1>Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.</h1>';
+    const titulo = '<h1>Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.</h1>';
     expect(h).toContain(titulo);
     expect(h).not.toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
     // A frase de marca, pequena, logo acima do título.

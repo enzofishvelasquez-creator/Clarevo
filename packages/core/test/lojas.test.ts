@@ -130,7 +130,7 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const nome of ['apple-descricao', 'google-descricao-completa']) {
       const d = campo(nome);
       const [promessa, privacidade, preco] = d.split('\n');
-      expect(promessa, nome).toBe('Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados no mesmo app.');
+      expect(promessa, nome).toBe('Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.');
       expect(privacidade, nome).toMatch(/^Você decide o que entra/);
       expect(preco, nome).toMatch(/R\$ 29,90 por mês.*R\$ 69,90 por mês.*14 dias grátis/);
       expect(d.trimEnd().endsWith('Cuidar da vida financeira faz parte de cuidar de você.'), nome).toBe(true);

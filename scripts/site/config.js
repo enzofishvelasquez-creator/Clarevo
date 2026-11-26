@@ -51,7 +51,7 @@ const URL_ENTRAR = `${URL_APP}/entrar`;
 const ESTADO_DO_PRODUTO = {
   lancado: false,
   lojas: { appStore: '', googlePlay: '' },
-  prazoDeResposta: '',
+  prazoDeResposta: 'até 1 dia útil, de segunda a sexta',
 };
 /** A página oficial da NR-1 no site do Ministério do Trabalho e Emprego (D-068): a fonte do bloco "Bem-estar financeiro e a NR-1", em Para empresas. Endereço achado na busca de 25/10/2026 (título "Norma Regulamentadora No. 1 (NR-1)"). */
 const URL_NR1 = 'https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1';
