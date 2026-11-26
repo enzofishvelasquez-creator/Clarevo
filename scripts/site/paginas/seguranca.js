@@ -45,7 +45,7 @@ function paginaSeguranca({ valores, img }) {
     bloco(
       `<h2 id="essencial">O essencial</h2>
 <ul class="nao-e">
-<li>Guardamos só o que você, ou as pessoas da sua Família, anotam ou escolhem importar.</li>
+<li>Você decide o que entra: guardamos só o que você, ou as pessoas da sua Família, anotam, mandam por mensagem ou escolhem importar.</li>
 <li>Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.</li>
 <li>Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
 <li>Sem anúncios, sem venda de dados e sem rastreamento para publicidade.</li>

@@ -1,7 +1,7 @@
 import { formatBpCompact, formatInteger, formatRate } from '../learn/format';
 import { fixedIncomeTaxBp, fixedIncomeTaxCents } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, monthsDuration, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parsePercentBp } from './inputs';
 
 /**
@@ -168,7 +168,7 @@ export function calcRendimentoCdi(input: RendimentoCdiInput): CalcOutcome<Rendim
       netCents,
       netYieldCents,
       resultLines,
-      notes: imposto === 'regressivo' ? [T.noteTable(), T.noteCdi] : [T.noteCdi],
+      ...calcNotes(imposto === 'regressivo' && ['info', T.noteTable()], ['estimate', T.noteCdi]),
       hypotheses: T.hypotheses(cdi, percentual, calendarDays, imposto),
     },
   };

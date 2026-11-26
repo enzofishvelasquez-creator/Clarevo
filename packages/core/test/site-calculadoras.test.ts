@@ -287,10 +287,12 @@ describe('site público: páginas das calculadoras', () => {
       expect(h).toContain('não garantem resultado');
       expect(h).toContain(`<div class="calc" data-calculadora="${c.slug}">`);
       expect(h).toContain('<script type="module" src="calculadora.js"></script>');
-      // Sem JavaScript: o aviso, o link para a versão web e cada campo da calculadora (rótulo e dica do core).
+      // Sem JavaScript: o aviso, o link para o app que qualquer pessoa pode abrir agora (antes do lançamento, a demonstração, porque a tela
+      // inicial do app web convida a criar conta, D-064; depois, a versão web, em site-estado.test.ts) e cada campo da calculadora.
       const sem = /<noscript>([\s\S]*?)<\/noscript>/.exec(h)?.[1] ?? '';
       expect(sem).toContain('precisa de JavaScript');
-      expect(sem).toContain('versão web');
+      expect(sem).toContain('ou use a <a href="https://demo.clarevo.app.br" rel="noopener noreferrer">demonstração</a> da Clarevo.');
+      expect(h).not.toContain('href="https://app.clarevo.app.br"');
       const ignorados = c.slug === 'plano-dividas' ? ['dividas'] : c.slug === 'dividir-contas' ? ['pessoas'] : [];
       for (const [chave, spec] of Object.entries(calcFields(c.slug))) {
         if (ignorados.includes(chave)) continue;
@@ -557,14 +559,14 @@ process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepoi
     for (const m of Object.values(Object.fromEntries(gerado.arquivos)).map(texto).join('\n').matchAll(/\.\.\/calculadoras\/[a-z-]+\.html\?([^"]+)"/g)) expect(m[1]).toMatch(/^modo=[a-z_-]+$/);
   });
 
-  it('"Calculadoras" está no menu principal, no rodapé, no índice e no início de Aprender, na página inicial e na 404', () => {
+  it('"Calculadoras" está no menu principal, no rodapé, no índice e no início de Aprender e na 404', () => {
     for (const [nome, h] of [...gerado.arquivos].filter(([n]) => n.endsWith('.html')).map(([n, v]) => [n, texto(v)] as const)) {
       expect(h, `${nome}: menu`).toMatch(/<ul class="menu-lista">.*<li><a href="[^"]*index\.html"[^>]*>Calculadoras<\/a><\/li>/);
       expect(h, `${nome}: rodapé`).toMatch(/<footer class="rodape">[\s\S]*<a href="[^"]*index\.html">Calculadoras<\/a>/);
     }
     expect(pagina('aprender/index.html')).toContain(`href="../calculadoras/index.html"><span class="titulo-cartao">${esc(CALC_UI_TEXT.learnCardTitle)}</span>`);
     expect(pagina('aprender/index.html')).toContain('>Calculadoras</a>');
-    expect(pagina('index.html')).toContain('<span class="titulo-cartao">Calculadoras</span>');
+    // Desde 25/11/2026 (D-125), a página inicial não tem mais a grade de atalhos: Calculadoras fica no menu e no rodapé (conferidos acima).
     expect(pagina('404.html')).toContain('href="/calculadoras/index.html">Calculadoras</a>');
   });
 

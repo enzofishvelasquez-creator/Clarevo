@@ -11,6 +11,7 @@ import { HelpButton } from '@/components/help-button';
 import { yearA11yLabel } from '@/components/series-parts';
 import { SpaceSheet, useSpaceChoices } from '@/components/space-sheet';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
+import { STORE_CAPTURE } from '@/lib/capture';
 import type { HelpScreen } from '@/lib/guide';
 import { WIDE_CONTENT_MAX, WIDE_GUTTER, WIDE_TAB_MAX, WIDE_TOP, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
@@ -85,7 +86,8 @@ function BrandRow() {
   const { width } = useWindowDimensions();
   // Abaixo de 360 px, logotipo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
   const narrow = width < 360;
-  const demo = auth.mode === 'demo';
+  // As capturas das lojas escondem o selo (`STORE_CAPTURE`): o olho cabe como numa conta real.
+  const demo = auth.mode === 'demo' && !STORE_CAPTURE;
   const eyeGap = eyeFits(width, narrow, demo, PixelRatio.getFontScale());
   return (
     <View style={[styles.top, narrow && { gap: space[2] }]}>
@@ -313,14 +315,16 @@ export function ContextPill({ label: given, fixed, inTab, switchable }: { label:
   const business = useBusiness();
   const choices = useSpaceChoices();
   const [open, setOpen] = useState(false);
-  const demo = auth.mode === 'demo';
+  // As capturas das lojas mostram a pílula de uma conta real ("Salvando em Pessoal"), sem o selo (`STORE_CAPTURE`).
+  const demo = auth.mode === 'demo' && !STORE_CAPTURE;
   // No negócio (D-113), o último "Pessoal" vira o nome do negócio ("Salvando em Sacolé da Mãe").
   const label = fixed ? given : contextLabelFor(given, kind, business.data?.name);
   // Nas abas, o selo "Demonstração" já está no cabeçalho: a pílula fica branca e diz só o contexto.
   const text = contextPillText(label, demo, inTab);
   const lime = demo && !inTab;
   const color = lime ? colors.textOnAccent : colors.brand;
-  const canSwitch = Boolean(switchable) && !fixed && (choices.spaces.length > 1 || choices.creatable.length > 0);
+  // A pílula só troca de espaço com mais de um espaço (estudo de 25/11/2026, sinal 22): só com o Pessoal, ela só diz o espaço.
+  const canSwitch = Boolean(switchable) && !fixed && choices.spaces.length > 1;
   // Na linha de baixo do cabeçalho do celular (StackedPillContext), a pílula tem a largura da faixa toda e não precisa da margem da direita
   // (era para afastar do "?"). O alvo de 44 px da pílula que troca de espaço avança por igual sobre o respiro de cima e de baixo, até a
   // altura da pílula fixa: a faixa tem a mesma altura com ou sem a seta (a pílula tem 18 px de linha, que crescem com a letra do aparelho,
@@ -364,13 +368,15 @@ export function ContextPill({ label: given, fixed, inTab, switchable }: { label:
 
 /**
  * Seletor de espaço nas abas (CL-V002, D-113b): Pessoal, a Família (D-055, quem tem uma) e o negócio (D-113, pelo nome, quem tem um). A
- * pílula branca desliza em 200 ms (sem animação com "reduzir movimento"). Aparece sempre nas abas que dependem do espaço (Resumo,
- * Movimentos e Metas), mesmo só com o Pessoal (retorno de quem testa, 18/11/2026: "Como eu mudo a versão do pessoal para o de
- * negócios?"): aí mostra o Pessoal escolhido e o "+". O "+" fica enquanto houver um espaço para criar (o Negócio e a Família) e abre a
- * folha "Criar um espaço". Investir é só do Pessoal e não tem o seletor.
+ * pílula branca desliza em 200 ms (sem animação com "reduzir movimento"). Aparece nas abas que dependem do espaço (Resumo, Movimentos e
+ * Metas) só com mais de um espaço (estudo de 25/11/2026, sinal 22: o seletor para quem só tem o Pessoal, e o "Pessoal" repetido em Metas,
+ * pareciam descuido). É a única indicação do espaço na tela. O "+" fica enquanto houver um espaço para criar e abre a folha "Criar um
+ * espaço"; só com o Pessoal, o espaço Negócio e a Família se criam em Conta ("Plano e espaços") e pelo atalho de Primeiros passos.
+ * Investir é só do Pessoal e não tem o seletor.
  */
 export function ContextSwitch() {
   const { spaces, creatable } = useSpaceChoices();
+  if (spaces.length < 2) return null;
   return <ContextSwitchTrack options={spaces} creatable={creatable.length > 0 ? SPACE_TEXT.createA11y(creatable) : null} />;
 }
 

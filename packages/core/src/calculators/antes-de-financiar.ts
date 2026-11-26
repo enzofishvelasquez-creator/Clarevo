@@ -5,7 +5,7 @@ import { formatBpCompact } from '../learn/format';
 import { installmentCents, percentTenths, roundDivBig } from '../learn/math';
 import { MAX_RECORD_CENTS, formatBRL, type Cents } from '../money';
 import { SIMULATE_MONTHS_MAX, monthlyRateText, monthsForTarget } from '../simulate';
-import { FieldReader, countField, moneyField, monthsCount, monthsDuration, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, moneyField, monthsCount, monthsDuration, rateField, type CalcFieldSpec, type CalcNoteItem, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parsePercentBp, type Parsed } from './inputs';
 
 /**
@@ -391,7 +391,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
           `Você paga ${brl(preco)} na compra, sem ${cet ? 'custo adicional' : 'juros'}.`,
         ],
         hypotheses: [],
-        notes: [],
+        ...calcNotes(),
       },
     };
   }
@@ -426,7 +426,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
   let parcelaPermille: number | null = null;
   let beforePermille: number | null = null;
   let afterPermille: number | null = null;
-  const notes: string[] = [estimateNote];
+  const notes: CalcNoteItem[] = [['estimate', estimateNote]];
   // Uma parcela só, paga na compra, não pesa mês a mês: sem as linhas de impacto na renda nem do comprometido.
   const showImpact = !paidAtPurchase;
   // O peso na renda usa a maior parcela (com taxa 0%, as últimas podem ter 1 centavo a mais).
@@ -441,7 +441,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
         `Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + heaviest)} enquanto durar o financiamento.`,
       );
     }
-    notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
+    notes.push(['info', `${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`]);
   } else if (showImpact && committed !== null && committed > 0) {
     resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + heaviest)} enquanto durar o financiamento.`);
   }
@@ -584,7 +584,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       goalParams,
       resultLines,
       hypotheses,
-      notes,
+      ...calcNotes(...notes),
     },
   };
 }

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   BUDGET_TEXT,
+  budgetRuleNotes,
   CARRIED_ATTEMPT_MAX_AGE_MS,
   DEMO_TEXT,
   DEMO_TODAY,
@@ -85,9 +86,11 @@ describe('CL-01: a regra do orçamento escrita uma vez só', () => {
   const rule = BUDGET_TEXT.rule;
 
   it('a frase da tela do orçamento é a do guia e a do manual (e a de docs/02), palavra por palavra', () => {
-    // Tela: a tela desenha BUDGET_TEXT.rule e nenhum texto escrito à mão sobre a regra.
+    // Tela: desde a revisão de 26/11/2026, as duas frases da regra vêm separadas no fim da tela (`budgetRuleNotes`; a do cartão só com
+    // cartão no espaço, conferido com a tela montada em primeiro-uso.test.ts), as mesmas palavras de BUDGET_TEXT.rule, e nenhum texto
+    // escrito à mão sobre a regra.
+    expect(budgetRuleNotes(true).join(' ')).toBe(rule);
     const screen = read('apps/app/src/app/orcamento/index.tsx');
-    expect(screen).toContain('{BUDGET_TEXT.rule}');
     expect(screen).not.toContain('Compras no cartão contam');
     // Guia (e a ajuda "?" da tela, que lê o mesmo catálogo).
     const entry = GUIDE_ENTRIES.find((e) => e.id === 'orcamento')!;
@@ -332,14 +335,18 @@ describe('CL-11: demonstração visível nos formulários e em Metas', () => {
     expect(header).toContain("auth.mode === 'demo'");
   });
 
-  it('formulários de gasto e de gasto fixo avisam, na linha final, que nada sai da demonstração; Metas mostra o contexto', () => {
+  it('formulários de gasto e de gasto fixo avisam, na linha final, que nada sai da demonstração; Metas mostra o espaço uma vez só', () => {
     for (const file of ['apps/app/src/components/record-form.tsx', 'apps/app/src/components/series-form.tsx']) {
       const source = read(file);
       expect(source, file).toContain('DEMO_TEXT.saveNote');
       expect(source, file).toContain("auth.mode === 'demo'");
     }
+    // Estudo de 25/11/2026 (sinal 22): "Pessoal" aparecia duas vezes em Metas (a pílula e o seletor). Agora a única indicação é o seletor,
+    // que só aparece com mais de um espaço; o selo "Demonstração" continua no cabeçalho das abas.
     const metas = read('apps/app/src/app/(tabs)/metas.tsx');
-    expect(metas).toContain('<AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">');
+    expect(metas).toContain('<AppHeader title={GOALS_TEXT.tabTitle}>');
+    expect(metas).not.toContain('context="Pessoal"');
+    expect(metas).toContain('<ContextSwitch />');
     // A conta real com o e-mail da demonstração não esconde "Primeiros passos".
     expect(read('apps/app/src/components/primeiros-passos.tsx')).toContain("const demoWithData = auth.mode === 'demo' && user?.email === DEMO_EMAIL;");
   });

@@ -2,7 +2,7 @@
 import { formatBpCompact } from '../learn/format.js';
 import { formatBRL } from '../money.js';
 import { SIMULATE_MONTHS_MAX, SIMULATE_MONTHS_MIN, SIMULATE_RATE_MAX_BP, SIMULATE_RESULT_MAX_CENTS, SIMULATE_TEXT, monthlyRateText, simulateGrowth } from '../simulate.js';
-import { FieldReader, countField, monthsDuration, moneyField, rateField } from './common.js';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField, rateField } from './common.js';
 import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './inputs.js';
 export const JUROS_COMPOSTOS_FIELDS = {
     inicial: moneyField('Quanto já tem para começar', 'quanto já tem para começar', '4.500,00', { optional: true }),
@@ -57,7 +57,7 @@ export function calcJurosCompostos(input) {
             contributedCents: growth.contributedCents,
             interestCents: growth.earningsCents,
             resultLines: [T.highlight(growth.finalCents, meses), T.contributed(growth.contributedCents), T.interest(growth.earningsCents)],
-            notes: [T.note],
+            ...calcNotes(['estimate', T.note]),
             hypotheses: T.hypotheses(taxa, mensal),
         },
     };

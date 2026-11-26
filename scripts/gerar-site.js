@@ -55,6 +55,10 @@
  *   --dados <arquivo> lê os valores dos marcadores de outro JSON (padrão: site/dados-da-empresa.json)
  *   --retrato <arquivo>  lê o retrato dos indicadores de outro JSON (padrão: site-src/indicadores/retrato.json)
  *   --noticias <pasta>   lê as edições do resumo semanal de outra pasta (padrão: site-src/noticias)
+ *   --estado <arquivo>   lê de um JSON as chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO` em scripts/site/config.js, D-125),
+ *                        como {"lancado": true, "lojas": {"appStore": "https://apps.apple.com/..."}}, para ver ou testar o site lançado.
+ *                        "lancado": true é recusado com a assinatura pelo app fechada (SUBSCRIBE_OPEN do núcleo); para ver o site
+ *                        lançado antes disso, junte "simularAssinaturaAberta": true (a geração avisa, e o --final recusa)
  *   --atualizar-indicadores  antes de gerar, consulta o Banco Central (o mesmo código do worker) e grava o retrato dos indicadores; sem
  *                        rede, avisa e gera com o retrato anterior. O `--final` recusa retrato vazio, incompleto ou com mais de 7 dias
  * A imagem de compartilhamento (`site-src/imagens/og-clarevo-1200x630.png`) é feita à parte, por `node scripts/gerar-og-site.js`.
@@ -152,6 +156,8 @@ async function principal(argv) {
   const novidades = opcao('--novidades');
   const arquivoRetrato = path.resolve(opcao('--retrato') || ARQUIVO_RETRATO);
   const noticias = opcao('--noticias');
+  const arquivoEstado = opcao('--estado');
+  const estado = arquivoEstado ? JSON.parse(fs.readFileSync(path.resolve(arquivoEstado), 'utf8')) : undefined;
 
   // D-106: o retrato dos indicadores só é refeito quando se pede (gerar sem rede dá sempre o mesmo site).
   if (argv.includes('--atualizar-indicadores')) {
@@ -171,6 +177,7 @@ async function principal(argv) {
     novidades: novidades ? path.resolve(novidades) : undefined,
     arquivoRetrato,
     noticias: noticias ? path.resolve(noticias) : undefined,
+    estado,
   });
   for (const aviso of resultado.avisos) console.warn(`aviso: ${aviso}`);
 

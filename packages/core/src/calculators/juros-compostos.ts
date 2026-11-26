@@ -1,7 +1,7 @@
 import { formatBpCompact } from '../learn/format';
 import { formatBRL, type Cents } from '../money';
 import { SIMULATE_MONTHS_MAX, SIMULATE_MONTHS_MIN, SIMULATE_RATE_MAX_BP, SIMULATE_RESULT_MAX_CENTS, SIMULATE_TEXT, monthlyRateText, simulateGrowth } from '../simulate';
-import { FieldReader, countField, monthsDuration, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './inputs';
 
 /**
@@ -92,7 +92,7 @@ export function calcJurosCompostos(input: JurosCompostosInput): CalcOutcome<Juro
       contributedCents: growth.contributedCents,
       interestCents: growth.earningsCents,
       resultLines: [T.highlight(growth.finalCents, meses), T.contributed(growth.contributedCents), T.interest(growth.earningsCents)],
-      notes: [T.note],
+      ...calcNotes(['estimate', T.note]),
       hypotheses: T.hypotheses(taxa, mensal),
     },
   };

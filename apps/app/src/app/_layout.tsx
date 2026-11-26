@@ -22,7 +22,7 @@ import { StoreWarmup } from '@/components/store-warmup';
 import { initCrashReport } from '@/lib/crash-report';
 import { useWideLayout } from '@/lib/layout';
 import { forgetDevice } from '@/lib/device-forget';
-import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
+import { afterLogin, deletedAccountIntent, firstStepTarget, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, takeInitialLink, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
@@ -246,10 +246,18 @@ function Navigation() {
       restoreTarget(appLinkTarget);
       return;
     }
-    if (!hasEntryTarget()) return;
-    const target = takeEntryTarget();
-    if (!target) return;
-    restoreTarget(target);
+    if (hasEntryTarget()) {
+      const target = takeEntryTarget();
+      if (target) {
+        firstStepTarget.take();
+        restoreTarget(target);
+        return;
+      }
+    }
+    // O atalho escolhido em "Sua primeira conta" (importar ou o Telegram, D-125): com o espaço pronto, a tela pedida abre por cima do Resumo.
+    // O endereço pedido ao abrir o app, se houver, tem a vez.
+    const firstStep = firstStepTarget.take();
+    if (firstStep) restoreTarget(firstStep);
   }, [status, user, inRecovery, appLinkTarget]);
 
   return (

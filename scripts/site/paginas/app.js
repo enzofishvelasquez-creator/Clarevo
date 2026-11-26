@@ -1,11 +1,12 @@
 'use strict';
 /**
  * O app: um passeio pelos recursos, cada um com o vídeo de uso ou a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada
- * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível: web
- * hoje; lojas "em breve", sem selos. Desde 18/11/2026 (D-115), cada vídeo fica no lugar da captura do recurso que ele mostra e toca
- * sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
+ * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível segue
+ * o estado do produto (`estado.js`, D-125): antes do lançamento, a web em fase de testes (o link só para a tela de entrar, de quem já
+ * testa) e as lojas "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 18/11/2026 (D-115), cada vídeo fica no
+ * lugar da captura do recurso que ele mostra e toca sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
  */
-const { URL_APP } = require('../config');
+const { chamadas, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
@@ -162,7 +163,7 @@ const MAIS = [
   { id: 'tema', titulo: 'Tema claro ou escuro', ajuda: 'ajuda/conta.html#p-tema', video: 'tema-escuro-claro', texto: 'Por padrão, a Clarevo segue o tema do aparelho. Em Conta, no card Tema, dá para escolher Claro ou Escuro, e a escolha vale só para aquele aparelho.' },
 ];
 
-function paginaApp({ valores, img, videos }) {
+function paginaApp({ valores, img, videos, estado }) {
   const u = (d) => rel(ARQUIVO, d);
   const c = catalogo();
   const guia = (id) => c.GUIA.find((e) => e.id === id);
@@ -209,27 +210,34 @@ ${figura}
   const comTela = MAIS.filter((m) => m.video || m.imagem).map(cartaoMais).join('\n');
   const mais = `${semTela ? `<div class="grade grade-texto">\n${semTela}\n</div>\n` : ''}<div class="mini">\n${comTela}\n</div>`;
 
+  // As chamadas e as lojas seguem o estado do produto (D-125, `estado.js`): antes do lançamento, a demonstração e "Como ter acesso", e as
+  // lojas "em breve"; depois, "Testar 14 dias grátis" e os selos de cada loja com endereço.
   const capa = `<h1>A Clarevo por dentro</h1>
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
-<div class="acoes">
-<a class="botao botao-principal" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
-<a class="botao botao-suave" href="${u('ajuda/index.html')}">Ver a Ajuda</a>
-</div>
-<p class="lojas">Em breve na App Store e no Google Play.</p>
+${chamadas(ARQUIVO, estado)}
+${estado.lancado ? selosDasLojas(estado) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
 ${faixaDeConfianca(ARQUIVO)}`;
+  const lojas = lojasPublicadas(estado);
+  const noCelular = estado.lancado && lojas.length
+    ? `<article class="cartao">
+<h3>No celular</h3>
+<p>O app para ${lojas.map((l) => (l.id === 'appStore' ? 'iPhone, na App Store' : 'Android, no Google Play')).join(', e para ')}. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
+${selosDasLojas(estado)}
+</article>`
+    : `<article class="cartao">
+<h3>No celular, em breve</h3>
+<p><span class="etiqueta">Em breve</span> O app para iPhone e Android será publicado na App Store e no Google Play. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
+</article>`;
 
   const brutas = [
     bloco(
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">
 <article class="cartao">
-<h3>Na web, hoje</h3>
-<p>A versão web da Clarevo já funciona no navegador do celular ou do computador. <a href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>.</p>
+<h3>${estado.lancado ? 'Na web' : 'Na web, em fase de testes'}</h3>
+<p>A versão web da Clarevo funciona no navegador do celular ou do computador. ${linkDaVersaoWeb(estado)}</p>
 </article>
-<article class="cartao">
-<h3>No celular, em breve</h3>
-<p><span class="etiqueta">Em breve</span> O app para iPhone e Android será publicado na App Store e no Google Play. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
-</article>
+${noCelular}
 <article class="cartao">
 <h3>Painel da empresa, só na web</h3>
 <p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
@@ -239,7 +247,7 @@ ${faixaDeConfianca(ARQUIVO)}`;
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração. Os vídeos tocam sem som enquanto aparecem na tela, e o botão redondo no canto de cada um pausa ou toca de novo.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
 <div class="recursos">
 ${linhas}
 </div>`,
@@ -253,7 +261,7 @@ ${mais}`,
   ];
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'O app por dentro: recursos e telas',
+    titulo: 'O app por dentro: contas, cartões e controle de gastos',
     descricao: 'Um passeio pelas cinco abas da Clarevo: Resumo, Movimentos, Metas, Investir e Aprender, com contas a pagar, cartões e Família, em telas da demonstração.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),

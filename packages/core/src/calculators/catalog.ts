@@ -1,3 +1,5 @@
+import type { CalcTexts } from './common';
+
 /** Lista da tela "Calculadoras" (docs/08 §2.2; spec4 §1.2), na ordem da tela. */
 export type CalcGroup = 'compra' | 'dividas' | 'guardar';
 
@@ -84,6 +86,18 @@ export function calcNotice(slug?: CalcSlug): string {
   return slug === 'dividir-contas' ? DIVIDIR_NOTICE : CALC_NOTICE;
 }
 
+/**
+ * Os avisos do resultado de uma calculadora, separados pelo tipo que cada calculadora dá a eles (`CalcNoteKind`, em `calcNotes`):
+ * `shown` (estimativa e aviso, sempre à vista com a resposta) e `folded` (os de apoio, que vão para "Como a conta é feita" junto com as
+ * hipóteses e as leis citadas). A ordem de cada grupo é a do core. Um aviso sem tipo (que não deveria existir) fica à vista.
+ */
+export function splitCalcNotes(texts: Pick<CalcTexts, 'notes' | 'noteKinds'> | null | undefined): { shown: string[]; folded: string[] } {
+  const shown: string[] = [];
+  const folded: string[] = [];
+  (texts?.notes ?? []).forEach((note, i) => (texts?.noteKinds[i] === 'info' ? folded : shown).push(note));
+  return { shown, folded };
+}
+
 /** Texto de abertura da tela "Calculadoras". */
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 
@@ -115,6 +129,12 @@ export const CALC_UI_TEXT = {
   seeAll: 'Ver todas as calculadoras',
   resultTitle: 'Resultado',
   hypothesesTitle: 'Hipóteses',
+  /**
+   * O resultado começa pela resposta; os avisos e as hipóteses (com as leis citadas) ficam recolhidos neste bloco (estudo de 25/11/2026,
+   * sinal 23), o mesmo nome da aba Investir. Os avisos de estimativa e os que mudam a leitura da conta continuam à vista (`splitCalcNotes`).
+   */
+  howTitle: 'Como a conta é feita',
+  howHint: 'Mostra as hipóteses da conta e outras explicações.',
   /** Antes do primeiro resultado (campos obrigatórios em branco). */
   waiting: 'Preencha os campos para ver o resultado.',
   /** Movimentos › Organizar: legenda fixa da linha "Calculadoras". */

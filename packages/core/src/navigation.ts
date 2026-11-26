@@ -109,6 +109,43 @@ export function topicTabFor(pathname: string): TabRoute {
   return TAB_OF_TOPIC.find(([re]) => re.test(path))?.[1] ?? '/';
 }
 
+/**
+ * Telas que não são de nenhuma aba: Conta e o que se abre dela (assinatura, exportar, Telegram, nível, excluir), a Família, o painel da
+ * empresa e a Contabilidade. Abertas pelo avatar de qualquer aba, elas ficam sem aba marcada, sempre do mesmo jeito (estudo de 25/11/2026,
+ * sinal 21: a Conta aparecia com Resumo, Aprender ou Investir marcados, conforme o caminho). A barra lateral do computador já fazia assim.
+ */
+const NO_TAB_AREA = /^\/(conta|familia|empresa|contabilidade)(\/|$)/;
+
+/** A tela é da área de Conta (sem aba marcada)? */
+export function isNoTabArea(pathname: string): boolean {
+  return NO_TAB_AREA.test(normalizePath(pathname));
+}
+
+/**
+ * A aba marcada na barra de uma tela de consulta: nenhuma (`null`) nas telas da área de Conta e nas abertas por cima dela (`fromConta`);
+ * nas outras, a aba de onde a pessoa veio (`origin`) ou, sem ela (endereço aberto direto), a do assunto.
+ */
+export function barTabFor(pathname: string, origin: TabRoute | null, fromConta = false): TabRoute | null {
+  if (fromConta || isNoTabArea(pathname)) return null;
+  return origin ?? topicTabFor(pathname);
+}
+
+/** O estado do roteador, só com o que a barra precisa ler (o `getRootState()` do expo-router, sem tipos do roteador). */
+export type NavState = { routes?: readonly { name: string; state?: NavState }[]; routeNames?: readonly string[]; index?: number };
+
+/**
+ * A tela de agora foi aberta por cima da Conta (a Conta está mais abaixo na pilha das telas que têm as abas)? Assim, uma tela aberta da
+ * Conta, como Seu negócio ou Quem vê estes dados, também fica sem aba marcada, na barra de baixo e na barra lateral do computador
+ * (`barTabFor(..., fromConta)`). O roteador guarda a pilha das telas dentro de uma rota de fora: a busca desce até a pilha que tem as
+ * abas ("(tabs)"), no máximo quatro níveis. Só as rotas abaixo da atual contam: a Conta aberta agora é `isNoTabArea`.
+ */
+export function contaBelow(state: NavState | undefined): boolean {
+  let s = state;
+  for (let depth = 0; s && depth < 4 && !(s.routeNames ?? s.routes?.map((r) => r.name) ?? []).includes('(tabs)'); depth++) s = s.routes?.[s.index ?? 0]?.state;
+  if (!s?.routes) return false;
+  return s.routes.slice(0, s.index ?? 0).some((r) => r.name === 'conta' || r.name.startsWith('conta/'));
+}
+
 export const BAR_TEXT = {
   /** Nome acessível da barra de abas. */
   label: 'Navegação principal',

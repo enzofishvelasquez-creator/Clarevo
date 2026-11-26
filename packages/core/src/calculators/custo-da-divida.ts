@@ -1,7 +1,7 @@
 import { formatBp, formatBpCompact } from '../learn/format';
 import { compoundTotalBig, equivalentAnnualBp, installmentCents } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, monthsCount, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, monthsCount, moneyField, rateField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parsePercentBp } from './inputs';
 
 /**
@@ -177,7 +177,7 @@ function parcelarFatura(valor: Cents, saldo: Cents, input: DividaInput): CalcOut
         ...(limited ? [DIVIDA_TEXT.capSchedule] : []),
         DIVIDA_TEXT.capHistory,
       ],
-      notes: [],
+      ...calcNotes(),
     },
   };
 }
@@ -211,7 +211,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
           annualLine,
         ],
         hypotheses: ['Rotativo por 1 ciclo, até a fatura seguinte (Res. CMN 4.549/2017).', 'Juros compostos, sem IOF, multa ou tarifas.'],
-        notes: [DIVIDA_TEXT.cetOutNote],
+        ...calcNotes(['estimate', DIVIDA_TEXT.cetOutNote]),
       },
     };
   }
@@ -235,7 +235,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
           annualLine,
         ],
         hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.', DIVIDA_TEXT.chequeCapScope],
-        notes: [...(aboveCap ? [DIVIDA_TEXT.chequeCapNote] : []), DIVIDA_TEXT.cetOutNote],
+        ...calcNotes(aboveCap && ['warning', DIVIDA_TEXT.chequeCapNote], ['estimate', DIVIDA_TEXT.cetOutNote]),
       },
     };
   }
@@ -256,7 +256,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
         annualLine,
       ],
       hypotheses: ['Parcelas iguais (tabela Price), a primeira 1 mês depois.', 'Só a taxa de juros informada, sem tarifas, seguros e IOF.'],
-      notes: [DIVIDA_TEXT.cetNote],
+      ...calcNotes(['estimate', DIVIDA_TEXT.cetNote]),
     },
   };
 }

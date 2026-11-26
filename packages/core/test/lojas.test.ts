@@ -91,16 +91,21 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     }
   });
 
-  it('as descrições dizem que o app não se conecta a contas bancárias e que a empresa não vê os dados', () => {
+  // Desde 25/11/2026 (D-125): a promessa de marca é "Você decide o que entra" (só entra o que a pessoa anota, importa ou manda por
+  // mensagem), e o fato de o app não se conectar a contas bancárias fica no fim das descrições, em IMPORTANTE, como informação.
+  it('as descrições dizem que você decide o que entra, que o app não se conecta a contas bancárias e que a empresa não vê os dados', () => {
     for (const nome of ['apple-descricao', 'google-descricao-completa']) {
       const t = todos.find((c) => c.nome === nome)!.texto;
+      expect(t, nome).toContain('Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem.');
       expect(t, nome).toContain('não se conecta a contas bancárias');
+      expect(t.indexOf('não se conecta a contas bancárias'), nome).toBeGreaterThan(t.indexOf('IMPORTANTE'));
       expect(t, nome).toContain('nunca vê seus gastos');
       expect(t, nome).toContain('Não é banco');
       expect(t, nome).toContain('não garantem resultado');
+      expect(t, nome).not.toMatch(/segurança nível bancário|100% seguro|economiz|Open Finance|Clarevo Plus|plano anual/i);
     }
-    expect(todos.find((c) => c.nome === 'apple-promocional')!.texto).toContain('não se conecta a contas bancárias');
-    expect(todos.find((c) => c.nome === 'google-descricao-curta')!.texto).toContain('contas bancárias');
+    expect(todos.find((c) => c.nome === 'apple-promocional')!.texto).toContain('Você decide o que entra');
+    expect(todos.find((c) => c.nome === 'google-descricao-curta')!.texto).not.toMatch(/Sem ligar a contas bancárias/);
   });
 
   it('as descrições citam só o que o app faz: a exclusão da conta, o recibo sem foto guardada e os limites da Família', () => {
@@ -111,19 +116,26 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     expect(t).toContain('nunca o número inteiro');
   });
 
-  it('o posicionamento é o de bem-estar financeiro (D-068): subtítulo, nome alternativo, descrição curta, mensagem central e frase de apoio, e a marca no feminino', () => {
+  // D-125 (25/11/2026): o subtítulo junta a palavra de busca e o benefício; as três primeiras linhas trazem a promessa, a privacidade e o
+  // preço com o teste; a mensagem central de antes (D-068) continua como assinatura no fim das descrições e nas imagens.
+  it('a promessa é concreta (D-125): subtítulo com palavra de busca, nome alternativo, descrição curta, as três primeiras linhas e a frase de marca, e a marca no feminino', () => {
     const campo = (n: string) => todos.find((c) => c.nome === n)!.texto;
-    expect(campo('apple-subtitulo')).toBe('Bem-estar financeiro');
-    expect(campo('apple-nome-alternativo')).toBe('Clarevo: bem-estar financeiro');
-    expect(campo('google-descricao-curta')).toMatch(/^Bem-estar financeiro: /);
+    expect(campo('apple-subtitulo')).toBe('Controle de gastos e contas');
+    expect(campo('apple-nome-alternativo')).toBe('Clarevo: controle de gastos');
+    expect(campo('google-descricao-curta')).toBe('Controle de gastos e contas do mês, com pessoal, família e negócio separados.');
     expect(campo('mensagem-central')).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
     expect(campo('frase-de-apoio')).toBe('Mais clareza para decidir');
+    // As palavras do subtítulo não se repetem nas palavras-chave (a Apple junta os três campos).
+    for (const w of ['controle', 'gastos', 'contas']) expect(campo('apple-palavras-chave').split(','), w).not.toContain(w);
     for (const nome of ['apple-descricao', 'google-descricao-completa']) {
       const d = campo(nome);
-      expect(d, nome).toContain('A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app');
-      expect(d, nome).toContain('Cuidar da vida financeira faz parte de cuidar de você');
-      expect(d, nome).toContain('Mais clareza para decidir.');
+      const [promessa, privacidade, preco] = d.split('\n');
+      expect(promessa, nome).toBe('Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.');
+      expect(privacidade, nome).toMatch(/^Você decide o que entra/);
+      expect(preco, nome).toMatch(/R\$ 29,90 por mês.*R\$ 69,90 por mês.*14 dias grátis/);
+      expect(d.trimEnd().endsWith('Cuidar da vida financeira faz parte de cuidar de você.'), nome).toBe(true);
       expect(d, nome).toContain('O QUE VOCÊ FAZ NA CLAREVO');
+      expect(d.match(/^• /gm)?.length, nome).toBeLessThanOrEqual(13);
       // Sem promessa de saúde: a descrição diz que não é atendimento de saúde e não promete resultado financeiro nem de saúde.
       expect(d, nome).toContain('Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde.');
       expect(d, nome).not.toMatch(/ansiedade|depress|terapia|tranquilidade|produtividade|sono\b|cura\b|trata(r|mento)\b/i);
@@ -131,15 +143,17 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const c of todos) expect(c.texto, c.nome).not.toMatch(/\b(?:o|O|do|no|ao|pelo|um)\s+Clarevo\b|NO CLAREVO/);
   });
 
-  it('a tela de boas-vindas do app tem a mensagem central da ficha como título, seguida da linha prática de antes, sem texto a mais', () => {
+  it('a tela de boas-vindas do app tem a mensagem central da ficha como título, o teste grátis e "Ver a demonstração" à vista (D-125)', () => {
     const tela = ler('apps/app/src/app/boas-vindas.tsx');
     const central = todos.find((c) => c.nome === 'mensagem-central')!.texto;
-    expect(tela).toMatch(new RegExp(`accessibilityRole="header">\\s*${central.replace(/\./g, '\\.')}\\s*</Txt>`));
-    expect(tela).toContain('Acompanhe o seu mês e construa planos para você e sua família.');
+    // O título é WELCOME_TEXT.title, a mesma frase da ficha (a frase central fica para o fundador decidir; as duas mudam juntas).
+    expect(tela).toMatch(/accessibilityRole="header">\s*\{WELCOME_TEXT\.title\}\s*<\/Txt>/);
+    expect(ler('packages/core/src/welcome.ts')).toContain(`title: '${central}'`);
+    // Estudo de 25/11/2026 (sinal 19): o teste grátis escrito na tela e a demonstração como segunda opção.
+    expect(tela).toContain('{WELCOME_TEXT.trial}');
+    expect(tela).toContain('WELCOME_TEXT.demo');
     expect(tela).not.toContain('Mais clareza');
     expect(tela).not.toContain('Seu dinheiro,');
-    // A estrutura de antes: o título, uma linha, a nota de privacidade, os dois botões e a demonstração.
-    expect(tela.match(/<Txt\b/g)).toHaveLength(3);
   });
 
   it('as descrições da Apple e do Google contam a mesma história; só a seção ASSINATURA muda, cada uma citando só a própria loja', () => {

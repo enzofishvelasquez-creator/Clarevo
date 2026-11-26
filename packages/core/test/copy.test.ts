@@ -2446,7 +2446,8 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
   it('GUIDE_TEXT, HELP_TEXT, TOUR_TEXT e MANUAL_TEXT inteiros e os textos montados', () => {
     check([...staticStrings(GUIDE_TEXT), ...staticStrings(HELP_TEXT), ...staticStrings(TOUR_TEXT), ...staticStrings(MANUAL_TEXT), ...guideFunctions]);
     expect(GUIDE_TEXT.cardTitle).toBe('Como usar o app da Clarevo');
-    expect(GUIDE_TEXT.tourAgain).toBe('Ver o tour de novo');
+    // Desde o estudo de 25/11/2026, o tour não abre sozinho: fica no topo do guia, para quem quiser.
+    expect(GUIDE_TEXT.tourAgain).toBe('Ver o tour do app');
     expect(GUIDE_TEXT.purposeTitle).toBe('Para que serve');
     expect(GUIDE_TEXT.whereTitle).toBe('Onde fica');
     expect(GUIDE_TEXT.stepsTitle).toBe('Como usar');
@@ -2503,7 +2504,7 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
   });
 
   it('os arquivos-fonte novos do guia passam', () => {
-    for (const name of ['guide/catalog.ts', 'guide/text.ts', 'guide/search.ts', 'guide/tour.ts', 'guide/types.ts']) {
+    for (const name of ['guide/catalog.ts', 'guide/text.ts', 'guide/search.ts', 'guide/types.ts', 'welcome.ts', 'money-input.ts']) {
       const source = readFileSync(join(CORE_SRC, name), 'utf8');
       expect(source, name).not.toMatch(FORBIDDEN);
       expect(source, name).not.toMatch(JUDGMENT);

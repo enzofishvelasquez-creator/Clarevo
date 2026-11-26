@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 
-import { Txt } from '@/components/ui';
+import { FitTxt, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 
 /**
@@ -18,13 +18,17 @@ export function useMoneyLabelMask(): (text: string) => string {
   return (text) => maskMoneyLabel(text, hidden);
 }
 
-/** Txt cujo texto (e nome acessível) pode ter valores em reais: com valores ocultos, mostra "R$ ••••". */
-export function MoneyTxt({ children, accessibilityLabel, ...props }: Omit<ComponentProps<typeof Txt>, 'children'> & { children: string }) {
+/**
+ * Txt cujo texto (e nome acessível) pode ter valores em reais: com valores ocultos, mostra "R$ ••••". `fit`: um valor sozinho (o total de
+ * um card), numa linha só que diminui a letra para caber (`FitTxt`), para nunca quebrar no meio com a letra grande.
+ */
+export function MoneyTxt({ children, accessibilityLabel, fit, ...props }: Omit<ComponentProps<typeof Txt>, 'children' | 'ref'> & { children: string; fit?: boolean }) {
   const hidden = useValuesHidden();
   const label = hidden ? maskMoneyLabel(accessibilityLabel ?? children, true) : accessibilityLabel;
+  const Comp = fit ? FitTxt : Txt;
   return (
-    <Txt {...props} accessibilityLabel={label}>
+    <Comp {...props} accessibilityLabel={label}>
       {maskMoneyText(children, hidden)}
-    </Txt>
+    </Comp>
   );
 }

@@ -1,7 +1,6 @@
-import { BAR_TEXT, BUSINESS_WORDS, barModeFor, topicTabFor } from '@clarevo/core';
-import { router, useNavigationContainerRef, usePathname } from 'expo-router';
+import { BAR_TEXT, BUSINESS_WORDS, barModeFor, isNoTabArea, topicTabFor } from '@clarevo/core';
+import { router, usePathname } from 'expo-router';
 import { Eye, EyeOff, MonitorSmartphone, Plus } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
 import { type GestureResponderEvent, Pressable, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/brand';
@@ -9,6 +8,7 @@ import { ProfileAvatar } from '@/components/profile-photo';
 import { TABS, useLastTab } from '@/components/tab-bar';
 import { Button, DemoPill, Txt, styles as ui } from '@/components/ui';
 import { promptInstall, useCanInstall } from '@/lib/install-prompt';
+import { contaBelow, useNavState } from '@/lib/nav-state';
 import { SIDE_NAV_WIDTH } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { useWork } from '@/state/data';
@@ -32,31 +32,6 @@ function navLink(href: string, go: () => void) {
   } as { onPress: (e: GestureResponderEvent) => void };
 }
 
-type NavState = { index?: number; routeNames?: string[]; routes?: { name: string; state?: NavState }[] };
-
-/**
- * A Conta está na pilha, abaixo da tela de agora? Família, Quem vê e as outras telas abertas a partir da Conta continuam com a Conta
- * marcada (revisão de 23/11/2026: a Família marcava o Resumo, a aba de onde a pessoa tinha saído antes de abrir a Conta).
- */
-function contaBelow(state: NavState | undefined): boolean {
-  // A pilha das telas é a que tem as abas; o roteador guarda a pilha dentro de uma rota de fora.
-  let s = state;
-  for (let depth = 0; s && depth < 4 && !(s.routeNames ?? s.routes?.map((r) => r.name) ?? []).includes('(tabs)'); depth++) s = s.routes?.[s.index ?? 0]?.state;
-  if (!s?.routes) return false;
-  return s.routes.slice(0, s.index ?? 0).some((r) => r.name === 'conta' || r.name.startsWith('conta/'));
-}
-
-/**
- * A pilha de telas de agora. Pelo aviso de troca do roteador, não lida ao desenhar: na hora em que o endereço muda, o estado guardado
- * ainda é o de antes (voltar da Conta para uma tela de baixo deixaria a Conta marcada).
- */
-function useNavState(): NavState | undefined {
-  const nav = useNavigationContainerRef();
-  const [state, setState] = useState<NavState | undefined>(() => (nav.isReady() ? (nav.getRootState() as NavState) : undefined));
-  useEffect(() => nav.addListener('state', (e) => setState(e.data.state as NavState | undefined)), [nav]);
-  return state;
-}
-
 /**
  * A barra lateral da versão para computador (a partir de 1024 px; pedido do Enzo em 12/11/2026): o logotipo, "Anotar gasto" sempre à
  * vista, as cinco áreas do app e, embaixo, ocultar valores e a Conta. Aparece em todas as telas da conta pronta (abas, consultas e
@@ -75,7 +50,8 @@ export function DesktopNav() {
   const active = inTabs ? path : (origin ?? topicTabFor(pathname));
   const navState = useNavState();
   const fromConta = !inTabs && contaBelow(navState);
-  const onConta = /^\/conta(\/|$)/.test(path) || fromConta;
+  // A área de Conta (Conta, Família, painel da empresa, Contabilidade) e o que se abre dela: a Conta marcada, nenhuma aba (core/navigation).
+  const onConta = isNoTabArea(path) || fromConta;
 
   return (
     <View style={styles.nav} role="navigation" aria-label={BAR_TEXT.label}>

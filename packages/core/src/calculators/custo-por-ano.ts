@@ -1,5 +1,5 @@
 import { MAX_RECORD_CENTS, formatBRL, roundDiv, type Cents } from '../money';
-import { FieldReader, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseMoney } from './inputs';
 
 /**
@@ -94,7 +94,7 @@ export function calcCustoPorAno(input: CustoPorAnoInput): CalcOutcome<CustoPorAn
       noteParams: monthlyCents <= MAX_RECORD_CENTS ? { tipo: 'mensal', valor: monthlyCents } : null,
       resultLines,
       hypotheses,
-      notes: [],
+      ...calcNotes(),
     },
   };
 }

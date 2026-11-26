@@ -18,7 +18,6 @@ export {
   guideSummary,
   guideWhere,
   searchGuide,
-  shouldShowTour,
   type GuideEntry,
   type HelpScreen,
   type TourCard,
@@ -34,12 +33,4 @@ export function openGuideEntry(id: string) {
 export function openGuideScreen(href: string) {
   if (appScreenIsTab({ href })) router.navigate(href as Href);
   else router.push(href as Href);
-}
-
-/**
- * Só para o roteiro automatizado (`scripts/e2e-web.js`): com esta marca na página, o tour de boas-vindas não abre, para os
- * demais passos do roteiro não precisarem pulá-lo a cada conta nova. Nenhuma pessoa tem essa marca.
- */
-export function tourOffByHost(): boolean {
-  return (globalThis as { __clarevoSemTour?: unknown }).__clarevoSemTour === true;
 }

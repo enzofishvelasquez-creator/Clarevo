@@ -703,6 +703,75 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 @media (min-width:35rem){.ajuda-temas:where(:has(>:last-child:nth-child(odd)))>:first-child{grid-column:span 2}}
 @media (min-width:40.75rem){.miolo>.temas:where(:has(>:nth-child(5)):has(>:last-child:nth-child(odd)))>:first-child{grid-column:span 2}}
 
+/* Vitrine de 25/11/2026 (D-125): a página inicial em seis blocos, a página do MEI e o estado do produto. */
+/* A assinatura da marca ("Cuidar da vida financeira faz parte de cuidar de você."), pequena, acima do título: o texto no azul claro da capa
+   (4,9:1) e um traço lima decorativo; o lima no azul tem 4,4:1 e só serve para texto grande. */
+.assinatura-marca{display:flex;align-items:center;gap:.6rem;margin:0 0 .85rem;font-weight:700;font-size:.9375rem;line-height:1.4;color:var(--sobre-topo-suave)}
+.assinatura-marca::before{content:"";flex:none;width:1.75rem;height:3px;border-radius:3px;background:var(--lima)}
+/* A linha do acesso embaixo das chamadas (fase de testes ou "14 dias grátis, sem cartão"). */
+.estado-produto{margin:.25rem 0 0;color:var(--sobre-topo-suave);font-size:.9375rem;font-weight:700;line-height:1.45}
+/* Os selos das lojas (só depois do lançamento e com o endereço de cada uma): pílulas escuras com o nome oficial, sem imagem de terceiros. */
+.selos-lojas{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0 0}
+.selo-loja{display:inline-flex;align-items:center;min-height:44px;padding:0 1.1rem;border-radius:12px;background:var(--aparelho);color:#FFFFFF!important;border:1px solid #3A4A86;font-weight:800;text-decoration:none}
+.selo-loja:hover{text-decoration:underline;text-underline-offset:.2em}
+.etiqueta-precos{margin:0 0 1rem}
+.etiqueta-capa{vertical-align:middle;margin-left:.35rem}
+/* As três portas: um cartão por público, com ícone, título, uma frase e um link só, que cobre o cartão inteiro. Uma coluna no celular e
+   três a partir de 52 rem (dois e um nunca: um cartão sozinho na última linha). */
+.portas{list-style:none;margin:0;padding:0;display:grid;gap:1rem;grid-template-columns:minmax(0,1fr)}
+@media (min-width:52rem){.portas{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.porta{position:relative;display:flex;flex-direction:column;gap:.6rem;margin:0;padding:1.25rem;background:var(--superficie);border:1px solid var(--linha);border-radius:20px;transition:border-color .15s,box-shadow .15s}
+.bloco-alt .porta{background:var(--fundo)}
+.porta>*{margin:0}
+.porta-icone{display:flex;align-items:center;justify-content:center;width:2.75rem;height:2.75rem;border-radius:14px;background:var(--azul-claro);color:var(--link)}
+.porta h3{font-size:1.1875rem;font-weight:800;line-height:1.3}
+/* No celular, o ícone ao lado do título, para as três portas não ocuparem três telas. */
+@media (max-width:51.99rem){
+  .porta{display:grid;grid-template-columns:2.5rem minmax(0,1fr);column-gap:.85rem;row-gap:.5rem;align-items:center}
+  .porta-icone{width:2.5rem;height:2.5rem;border-radius:12px}
+  .porta>:not(.porta-icone):not(h3){grid-column:1/-1}
+  .porta>h3{grid-column:2}
+}
+.porta p{color:var(--texto-2)}
+.porta .porta-link{display:inline-flex;align-items:center;gap:.4rem;margin-top:auto;padding-top:.2rem;color:var(--link);font-weight:800}
+.porta .porta-link a{color:var(--link);text-decoration:none}
+.porta .porta-link a::after{content:"";position:absolute;inset:0;border-radius:20px}
+.porta .porta-link svg{flex:none;transition:transform .15s}
+.porta:hover{border-color:var(--link);box-shadow:0 12px 28px rgba(6,16,64,.10)}
+.porta:hover .porta-link a{text-decoration:underline;text-underline-offset:.18em}
+.porta:hover .porta-link svg{transform:translateX(3px)}
+.porta:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
+@supports selector(:has(*)){.porta .porta-link a:focus-visible{outline:none}}
+@media (prefers-reduced-motion:reduce){.porta,.porta svg{transition:none}.porta:hover svg{transform:none}}
+/* Como funciona: os três passos um embaixo do outro, com o número ao lado, e o vídeo ao lado a partir de 56 rem (no celular, embaixo). */
+.passos-com-celular{display:grid;gap:2rem;align-items:center}
+@media (min-width:56rem){.passos-com-celular{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:3rem}}
+.passos-com-celular .celular{justify-self:center}
+.passos.passos-lista{grid-template-columns:minmax(0,1fr)}
+.passos-lista li{display:grid;grid-template-columns:2.25rem minmax(0,1fr);column-gap:1rem;align-items:start}
+.passos-lista li::before{grid-row:1/span 2;margin-bottom:0}
+.passos-lista li>*{grid-column:2}
+.passos-com-celular+.acoes{margin-top:1.5rem}
+/* A chamada do fim (página inicial e página do MEI): o azul da capa, com as mesmas cores de botão. */
+.chamada-final{background:var(--topo);color:var(--sobre-topo);border-radius:24px;padding:2rem 1.5rem}
+@media (min-width:48rem){.chamada-final{padding:2.5rem 2.5rem}}
+.chamada-final h2{margin:0 0 .6rem;color:var(--sobre-topo)}
+.chamada-final p{max-width:46rem;color:var(--sobre-topo-suave)}
+.chamada-final a{color:var(--sobre-topo)}
+.chamada-final .acoes{margin-bottom:0}
+.chamada-final>:last-child{margin-bottom:0}
+.chamada-final .botao-principal{background:var(--lima);color:var(--sobre-lima)}
+.chamada-final .botao-suave{border-color:var(--sobre-topo);color:var(--sobre-topo)}
+.chamada-final :focus-visible{outline-color:var(--foco-topo)}
+/* Os cartões do Espaço Negócio, na página do MEI: o desenho dos recursos dos planos, sem link (o cartão não leva a lugar nenhum). */
+.recurso-cartao.recurso-fixo h3{margin:0;font-size:1.0625rem;font-weight:800;line-height:1.3}
+.recurso-cartao.recurso-fixo:hover{border-color:var(--linha);box-shadow:none}
+/* Para quem é MEI e Leve, e só seu: duas colunas a partir de 56 rem. */
+.colunas-mei{display:grid;gap:2rem 3rem}
+@media (min-width:56rem){.colunas-mei{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.colunas-mei h2{margin-top:0}
+.colunas-mei ul{margin-bottom:0}
+
 /* Rodapé */
 .rodape{background:var(--rodape);color:var(--sobre-rodape-2);padding:2.5rem 0 2rem;font-size:.9375rem;margin-top:0}
 .rodape-grade{display:grid;gap:1.5rem 1.25rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:1.5rem}
@@ -743,10 +812,12 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa .assinatura-marca,.capa .estado-produto,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}
   .rodape a,.rodape p,.rodape-fim p{color:#000}
+  .chamada-final{background:#fff;color:#000;border:1px solid #000}
+  .chamada-final h2,.chamada-final p,.chamada-final a{color:#000}
   details.conta ol{display:block}
 }

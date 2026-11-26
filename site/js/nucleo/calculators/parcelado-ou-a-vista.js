@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/parcelado-ou-a-vista.ts. Não edite: rode "node scripts/gerar-site.js".
 import { equivalentAnnualRate, impliedMonthlyRate } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, moneyField, rateText } from './common.js';
+import { FieldReader, calcNotes, countField, moneyField, rateText } from './common.js';
 import { parseCount, parseMoney } from './inputs.js';
 export const PARCELADO_RANGE = { compra: { min: 2, max: 480 }, 'cota-unica': { min: 2, max: 12 } };
 export const PARCELADO_FIELDS = {
@@ -116,7 +116,7 @@ export function calcParceladoOuAVista(input) {
             noteParams: action === 'anotar_parcelamento' ? { tipo: 'parcelada', natureza: 'compra_parcelada', parcelas: n, valor: parcela } : null,
             resultLines,
             hypotheses,
-            notes: [],
+            ...calcNotes(),
         },
     };
 }

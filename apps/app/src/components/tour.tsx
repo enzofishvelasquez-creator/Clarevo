@@ -1,16 +1,12 @@
 import { BookOpen, CalendarClock, Flag, House, NotebookPen, type LucideIcon } from 'lucide-react-native';
-import { usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useReturnBand } from '@/components/retorno-faixa';
 import { Button, LinkButton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { SIDE_NAV_WIDTH, WIDE_CONTENT_MAX, useWideLayout } from '@/lib/layout';
-import { updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
-import { TOUR_CARDS, TOUR_TEXT, shouldShowTour, tourOffByHost, type TourIcon } from '@/lib/guide';
-import { useSession } from '@/state/session';
+import { TOUR_CARDS, TOUR_TEXT, type TourIcon } from '@/lib/guide';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const ICON: Record<TourIcon, LucideIcon> = { resumo: House, anotar: NotebookPen, contas: CalendarClock, metas: Flag, ajuda: BookOpen };
@@ -42,12 +38,14 @@ function widePlace(windowWidth: number, bar: number): { paddingRight: number; ca
 }
 
 /**
- * Tour de boas-vindas (D-049(2)): cinco cartões numa folha presa ao pé da tela (revisão das telas, 16/11/2026: o cartão no meio cobria o
+ * Tour do app (D-049(2)): cinco cartões numa folha presa ao pé da tela (revisão das telas, 16/11/2026: o cartão no meio cobria o
  * que descrevia; a folha deixa a tela de cima à vista; no computador, é um cartão solto no canto de baixo à direita do conteúdo). Cada
  * cartão tem um ícone simples e texto curto; "Pular" no topo da folha, menos no último cartão; "Voltar" do segundo cartão em diante e
  * "Próximo" (no último, "Começar"). Sem animação (também não depende de "reduzir movimento"). O nome acessível da janela é lido ao
  * abrir, o título e a posição ("1 de 5") ficam no próprio cartão, e a troca de cartão é anunciada numa região viva educada (no iOS,
  * pelo anúncio do sistema). Esc e o voltar do sistema fecham. O foco fica preso na janela e volta ao que estava antes (RN Web Modal).
+ * Desde o estudo de 25/11/2026 (Onda 1, item 8), o tour não abre sozinho na primeira entrada: a ajuda vem quando a pessoa pede, em Aprender ›
+ * Como usar o app da Clarevo › "Ver o tour do app", e nas próprias telas (o botão ? e os Primeiros passos do Resumo).
  */
 export function TourDialog({ onClose }: { onClose: () => void }) {
   const [index, setIndex] = useState(0);
@@ -130,33 +128,6 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
       </View>
     </Modal>
   );
-}
-
-/**
- * O tour da primeira entrada, montado no Resumo (D-049(2)). Abre uma vez por pessoa em cada aparelho (a preferência local
- * `tourSeen`, só em memória na demonstração), depois de as preferências serem lidas, e nunca sobre a faixa "Seus últimos meses"
- * (D-030) nem sobre formulários: as regras estão em `shouldShowTour` (core). "Pular", Esc e "Começar" marcam como visto.
- * A revisão dos últimos meses só é consultada enquanto o tour ainda pode abrir; depois de visto, nada mais é lido para ele.
- */
-export function WelcomeTour({ personal, contextId }: { personal: boolean; contextId: string | undefined }) {
-  const { user, auth } = useSession();
-  const pathname = usePathname();
-  const userId = user?.id;
-  const prefs = useDevicePrefs(userId);
-  // Lido uma vez, ao montar (só o roteiro automatizado liga essa marca).
-  const [hostOff] = useState(tourOffByHost);
-  const pending = Boolean(userId) && personal && !hostOff && prefs !== undefined && !prefs.tourSeen;
-  const band = useReturnBand(pending ? contextId : undefined);
-  // Se a faixa "Seus últimos meses" apareceu neste Resumo, o tour espera até o Resumo abrir de novo: nunca abre sobre ela nem
-  // logo depois de a pessoa decidir.
-  const [sawBand, setSawBand] = useState(false);
-  useEffect(() => {
-    if (band.status === 'visivel') setSawBand(true);
-  }, [band.status]);
-  // Sem o contexto Pessoal carregado, a faixa ainda é desconhecida: o tour espera.
-  const reviewBand = sawBand ? 'visivel' : personal && !contextId ? 'pendente' : band.status;
-  if (!userId || !shouldShowTour({ pathname, prefsLoaded: prefs !== undefined, seen: prefs?.tourSeen ?? false, personal, reviewBand, disabled: hostOff })) return null;
-  return <TourDialog onClose={() => updatePrefs(userId, { tourSeen: true }, auth.mode !== 'demo')} />;
 }
 
 const styles = StyleSheet.create({

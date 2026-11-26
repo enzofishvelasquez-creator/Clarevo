@@ -58,6 +58,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { STORE_CAPTURE } from '@/lib/capture';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -1168,7 +1169,7 @@ export function SeriesForm({
               Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada mês vira uma conta a pagar, e só o
               que você marca como paga entra em Pago.
             </Txt>
-            {auth.mode === 'demo' ? (
+            {auth.mode === 'demo' && !STORE_CAPTURE ? (
               <Txt variant="label" color={colors.textSecondary}>
                 {DEMO_TEXT.saveNote}
               </Txt>

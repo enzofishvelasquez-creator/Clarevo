@@ -5,7 +5,7 @@
  * descrição, Open Graph e dados estruturados. Com domínio em `site/dados-da-empresa.json`, a página ganha `canonical`, `og:url` e
  * `og:image` com endereço completo; sem domínio, não há nada disso (e nada de sitemap).
  */
-const { MENU, RODAPE_COLUNAS, RODAPE_LEGAL, URL_APP } = require('./config');
+const { MENU, RODAPE_COLUNAS, RODAPE_LEGAL } = require('./config');
 const { esc, expandirMarcador, FONTE_MARCADOR, pendenciasDoTexto, valorDe } = require('./texto');
 const { rel, caminhoLimpo, jsonSeguro } = require('./util');
 
@@ -33,10 +33,14 @@ function menuHtml(arquivo) {
     return `<li><a href="${rel(arquivo, p.arquivo)}"${attrs}>${esc(p.rotulo)}</a></li>`;
   };
   const lista = MENU.map(item).join('');
+  // A chamada do cabeçalho segue o estado do produto (D-125): "Entrar (quem testa)", para a tela de entrar do app web, antes do lançamento;
+  // "Testar grátis", para a tela de criar conta, depois.
+  const { estadoEmVigor, chamadaDoMenu } = require('./estado');
+  const cta = chamadaDoMenu(estadoEmVigor());
   return `<nav class="menu" aria-label="Principal">
 <ul class="menu-lista">${lista}</ul>
-<a class="menu-cta" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
-<details class="menu-movel"><summary>Menu</summary><ul>${lista}<li><a href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a></li></ul></details>
+<a class="menu-cta" href="${esc(cta.href)}" rel="noopener noreferrer">${esc(cta.texto)}</a>
+<details class="menu-movel"><summary>Menu</summary><ul>${lista}<li><a href="${esc(cta.href)}" rel="noopener noreferrer">${esc(cta.texto)}</a></li></ul></details>
 </nav>`;
 }
 
@@ -189,7 +193,10 @@ function celular(img, arquivo, { legenda = true, carregamento = 'lazy', textoLeg
 
 /** Os ícones da faixa de confiança, desenhados em linha (SVG no próprio HTML, sem arquivo nem estilo em atributo). */
 const ICONES_DA_CONFIANCA = {
-  banco: '<path d="M3 9.5 12 4l9 5.5M5 10v7M9.5 10v7M14.5 10v7M19 10v7M3 20h18"/>',
+  // "Você decide o que entra" (D-125): a bandeja de entrada.
+  entrada: '<path d="M4 13.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4.5"/><path d="M4 13.5h4.5l1.5 2.5h4l1.5-2.5H20L17.5 5h-11z"/>',
+  // "Sem anúncios e sem venda de dados": o escudo com a marca de conferido.
+  escudo: '<path d="M12 3.5 5 6.2v5.3c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6.2z"/><path d="M9 12l2 2 4-4"/>',
   dinheiro: '<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
   cartao: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/>',
 };
@@ -200,10 +207,19 @@ const ICONES_DA_CONFIANCA = {
  * para a página Segurança e privacidade, com o convite visível "Segurança e privacidade" sublinhado no fim (desde 19/11/2026: antes era
  * "Ver o que a Clarevo não faz", com link para o bloco desse nome, que ficou recolhido no fim de Segurança); as vírgulas e o "Mais em"
  * escondidos da tela fazem o nome do link ser uma frase para quem usa leitor de tela.
+ *
+ * Desde 25/11/2026 (D-125), a primeira frase é "Você decide o que entra" (era "Sem conexão com o seu banco"): continua verdadeira hoje (só
+ * entra o que a pessoa anota, importa ou manda por mensagem) e não envelhece se um dia houver uma conexão opcional. A terceira passou a ser o
+ * modelo de negócio ("Sem anúncios e sem venda de dados"); o detalhe do cartão continua em Segurança.
  */
+const FRASES_DA_CONFIANCA = [
+  ['entrada', 'Você decide o que entra'],
+  ['escudo', 'Sem anúncios e sem venda de dados'],
+  ['dinheiro', 'Não movimenta dinheiro nem oferece crédito'],
+];
 function faixaDeConfianca(arquivo) {
   const item = (icone, texto) => `<span class="confianca-item"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_DA_CONFIANCA[icone]}</svg>${esc(texto)}</span>`;
-  return `<p class="confianca"><a href="${rel(arquivo, 'seguranca.html')}">${item('banco', 'Sem conexão com o seu banco')}<span class="so-leitor">, </span>${item('dinheiro', 'Não movimenta dinheiro nem oferece crédito')}<span class="so-leitor">, </span>${item('cartao', 'Não guarda os dados completos do cartão')}<span class="so-leitor">. Mais em </span><span class="confianca-mais">Segurança e privacidade<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="so-leitor">.</span></a></p>`;
+  return `<p class="confianca"><a href="${rel(arquivo, 'seguranca.html')}">${FRASES_DA_CONFIANCA.map(([icone, texto]) => item(icone, texto)).join('<span class="so-leitor">, </span>')}<span class="so-leitor">. Mais em </span><span class="confianca-mais">Segurança e privacidade<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="so-leitor">.</span></a></p>`;
 }
 
 /**
@@ -216,6 +232,15 @@ const ICONES = {
   conta: '<path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/>',
   calendario: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2"/>',
   cartao: ICONES_DA_CONFIANCA.cartao,
+  dinheiro: ICONES_DA_CONFIANCA.dinheiro,
+  entrada: ICONES_DA_CONFIANCA.entrada,
+  escudo: ICONES_DA_CONFIANCA.escudo,
+  // A receber (D-122, página do MEI): o relógio.
+  receber: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  // Família (as três portas da página inicial): duas pessoas.
+  pessoas: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 14.2A4.5 4.5 0 0 1 21 18.5"/>',
+  // Empresas (as três portas): o prédio.
+  empresa: '<path d="M4.5 20V5.5A1.5 1.5 0 0 1 6 4h7a1.5 1.5 0 0 1 1.5 1.5V20M14.5 10H18a1.5 1.5 0 0 1 1.5 1.5V20M3 20h18M8 8h3M8 11.5h3M8 15h3"/>',
   importar: '<path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M12 11v6M9.5 14.5 12 17l2.5-2.5"/>',
   ler: '<path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/><path d="M8 12h8"/>',
   meta: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.75"/><circle cx="12" cy="12" r="1.25"/>',
@@ -253,4 +278,4 @@ function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, icone, listaDeAtalhos, dominioDe, urlDoSite };
+module.exports = { SCRIPT_DO_TEMA, FRASES_DA_CONFIANCA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, icone, listaDeAtalhos, dominioDe, urlDoSite };

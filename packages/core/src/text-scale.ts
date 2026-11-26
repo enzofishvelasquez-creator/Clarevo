@@ -23,3 +23,9 @@ export function clampedLines(lines: number, fontScale: number): number | undefin
 
 /** Quanto o selo "Demonstração" cresce com a letra grande: só até 1,3 vez, porque o cabeçalho divide a faixa com o logotipo e o avatar. */
 export const DEMO_PILL_MAX_FONT_SCALE = 1.3;
+
+/**
+ * Abas de baixo com letra grande (estudo de 25/11/2026, sinal 20: "Resu…", "Movi…"): os rótulos crescem até 1,3 vez e encolhem para caber,
+ * em qualquer escala (revisão de 26/11/2026: os rótulos não somem acima de 1,3); no iPhone, tocar e segurar a aba mostra o nome grande.
+ */
+export const TAB_LABEL_MAX_FONT_SCALE = 1.3;

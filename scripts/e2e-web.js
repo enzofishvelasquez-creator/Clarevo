@@ -83,9 +83,6 @@ setInterval(async () => {
   // atalho acha a sessão e o QueryClient na árvore atual do React para gravar como outro aparelho faria (ou simular uma
   // falha de rede) e pedir às telas abertas que leiam de novo. Não muda nada no app.
   await ctx.addInitScript(() => {
-    // O tour de boas-vindas (D-049) fica desligado em todo carregamento da página: os blocos antigos criam contas novas o tempo todo e
-    // não esperam uma janela por cima do Resumo. O bloco "Tutorial (D-049)" liga o tour de propósito (window.__clarevoSemTour = false).
-    window.__clarevoSemTour = true;
     const find = () => {
       const root = document.getElementById('root');
       const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
@@ -151,7 +148,19 @@ setInterval(async () => {
   const writes = []; p.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && writes.push(`${r.method()} ${r.url()}`));
   // Texto da tela, com o espaço não separável ("R$\u00a0900,00" nunca quebra a linha) lido como espaço comum.
   const bodyText = async () => (await p.locator('body').innerText()).replace(/\u00a0/g, ' ');
-  const body = async () => { const t = await bodyText(); await headingWatch(); return t; };
+  // "Como a conta é feita" (D-125, sinal 23): nas calculadoras, o resultado começa pela resposta, e os avisos e as hipóteses ficam recolhidos.
+  // O roteiro abre os blocos fechados antes de ler a tela de uma calculadora (o que o bloco esconde continua conferido).
+  const expandHow = () => p.evaluate(() => {
+    let n = 0;
+    for (const e of document.querySelectorAll('[role=button][aria-expanded="false"]')) {
+      if (e.getBoundingClientRect().width > 0 && (e.textContent || '').trim() === 'Como a conta é feita') { e.click(); n++; }
+    }
+    return n;
+  });
+  const body = async () => {
+    if (/^\/calcular\//.test(new URL(p.url()).pathname) && (await expandHow().catch(() => 0))) await p.waitForTimeout(150);
+    const t = await bodyText(); await headingWatch(); return t;
+  };
   // Hierarquia de títulos (D-063 item 2, Ciclo Z), conferida em toda leitura da tela: o roteiro lê o texto da tela (`body`) em cada
   // tela que visita, então essa leitura também confere a regra estrita "um título de nível 1 por tela, o primeiro título no nível 1 e nenhum salto de nível"
   // (de 1 para 3, por exemplo) em todas elas. A janela aberta (diálogo, folha) é um escopo à parte da tela por baixo: o título dela é o
@@ -203,6 +212,9 @@ setInterval(async () => {
   // "Diferença do mês" sozinho é o título do card do Resumo, que só aparece com os números carregados; sem cartão, o cartão de Aprender
   // do fim do Resumo diz "Diferença do mês e saldo da conta" (revisão das telas, 16/11/2026) e não deve contar como o Resumo pronto.
   const waitText = (t, timeout=8000) => p.getByText(t, { exact: t === 'Diferença do mês' }).filter({ visible: true }).first().waitFor({ timeout });
+  // Orçamento por categoria aberto (D-125, sinal 23): a regra do cartão saiu do topo e só aparece com cartão; a espera é pelo título da tela e pela
+  // grade do mês (que aparece depois de carregar).
+  const waitBudget = async () => { await p.locator('h1').filter({ hasText: /^Orçamento por categoria$/ }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); await p.getByText('Ver Pago por categoria', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); };
   // Texto da tela no primeiro instante em que um texto aparece (leitura contínua, sem o intervalo de espera do Playwright):
   // mostra o que a tela exibe junto com uma faixa, antes de qualquer nova leitura de dados terminar.
   const firstBodyWith = async (text, timeout = 8000) => {
@@ -349,6 +361,32 @@ setInterval(async () => {
   // 1. Cadastro de uma conta nova (acesso simulado)
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await shot('01_boas_vindas');
+  // Boas-vindas (D-125, estudo de 25/11/2026, sinal 19): o teste grátis escrito na tela, um caminho principal ("Criar conta") e um segundo à
+  // vista ("Ver a demonstração"); "Entrar" e o convite da empresa continuam, como links menores, abaixo dos dois botões.
+  {
+    const bv = await body();
+    const bvLayout = await p.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const byName = (n) => [...document.querySelectorAll('[role=button]')].filter(shown).find((e) => (e.getAttribute('aria-label') || e.textContent || '').trim() === n);
+      const box = (e) => (e ? e.getBoundingClientRect() : null);
+      const trial = [...document.querySelectorAll('div,span')].filter(shown).find((e) => e.textContent === '14 dias grátis, sem cartão' && e.children.length === 0);
+      const criar = box(byName('Criar conta')); const demo = box(byName('Ver a demonstração')); const entrar = box(byName('Entrar')); const convite = box(byName('Tenho um convite da empresa'));
+      const bg = (e) => (e ? getComputedStyle(e).backgroundColor : null);
+      return { trial: trial ? Math.round(trial.getBoundingClientRect().top) : null, criar: criar && Math.round(criar.top), criarH: criar && Math.round(criar.height), demo: demo && Math.round(demo.top), demoH: demo && Math.round(demo.height), entrar: entrar && Math.round(entrar.top), entrarH: entrar && Math.round(entrar.height), convite: convite && Math.round(convite.top), criarBg: bg(byName('Criar conta')), demoBg: bg(byName('Ver a demonstração')), h: innerHeight, bigButtons: [...document.querySelectorAll('[role=button]')].filter(shown).filter((e) => e.getBoundingClientRect().height >= 50 && e.getBoundingClientRect().width > 200).length };
+    });
+    ok('Boas-vindas (D-125): "14 dias grátis, sem cartão" e o que acontece depois do teste, antes do botão "Criar conta"',
+      bv.includes('14 dias grátis, sem cartão') && bv.includes('Depois, sem assinar, você continua vendo e exportando o que anotou.') && bvLayout.trial !== null && bvLayout.trial < bvLayout.criar, JSON.stringify(bvLayout));
+    ok('Boas-vindas (D-125): dois botões grandes, "Criar conta" (o principal, azul) e "Ver a demonstração" (o segundo, suave, logo abaixo), com "Com dados fictícios, sem criar conta."',
+      bvLayout.bigButtons === 2 && bvLayout.criar !== null && bvLayout.demo !== null && bvLayout.demo > bvLayout.criar && bvLayout.criarBg === 'rgb(36, 87, 245)' && bvLayout.demoBg !== bvLayout.criarBg && bv.includes('Com dados fictícios, sem criar conta.'), JSON.stringify(bvLayout));
+    ok('Boas-vindas (D-125): "Já tem conta? Entrar" e "Tenho um convite da empresa" continuam, como links menores, depois dos dois botões',
+      bv.includes('Já tem conta?') && bvLayout.entrar !== null && bvLayout.entrar > bvLayout.demo && bvLayout.convite !== null && bvLayout.convite > bvLayout.entrar && bvLayout.entrarH < bvLayout.criarH, JSON.stringify(bvLayout));
+    for (const w of [320, 360]) {
+      await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(350);
+      await layoutChecks(`Boas-vindas ${w}px`);
+      if (w === 320) await shot('01_boas_vindas_320px');
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  }
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   // D-064 (privacidade e termos no app): o texto de aceite fica acima do botão "Criar conta", sem caixa de seleção. O build de demonstração
   // sobe com EXPO_PUBLIC_SITE_URL vazia, então os dois nomes aparecem sem link (nem botão, nem endereço do site).
@@ -380,6 +418,19 @@ setInterval(async () => {
   await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
   await shot('03_primeira_conta');
   ok('primeira conta sugere "Conta principal"', (await field('Nome da conta').inputValue()) === 'Conta principal');
+  // Primeiro passo (D-125, Onda 1, item 8): ao lado de "Começar meu mês", os dois jeitos de começar com menos digitação, que já existiam
+  // escondidos (Movimentos › Organizar › Importar e Conta › Telegram): importar o extrato, a fatura ou um print, e anotar pelo Telegram.
+  {
+    const pc = await body();
+    const pcOrder = await p.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const top = (n) => { const e = [...document.querySelectorAll('[role=button]')].filter(shown).find((x) => (x.getAttribute('aria-label') || x.textContent || '').trim() === n); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      return { comecar: top('Começar meu mês'), importar: top('Importar extrato, fatura ou print'), telegram: top('Anotar pelo Telegram'), h: innerHeight };
+    });
+    ok('primeiro passo (D-125): "Importar extrato, fatura ou print" e "Anotar pelo Telegram" ao lado de "Começar meu mês", à vista sem rolar',
+      pc.includes('Ou comece com menos digitação') && pcOrder.comecar !== null && pcOrder.importar > pcOrder.comecar && pcOrder.telegram > pcOrder.importar && pcOrder.telegram < pcOrder.h, JSON.stringify(pcOrder));
+    await layoutChecks('primeiro passo 390px');
+  }
   await btn('Começar meu mês').click(); await waitText('Diferença do mês');
   // O card de contas a pagar espera a geração do dia dos gastos fixos (que, numa conta nova, não cria nada).
   for (const x of ['Nenhuma conta a pagar em aberto.', 'Nenhum pagamento em outubro de 2026']) await waitText(x).catch(() => {});
@@ -404,7 +455,9 @@ setInterval(async () => {
   // Com o primeiro passo em aberto, "Não tenho gastos fixos" vem antes de "Agora não" (D-091, docs/10 A25). Quem ainda não tem negócio vê
   // também "Tem um negócio? Crie o espaço Negócio" (D-113b), uma linha que não conta como passo, logo antes de "Agora não".
   const PP_BUSINESS = 'Tem um negócio? Crie o espaço Negócio';
-  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), PP_BUSINESS, 'Agora não']);
+  // Os dois jeitos rápidos de começar (D-125, Onda 1, item 8) vêm no alto do card, antes dos passos, e não contam como passo.
+  const PP_QUICK = ['Importar extrato, fatura ou print. Os lançamentos do mês de uma vez', 'Anotar pelo Telegram. Mande "mercado 45" numa mensagem'];
+  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...PP_QUICK, ...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), PP_BUSINESS, 'Agora não']);
   await waitText('Primeiros passos');
   t = await body();
   ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
@@ -432,11 +485,18 @@ setInterval(async () => {
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
   ok('primeiros passos: fora do mês anterior', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await waitText('Primeiros passos');
-  // Seletor de espaço sempre à vista (D-113b): só com o Pessoal, o seletor mostra "Pessoal" escolhido e o "+" ("Criar um espaço: Negócio
-  // ou Família"); "fora de Família" é conferido no bloco "Família (D-055)", com uma Família criada.
-  ok('primeiros passos (D-113b): só com o Pessoal, o Resumo mostra o seletor com "Pessoal" escolhido e o "+", e o card fica no Pessoal',
-    JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Ver dados d/.test(e.getAttribute('aria-label') || '')).map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-selected')}`))) === JSON.stringify(['Ver dados de Pessoal:true']) &&
-    (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1 && (await headingShown('Primeiros passos')));
+  // Seletor de espaço só com mais de um espaço (D-125, sinal 22; antes, D-113b, o seletor aparecia sempre): só com o Pessoal, o Resumo não
+  // mostra seletor nem "+"; o espaço Negócio se cria pelo atalho do card (abaixo) e em Conta. Com Família, o bloco "Família (D-055)" confere.
+  ok('primeiros passos (D-125): só com o Pessoal, o Resumo não mostra o seletor de espaço nem o "+", e o card fica no Pessoal',
+    (await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Ver dados d/.test(e.getAttribute('aria-label') || '')).length)) === 0 &&
+    (await visibleCount('button', /^Criar um espaço/)) === 0 && (await headingShown('Primeiros passos')));
+  // Os jeitos rápidos do card levam às telas que já existiam: a importação e a tela do Telegram, por cima do Resumo.
+  await btn(PP_QUICK[0]).click(); await waitText('Escolha o arquivo');
+  ok('primeiros passos (D-125): "Importar extrato, fatura ou print" abre a importação (/importar)', new URL(p.url()).pathname === '/importar', p.url());
+  await btn('Voltar').click(); await waitText('Primeiros passos');
+  await btn(PP_QUICK[1]).click(); await p.waitForURL((u) => u.pathname === '/conta/telegram', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(400);
+  ok('primeiros passos (D-125): "Anotar pelo Telegram" abre a tela do Telegram (/conta/telegram)', new URL(p.url()).pathname === '/conta/telegram', p.url());
+  await btn('Voltar').click(); await waitText('Primeiros passos');
   // "Tem um negócio? Crie o espaço Negócio" (D-113b) abre a criação do espaço Negócio; voltar devolve o Resumo com o card.
   await btn(PP_BUSINESS).click(); await waitText('Nome do negócio');
   ok('primeiros passos (D-113b): "Tem um negócio? Crie o espaço Negócio" abre "Espaço Negócio" em /negocio/novo', new URL(p.url()).pathname === '/negocio/novo' && (await h1Name()) === 'Espaço Negócio', p.url());
@@ -666,12 +726,12 @@ setInterval(async () => {
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
   await p.reload(); await waitText('Cuidar da vida financeira');
   const ppStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.primeiros-passos')); } catch { return ['erro']; } });
-  ok('demonstração: recarregar volta às boas-vindas, sem "Primeiros passos" gravado no aparelho', ppStored.length === 0 && (await visibleCount('button', 'Ver demonstração com dados fictícios')) === 1, ppStored.join(' | '));
+  ok('demonstração: recarregar volta às boas-vindas, sem "Primeiros passos" gravado no aparelho', ppStored.length === 0 && (await visibleCount('button', 'Ver a demonstração')) === 1, ppStored.join(' | '));
   const origemStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.como-conheceu')); } catch { return ['erro']; } });
   ok('demonstração (D-067): nada de "Como você conheceu a Clarevo?" gravado no aparelho (nem o dia de uso, nem o "Agora não")', origemStored.length === 0, origemStored.join(' | '));
 
   // 2. Conta de demonstração e sequência de aceite
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00');
   await p.waitForTimeout(500);
   t = await body();
   const totals = async () => { const s = await body(); return ['R$ 6','R$ 3'].length && s; };
@@ -1756,7 +1816,7 @@ setInterval(async () => {
   await btn('Voltar para a tarefa').click(); await waitText('Ver a assinatura');
   ok('"Voltar para a tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
   await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   await openToPay(); await waitText('Próximos meses');
   t = await body();
@@ -1985,12 +2045,13 @@ setInterval(async () => {
   const liveText = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.innerText).join('\n').replace(/ /g, ' '));
   // Cartão inteiro do resultado (título, linhas, avisos e hipóteses), guardado para a conferência de termos no fim.
   const resultCardText = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.parentElement.innerText).join('\n').replace(/ /g, ' '));
-  const keepResult = async () => { resultTexts.push(await resultCardText()); await keepText(); };
+  const keepResult = async () => { if (await expandHow()) await p.waitForTimeout(150); resultTexts.push(await resultCardText()); await keepText(); };
   // Digita e sai do campo (os erros só aparecem depois de sair do campo).
   const typeIn = async (label, text) => { const f = field(label); await f.fill(text); await f.press('Tab'); };
   // O resultado acompanha a digitação: espera até 3 s todos os textos aparecerem.
   const shows = async (...texts) => {
     for (const end = Date.now() + 3000; ;) {
+      if (await expandHow()) await p.waitForTimeout(150);
       const s = await body();
       if (texts.every((x) => s.includes(x))) return true;
       if (Date.now() > end) return false;
@@ -2178,6 +2239,56 @@ setInterval(async () => {
   ok('multa e juros, fatura: com 99% de rotativo, o teto da Lei 14.690/2023 (R$ 2.006,26 com o IOF)', await shows('a fatura fica em R$ 2.006,26.', 'Lei 14.690/2023'));
   await calcWidths('multa e juros, fatura', 'Multa e juros por atraso');
   await backToCalcList();
+
+  // Revisão de 26/11/2026: cada aviso tem um tipo dito no core (CalcNoteKind). A estimativa e os avisos que mudam a leitura da conta (multa
+  // acima de 2%, teto do rotativo, taxa acima do teto do cheque especial) ficam à vista sem abrir "Como a conta é feita"; o bloco fechado
+  // guarda só as hipóteses e os avisos de apoio. Lido com bodyText(), que não abre o bloco (body() abre). O botão diz se está aberto e qual
+  // bloco controla (aria-expanded e aria-controls).
+  {
+    const howState = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button][aria-expanded]')].find((e) => e.getBoundingClientRect().width > 0 && (e.textContent || '').trim() === 'Como a conta é feita');
+      if (!b) return null;
+      const id = b.getAttribute('aria-controls');
+      const region = id ? document.getElementById(id) : null;
+      return { expanded: b.getAttribute('aria-expanded'), controls: id, region: region ? (region.innerText || '').trim().length : -1 };
+    });
+    const rawHas = (x) => waitUntil(async () => (await bodyText()).includes(x), 4000);
+    const CDC = 'A multa informada passa de 2%. Em relações de consumo abrangidas pelo Código de Defesa do Consumidor (art. 52, § 1º), a multa é limitada a 2%';
+    await openCalc('Multa e juros por atraso');
+    await typeIn('Valor da conta', '200,00'); await typeIn('Multa (%)', '10'); await typeIn('Juros ao mês (%)', '1'); await typeIn('Dias depois do vencimento', '10');
+    await rawHas('O valor exato é o do boleto atualizado.');
+    let raw = await bodyText(); let how = await howState();
+    ok('avisos à vista (revisão de 26/11/2026), multa de 10%: o limite de 2% do CDC e "O valor exato é o do boleto atualizado." aparecem sem abrir "Como a conta é feita"; as hipóteses e o aviso de apoio ficam no bloco fechado',
+      raw.includes(CDC) && raw.includes('O valor exato é o do boleto atualizado.') && !raw.includes('Multa cobrada uma vez sobre o valor da conta.') && !raw.includes('Para a fatura do cartão, escolha') &&
+        how !== null && how.expanded === 'false', JSON.stringify(how));
+    ok('"Como a conta é feita" fechado: aria-expanded="false" e aria-controls aponta para o bloco, que existe e fica vazio', how !== null && /^como-a-conta-/.test(how.controls || '') && how.region === 0, JSON.stringify(how));
+    await btn('Como a conta é feita').click(); await p.waitForTimeout(300);
+    how = await howState(); raw = await bodyText();
+    ok('"Como a conta é feita" aberto: aria-expanded="true", e o bloco controlado traz as hipóteses e o aviso de apoio', how !== null && how.expanded === 'true' && how.region > 0 &&
+      raw.includes('Multa cobrada uma vez sobre o valor da conta.') && raw.includes('Para a fatura do cartão, escolha'), JSON.stringify(how));
+    await backToCalcList();
+    await openCalc('Multa e juros por atraso');
+    await radio('Fatura do cartão').click(); await p.waitForTimeout(300);
+    await typeIn('Valor que ficou sem pagar', '1.000,00'); await typeIn('Juros do rotativo ao mês (%)', '99'); await typeIn('Juros de mora ao mês (%)', '1');
+    await typeIn('Multa (%)', '10'); await typeIn('Dias depois do vencimento', '30');
+    await rawHas('O valor exato é o da próxima fatura.');
+    raw = await bodyText(); how = await howState();
+    ok('avisos à vista, fatura com 99% de rotativo e multa de 10%: o teto da Lei 14.690/2023, a multa acima de 2% e "O valor exato é o da próxima fatura." sem abrir o bloco',
+      raw.includes('Desde 2024, os juros e os encargos do rotativo não podem passar do valor que ficou sem pagar (Lei 14.690/2023).') &&
+        raw.includes('A multa informada passa de 2%. Na fatura do cartão, uma relação de consumo, a multa é limitada a 2%') && raw.includes('O valor exato é o da próxima fatura.') &&
+        how !== null && how.expanded === 'false', JSON.stringify(how));
+    await backToCalcList();
+    await openCalc('Quanto custa uma dívida?');
+    await radio('Cheque especial').click(); await p.waitForTimeout(300);
+    await typeIn('Valor da dívida', '1.000,00'); await typeIn('Taxa de juros ao mês (%)', '10'); await typeIn('Por quantos meses', '3');
+    await rawHas('teto de 8% ao mês');
+    raw = await bodyText(); how = await howState();
+    ok('avisos à vista, cheque especial a 10% ao mês: o teto de 8% ao mês (Res. CMN 4.765/2019) e o aviso do CET sem abrir "Como a conta é feita"; as hipóteses no bloco fechado',
+      raw.includes('A taxa informada passa do teto de 8% ao mês do cheque especial de pessoas físicas e MEI (Res. CMN 4.765/2019).') &&
+        raw.includes('A conta usa só a taxa de juros, sem o CET.') && !raw.includes('Juros compostos, mês a mês, sem pagamentos no período.') && how !== null && how.expanded === 'false', JSON.stringify(how));
+    await shot('60c_calc_avisos_a_vista');
+    await backToCalcList();
+  }
 
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
   await openCalc('Quanto guardar para imprevistos?');
@@ -2460,8 +2571,8 @@ setInterval(async () => {
 
   // Família na demonstração (D-055): sem Família de exemplo (o seletor mostra só o Pessoal e o "+", D-113b), e a tela Família (por Conta)
   // explica, sem membros simulados nem botão de anotar
-  ok('demonstração (D-113b): o seletor do Resumo mostra só "Pessoal", com o "+"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 1 &&
-    (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
+  ok('demonstração (D-125): só com o Pessoal, o Resumo não mostra o seletor de espaço nem o "+"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0 &&
+    (await visibleCount('button', /^Criar um espaço/)) === 0);
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   t = await body();
@@ -2927,7 +3038,7 @@ setInterval(async () => {
   const viaEntry = async (url, ready) => {
     await p.goto(`http://localhost:${PORT}${url}`); await waitText('Cuidar da vida financeira');
     const atEntry = new URL(p.url()).pathname;
-    await btn('Ver demonstração com dados fictícios').click(); await waitText(ready, 12000).catch(() => {});
+    await btn('Ver a demonstração').click(); await waitText(ready, 12000).catch(() => {});
     return atEntry;
   };
   let entry = await viaEntry('/calcular', 'Decidir uma compra');
@@ -2989,7 +3100,7 @@ setInterval(async () => {
   // referência de mercado com a fonte. Falha de carga mostra erro, nunca 0%.
   const freshDemo = async () => {
     await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   };
   const rcRow = () => p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first();
   const rcLabel = (pct, spent, ref, month = 'outubro') => `Renda comprometida em ${month}: ${pct} da renda de referência. ${spent} de ${ref}. Abre os detalhes.`;
@@ -3708,11 +3819,11 @@ setInterval(async () => {
   ok('D a ação do tema abre /simular', new URL(p.url()).pathname === '/simular', p.url());
   // Endereço direto (versão web instalada): valores do link; a taxa vinda do endereço nunca é lida; lixo é ignorado.
   await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  await btn('Ver a demonstração').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   const direct = await formValues();
   ok('D endereço direto: os valores do link (22.500,00 e 1.000,00) e a taxa do endereço não é lida', direct.includes('Quanto quer juntar=22.500,00') && direct.includes('Quanto vai guardar por mês=1.000,00') && direct.includes('Taxa de rendimento ao ano (%)='), JSON.stringify(direct));
   await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  await btn('Ver a demonstração').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
 
   const urlPath = () => new URL(p.url()).pathname;
@@ -3824,6 +3935,43 @@ setInterval(async () => {
   ok('E Anotar gasto: Descrição, Valor, Data, "Como você pagou?" (a origem) e Categoria, nessa ordem, com "Dinheiro, débito ou Pix" marcado e "Cartão de crédito" desmarcado',
     Object.values(payTops).every((v) => v !== null) && payTops.descricao < payTops.valor && payTops.valor < payTops.data && payTops.data < payTops.como && payTops.como < payTops.categoria &&
     (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await visibleCount('textbox', 'Em quantas vezes?')) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1, JSON.stringify(payTops));
+  // Máscara de moeda (revisão de 26/11/2026, core/money-input.ts): o ponto digitado no teclado do computador vale como milhar quando vêm
+  // três algarismos e, com um ou dois, é lido como centavos ao sair do campo; colar por cima de um valor segue a leitura de parseBRL (antes,
+  // "9.99" por cima de "8,00" virava "999"); apagar logo depois de um ponto da máscara apaga o algarismo de antes, Delete apaga o de depois,
+  // e o cursor fica no lugar quando os pontos mudam (antes, ia para o fim).
+  {
+    const mv = field('Valor em reais');
+    const mval = () => mv.inputValue();
+    const mcaret = () => mv.evaluate((e) => e.selectionStart);
+    const mtype = async (keys) => { await mv.fill(''); await mv.focus(); await p.keyboard.type(keys, { delay: 25 }); await p.waitForTimeout(150); return mval(); };
+    const typed = {};
+    for (const keys of ['2000', '1.500', '10.000,00', '12.5', '1234.56']) typed[keys] = await mtype(keys);
+    ok('máscara, digitando: "2000" vira "2.000"; "1.500" e "10.000,00" ficam com o ponto dos milhares; "12.5" e "1234.56" ficam como digitados, lidos como centavos',
+      JSON.stringify(typed) === JSON.stringify({ '2000': '2.000', '1.500': '1.500', '10.000,00': '10.000,00', '12.5': '12.5', '1234.56': '1234.56' }), JSON.stringify(typed));
+    const blurred = {};
+    for (const keys of ['1.500', '12.5', '1234.56']) { await mtype(keys); await mv.press('Tab'); await p.waitForTimeout(150); blurred[keys] = await mval(); }
+    ok('máscara, ao sair do campo: "1.500" vira "1.500,00", "12.5" vira "12,50" e "1234.56" vira "1.234,56"',
+      JSON.stringify(blurred) === JSON.stringify({ '1.500': '1.500,00', '12.5': '12,50', '1234.56': '1.234,56' }), JSON.stringify(blurred));
+    const pasted = {};
+    for (const [before, paste] of [['8,00', '9.99'], ['45,90', '12.50'], ['45,90', '100.00'], ['500', '12.5'], ['1.234,56', '1.250']]) {
+      await mv.fill(before); await mv.focus(); await mv.selectText(); await p.keyboard.insertText(paste); await p.waitForTimeout(150);
+      pasted[`${before} + ${paste}`] = await mval();
+    }
+    ok('máscara, colando por cima de um valor: "9.99" sobre "8,00" é 9,99 (antes, 999), "12.50" e "100.00" sobre "45,90" são 12,50 e 100,00, "12.5" sobre "500" é 12,5 e "1.250" é mil duzentos e cinquenta',
+      JSON.stringify(pasted) === JSON.stringify({ '8,00 + 9.99': '9,99', '45,90 + 12.50': '12,50', '45,90 + 100.00': '100,00', '500 + 12.5': '12,5', '1.234,56 + 1.250': '1.250' }), JSON.stringify(pasted));
+    const carets = {};
+    await mv.fill('1.234'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(2, 2)); await p.keyboard.press('Backspace'); await p.waitForTimeout(200);
+    carets.backspace = [await mval(), await mcaret()];
+    await mv.fill('1.234'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(1, 1)); await p.keyboard.press('Delete'); await p.waitForTimeout(200);
+    carets.delete = [await mval(), await mcaret()];
+    await mv.fill('123'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(1, 1)); await p.keyboard.type('9'); await p.waitForTimeout(200);
+    carets.middle = [await mval(), await mcaret()];
+    await mv.fill('1.234,56'); await mv.focus(); await mv.evaluate((e) => e.setSelectionRange(3, 3)); await p.keyboard.press('Backspace'); await p.waitForTimeout(200);
+    carets.regroup = [await mval(), await mcaret()];
+    ok('máscara, cursor na web: Backspace em "1.|234" dá "|234"; Delete em "1|.234" dá "1|34"; "9" em "1|23" dá "1.9|23"; Backspace em "1.2|34,56" dá "1|34,56"',
+      JSON.stringify(carets) === JSON.stringify({ backspace: ['234', 0], delete: ['134', 1], middle: ['1.923', 3], regroup: ['134,56', 1] }), JSON.stringify(carets));
+    await mv.fill(''); await mv.press('Tab'); await p.waitForTimeout(150);
+  }
   await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
   t = await body();
   ok('E Anotar gasto com cartão: escolhe o único cartão, pede "Em quantas vezes?" (1 a 48), troca para "Data da compra" e o botão vira "Anotar compra no cartão"',
@@ -4104,10 +4252,10 @@ setInterval(async () => {
   const invoiceCommitmentId = await otherDevice(async (repo, ctx) => { const c = (await repo.listCards(ctx)).find((x) => x.name === 'Cartão Exemplo'); return (await repo.listInvoiceCommitments(c.id)).find((i) => i.invoice.month === '2026-11').id; });
   const exemploIdDeep = await cardIdOf('Cartão Exemplo');
   await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
+  await btn('Ver a demonstração').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Já paguei"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Já paguei')) === 0, urlPath());
   await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
+  await btn('Ver a demonstração').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço direto da fatura (/cartoes/<id>/fatura/2026-12) abre a fatura de dezembro', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-12` && (await body()).includes('Fatura de dezembro'), urlPath());
 
   // Valores ocultos ("Ocultar valores"): nenhum valor das telas novas fica à vista, nem nos nomes acessíveis.
@@ -4562,7 +4710,7 @@ setInterval(async () => {
 
   // B2 · Seus últimos meses: a conta de fatura abre a fatura (como em Contas a pagar), sem "Já paguei" nem "Não houve".
   await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await otherDevice(async (repo, ctx) => {
     const k = () => `e2e-${Math.random()}`;
     const card = (await repo.createCard(k(), ctx, { name: 'Cartão azul', lastDigits: null, closingDay: 1, dueDay: 5, limitCents: null })).card;
@@ -4598,7 +4746,7 @@ setInterval(async () => {
   // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.
   const enterReturnDemo = async () => {
     await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   };
   // Bloco da faixa "Seus últimos meses" (do título aos botões); null se a faixa não aparece.
@@ -5142,7 +5290,7 @@ setInterval(async () => {
   };
   const demoHome = async () => {
     await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
   // O nome acessível da aba "Movimentos" contém o rótulo visível (WCAG 2.5.3): "Movimentos do mês".
@@ -5426,7 +5574,19 @@ setInterval(async () => {
   await goResumo(); await openConta();
   ok('nav lembretes: em Conta ficam os lembretes (na web, o texto de que são do app para celular)', urlPath() === '/conta' && (await body()).includes('Lembretes estão disponíveis no app para celular.'), p.url());
   await keepText();
-  await checkBar('nav barra: Conta', 'Resumo');
+  // Telas fora das abas (D-125, sinal 21): a Conta fica sem aba marcada, por qualquer caminho (antes: Resumo, Aprender ou Investir, conforme
+  // de onde a pessoa vinha). O que se abre da Conta (Família, exportar) também.
+  await checkBar('nav barra: Conta');
+  const contaTabs = [];
+  contaTabs.push(['Resumo', (await barState()).selected]);
+  await shot('05c_conta_sem_aba_marcada');
+  for (const tab of ['Investir', 'Aprender', 'Metas']) {
+    await navBackTo(tab); await openConta(); await p.waitForTimeout(300);
+    contaTabs.push([tab, (await barState()).selected]);
+  }
+  ok('nav barra (D-125): a Conta não marca aba nenhuma, aberta do Resumo, de Investir, de Aprender ou de Metas', contaTabs.every(([, sel]) => sel.length === 0), JSON.stringify(contaTabs));
+  await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
+  ok('nav barra (D-125): uma tela aberta da Conta (Exportar meus dados) também fica sem aba marcada', urlPath() === '/conta/exportar' && (await barState()).selected.length === 0, `${p.url()} ${JSON.stringify(await barState())}`);
   await navBackTo('Resumo');
 
   // ---- 4. Metas compacta: pergunta compacta, plano dentro do card da reserva, "Fazer as contas" ----
@@ -6571,7 +6731,7 @@ setInterval(async () => {
   const f2Open = async () => {
     await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click();
-    await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(500);
+    await waitBudget(); await p.waitForTimeout(500);
   };
   const f2Month = async (name, label) => { await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText(`Pessoal · ${label}`); await p.waitForTimeout(500); };
   /** Larguras das barras (fração do trilho) e cores: só azul da marca no preenchimento e nada de vermelho. */
@@ -6612,7 +6772,8 @@ setInterval(async () => {
   await f2Open();
   t = await f2Keep();
   ok('F2 /orcamento: título, barra inferior com Movimentos marcada, "Orçado R$ 4.600,00 · Usado R$ 4.300,00" e a regra do cartão', urlPath() === '/orcamento' && (await h1Name()) === 'Orçamento por categoria' && barOk(await barState()) && (await barState()).selected[0] === MOV_TAB &&
-    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga. Gastos e contas pagas contam no mês da data do pagamento.'), `${urlPath()} ${JSON.stringify(await barState())}`);
+    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga.') &&
+    t.includes('Gastos e contas pagas contam no mês da data do pagamento.'), `${urlPath()} ${JSON.stringify(await barState())}`);
   ok('F2 /orcamento Moradia: "R$ 2.500,00 de R$ 2.500,00", 100,0% e "Orçamento usado por inteiro" (o aluguel pago)',
     (await visibleCount('button', /^Moradia, R\$ 2\.500,00 de R\$ 2\.500,00, 100,0% do orçamento\. Orçamento usado por inteiro\. Alterar orçamento de Moradia\.$/)) === 1 && t.includes('Orçamento usado por inteiro'));
   ok('F2 /orcamento Mercado: "R$ 1.400,00 de R$ 1.800,00", 77,8% e "Faltam R$ 400,00"',
@@ -6749,7 +6910,7 @@ setInterval(async () => {
     !t.includes('Lazer') && t.includes('O orçamento conta o usado no mês.') && (await visibleCount('button', 'Ver orçamento por categoria')) === 1);
   ok('F2 Por categoria: o nome acessível da barra inclui o orçamento', (await visibleCount('generic', /Mercado, R\$ 1\.400,00, 35,9% do pago, de R\$ 1\.800,00 orçados/)) >= 0 && (await p.locator('[aria-label*="de R$ 1.800,00 orçados"]').count()) >= 1);
   await atWidths(async (w) => { await layoutChecks(`F2 Por categoria ${w}px`); if (w === 390) await shot('205_por_categoria_orcado'); });
-  await btn('Ver orçamento por categoria').click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(400);
+  await btn('Ver orçamento por categoria').click(); await waitBudget(); await p.waitForTimeout(400);
   ok('F2 "Ver orçamento por categoria" abre /orcamento', urlPath() === '/orcamento');
 
   // ---- 6. Aviso dentro do app: 80% e 100% na mensagem de sucesso, só no cruzamento ----
@@ -6923,7 +7084,7 @@ setInterval(async () => {
   }
   await atWidths(async (w) => { await layoutChecks(`F2 busca No app ${w}px`); if (w === 390) await shot('217_aprender_no_app_orcamento'); });
   await f2Box().fill('gastar menos'); await waitText('No app'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).first().click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).first().click(); await waitBudget(); await p.waitForTimeout(400);
   ok('F2 busca › tocar abre /orcamento com a barra à vista', urlPath() === '/orcamento' && barOk(await barState()), p.url());
 
   // ---- 10. Conta nova: nada de exemplo; Primeiros passos não muda ----
@@ -7738,7 +7899,7 @@ setInterval(async () => {
 
   // ---- 10. O lembrete (cenário ?cenario=assinaturas: cadastradas em 30/06/2026 e nunca revisadas) ----
   await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('H2 cenário "assinaturas": o Resumo tem os totais de outubro de sempre e nenhuma faixa de "Seus últimos meses"', !(await bandShown()));
   await expectTotals('H2 cenário "assinaturas": outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
@@ -7760,7 +7921,7 @@ setInterval(async () => {
   ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
   // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
   await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await h2OpenFixos();
   ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Que tal revisar suas assinaturas?'));
@@ -8431,10 +8592,9 @@ setInterval(async () => {
   // Tutorial (D-049) · docs/08 §5 item 17, pedido de Enzo em 11/10/2026 ("um tutorial de uso do app, com as funcionalidades, onde
   // encontrar, como utilizar"). Quatro partes, todas sobre o mesmo catálogo do core (packages/core/src/guide): (1) o guia em Aprender ›
   // Como usar o Clarevo, com a lista por grupos e as entradas ("Para que serve", "Onde fica", "Como usar" e "Abrir {tela}"); (2) o tour
-  // de cinco cartões na primeira entrada, uma vez por pessoa em cada aparelho, sempre pulável e acessível; (3) o botão "?" no cabeçalho
-  // das telas listadas, com a folha "Como usar" e "Ver no guia"; (4) o manual gerado do mesmo catálogo (scripts/gerar-manual.js).
-  // O roteiro desliga o tour a cada carregamento da página (window.__clarevoSemTour, ver o início), para os outros blocos não precisarem
-  // pulá-lo; aqui ele é ligado de propósito nas contas novas e na demonstração.
+  // de cinco cartões, desde o estudo de 25/11/2026 (D-125, Onda 1, item 8) só quando a pessoa pede ("Ver o tour do app", no topo do
+  // guia), sempre pulável e acessível; (3) o botão "?" no cabeçalho das telas listadas, com a folha "Como usar" e "Ver no guia"; (4) o
+  // manual gerado do mesmo catálogo (scripts/gerar-manual.js). O tour não abre mais sozinho na primeira entrada, nem na demonstração.
   // ==================================================================================================================
   const j1Writes0 = writes.length;
   const j1Texts = [];
@@ -8444,18 +8604,16 @@ setInterval(async () => {
     for (const [w, h] of [[390, 844], [320, 800]]) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450); await fn(w); }
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
-  const j1TourOn = () => p.evaluate(() => { window.__clarevoSemTour = false; });
   const j1TOUR = 'Primeiros passos na Clarevo';
   const j1Dialog = (name) => p.getByRole('dialog', { name, exact: true }).filter({ visible: true });
   const j1Tab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const j1Demo = async (query = '') => {
     await p.goto(`http://localhost:${PORT}/${query}`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
-  // Conta nova com o tour ligado (a página recarrega e o roteiro o desligaria): a marca é desfeita antes de entrar no Resumo.
   const j1NewAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await j1TourOn();
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -8473,31 +8631,81 @@ setInterval(async () => {
     return {
       title: heading ? heading.textContent : null, level: heading ? heading.getAttribute('aria-level') : null,
       buttons: buttons.map((b) => b.getAttribute('aria-label') || b.textContent), minH: Math.round(Math.min(...buttons.map((b) => b.getBoundingClientRect().height))),
-      text: dlg.innerText.replace(/\u00a0/g, ' '), live, modal: dlg.getAttribute('aria-modal'), focusInside: dlg.contains(document.activeElement),
+      text: dlg.innerText.replace(/ /g, ' '), live, modal: dlg.getAttribute('aria-modal'), focusInside: dlg.contains(document.activeElement),
     };
   }, j1TOUR);
   const j1TourGone = async () => { await j1Dialog(j1TOUR).first().waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {}); return (await j1Dialog(j1TOUR).count()) === 0; };
   const j1Next = async () => { await j1Dialog(j1TOUR).getByRole('button', { name: /^(Próximo|Começar)$/ }).first().click(); await p.waitForTimeout(250); };
   const j1Baseline = ['1:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês'];
+  const j1OpenGuide = async () => {
+    await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui');
+    await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
+  };
 
-  // ---- 1. Conta nova: o tour abre sozinho no Resumo, com cinco cartões, "Pular" e "Próximo" (no fim, "Começar") ----
+  // ---- 1. Conta nova: o tour não abre sozinho (D-125); o Resumo começa pelos Primeiros passos, com importar e o Telegram ----
   await j1NewAccount('Jo Tutorial', 'jo@exemplo.com');
-  await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
+  await waitText('Primeiros passos'); await p.waitForTimeout(1500);
+  ok('Tutorial (D-125): numa conta nova, o tour não abre sozinho no Resumo; os Primeiros passos começam por "Importar extrato, fatura ou print" e "Anotar pelo Telegram"',
+    (await j1Dialog(j1TOUR).count()) === 0 && JSON.stringify(await headingList()) === JSON.stringify(j1Baseline) &&
+    JSON.stringify((await cardButtons('Primeiros passos'))?.slice(0, 2)) === JSON.stringify(['Importar extrato, fatura ou print. Os lançamentos do mês de uma vez', 'Anotar pelo Telegram. Mande "mercado 45" numa mensagem']), JSON.stringify(await headingList()));
+  await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(900);
+  ok('Tutorial (D-125): nem ao trocar de aba e voltar ao Resumo', (await j1Dialog(j1TOUR).count()) === 0);
+
+  // ---- 1b. O primeiro passo (D-125, Onda 1, item 8): "Importar extrato, fatura ou print" e "Anotar pelo Telegram" criam a conta, vazia, e
+  // abrem a tela pedida por cima do Resumo ("Voltar" leva ao Resumo, com os Primeiros passos) ----
+  const j1FirstStep = async (name, email, choice) => {
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn(choice).click();
+  };
+  await j1FirstStep('Kai Tutorial', 'kai@exemplo.com', 'Importar extrato, fatura ou print');
+  await waitText('Escolha o arquivo', 12000); await p.waitForTimeout(500);
+  ok('primeiro passo (D-125): "Importar extrato, fatura ou print" cria a conta e abre a importação (/importar), com o arquivo, o PDF e os prints',
+    j1Path() === '/importar' && (await body()).includes('Escolha o arquivo que o banco gera: PDF, OFX ou planilha CSV.') && (await body()).includes('Ou envie prints da tela do banco'), p.url());
+  await shot('03b_primeiro_passo_importar');
+  await btn('Voltar').click(); await waitText('Diferença do mês'); await waitText('Primeiros passos'); await p.waitForTimeout(600);
+  ok('primeiro passo (D-125): "Voltar" leva ao Resumo da conta nova, vazia (sem dado de exemplo), com os Primeiros passos',
+    j1Path() === '/' && (await body()).includes('R$ 0,00') && (await body()).includes('Nenhum pagamento em outubro de 2026') && (await headingShown('Primeiros passos')), p.url());
+  ok('primeiro passo (D-125): a conta criada pelo atalho tem o nome sugerido ("Conta principal") e nada anotado',
+    (await otherDevice(async (repo, ctx) => { const sp = await repo.getSpace(); return `${sp.accounts.map((a) => a.name).join(',')}|${(await repo.listRecords(ctx, '2026-10')).length}`; })) === 'Conta principal|0');
+  await j1FirstStep('Lia Tutorial', 'lia@exemplo.com', 'Anotar pelo Telegram');
+  await p.waitForURL((u) => u.pathname === '/conta/telegram', { timeout: 12000 }).catch(() => {}); await p.waitForTimeout(800);
+  ok('primeiro passo (D-125): "Anotar pelo Telegram" cria a conta e abre a tela do Telegram (/conta/telegram), que na demonstração explica', j1Path() === '/conta/telegram' && (await body()).includes('Telegram'), p.url());
+  await shot('03c_primeiro_passo_telegram');
+  await btn('Voltar').click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
+  ok('primeiro passo (D-125): do Telegram, "Voltar" leva ao Resumo da conta nova', j1Path() === '/');
+  // Revisão de 26/11/2026: numa conta sem cartão, o Orçamento mostra a regra dos gastos e contas pagas, que vale sem cartão, e não a das
+  // compras no cartão.
+  await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Orçamento por categoria,/ }).filter({ visible: true }).first().click(); await waitBudget(); await p.waitForTimeout(400);
+  {
+    const ob = await body();
+    ok('Orçamento sem cartão (revisão de 26/11/2026): a regra dos gastos e contas pagas fica no fim da tela, sem a regra das compras no cartão',
+      ob.includes('Gastos e contas pagas contam no mês da data do pagamento.') && !ob.includes('cada compra no cartão conta'), ob.slice(-600));
+  }
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+
+  // ---- 2. "Ver o tour do app" no guia: cinco cartões, "Pular" e "Próximo" (no fim, "Começar"), acessível ----
+  await j1OpenGuide();
+  await btn('Ver o tour do app').click(); await j1Dialog(j1TOUR).first().waitFor({ timeout: 6000 });
   let j1s = await j1TourState();
   ok('Tutorial tour: a janela tem o nome "Primeiros passos na Clarevo", é modal, mostra o cartão 1 de 5 ("Resumo do mês") com título de nível 2, "Pular" e "Próximo", sem "Começar" nem "Voltar"',
     j1s !== null && j1s.modal === 'true' && j1s.title === 'Resumo do mês' && j1s.level === '2' && j1s.text.includes('1 de 5') && j1s.buttons.includes('Pular') && j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar') && !j1s.buttons.includes('Voltar') &&
     j1s.text.includes('Veja o que você recebeu, o que pagou e o que ainda vai vencer no mês.'), JSON.stringify(j1s));
   ok('Tutorial tour: o foco já está dentro da janela e os botões têm 44 px ou mais', j1s !== null && j1s.focusInside && j1s.minH >= 44, JSON.stringify(j1s));
-  // Revisão das telas (16/11/2026): o cartão é uma folha presa ao pé da tela, e o Resumo de cima continua à vista (sem véu escuro).
+  // Revisão das telas (16/11/2026): o cartão é uma folha presa ao pé da tela, e a tela de cima continua à vista (sem véu escuro).
   const j1Sheet = await p.evaluate((label) => {
     const dlg = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getAttribute('aria-label') === label && e.getBoundingClientRect().width > 0);
     const heading = dlg && [...dlg.querySelectorAll('[role=heading]')].find((e) => e.getBoundingClientRect().width > 0);
     let sheet = heading; while (sheet && sheet.parentElement && sheet.parentElement !== dlg && Math.round(sheet.getBoundingClientRect().bottom) < window.innerHeight - 1) sheet = sheet.parentElement;
     const r = sheet ? sheet.getBoundingClientRect() : null;
-    const total = [...document.querySelectorAll('[role=button]')].find((e) => /^Recebido, R\$/.test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
-    return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight, totalTop: total ? Math.round(total.getBoundingClientRect().top) : null } : null;
+    return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight } : null;
   }, j1TOUR);
-  ok('Tutorial tour: o cartão fica preso ao pé da tela, e os totais do Resumo aparecem acima dele', j1Sheet !== null && j1Sheet.bottom >= j1Sheet.h - 1 && j1Sheet.top > j1Sheet.h / 3 && j1Sheet.totalTop !== null && j1Sheet.totalTop < j1Sheet.top, JSON.stringify(j1Sheet));
+  ok('Tutorial tour: o cartão fica preso ao pé da tela, com a tela de cima à vista', j1Sheet !== null && j1Sheet.bottom >= j1Sheet.h - 1 && j1Sheet.top > j1Sheet.h / 3, JSON.stringify(j1Sheet));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial tour cartão 1 ${w}px`); await shot(w === 390 ? '340_tour_1_resumo' : '340_tour_1_resumo_320px'); });
   const j1Cards = [
@@ -8526,66 +8734,32 @@ setInterval(async () => {
     }
   }
   await j1Next();
-  ok('Tutorial tour: "Começar" fecha a janela', await j1TourGone());
-  ok('Tutorial tour: o Resumo não muda (os títulos, "Primeiros passos" e "Anotar gasto" continuam como antes)', JSON.stringify(await headingList()) === JSON.stringify(j1Baseline) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await headingList()));
-  await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
-  await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(900);
-  ok('Tutorial tour: uma vez só (não volta ao trocar de aba e voltar ao Resumo)', await j1TourGone());
-
-  // ---- 2. "Ver o tour de novo" no guia: mostra os cinco cartões outra vez, mesmo já visto ----
-  await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui');
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
-  await btn('Ver o tour de novo').click(); await j1Dialog(j1TOUR).first().waitFor({ timeout: 6000 });
+  ok('Tutorial tour: "Começar" fecha a janela, e o guia continua aberto', (await j1TourGone()) && j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo');
+  await btn('Ver o tour do app').click(); await j1Dialog(j1TOUR).first().waitFor({ timeout: 6000 });
   j1s = await j1TourState();
-  ok('Tutorial tour: "Ver o tour de novo" abre o cartão 1 de 5 depois de já visto', j1s !== null && j1s.title === 'Resumo do mês' && j1s.text.includes('1 de 5'), JSON.stringify(j1s));
+  ok('Tutorial tour: "Ver o tour do app" abre de novo o cartão 1 de 5', j1s !== null && j1s.title === 'Resumo do mês' && j1s.text.includes('1 de 5'), JSON.stringify(j1s));
   await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
-  ok('Tutorial tour: "Pular" fecha o tour revisto, e o guia continua aberto', (await j1TourGone()) && j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo');
-
-  // ---- 3. Outra conta nova: "Pular" no primeiro cartão fecha e o tour não volta; Esc também pula; o foco fica na janela ----
-  await j1NewAccount('Kai Tutorial', 'kai@exemplo.com');
-  await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
-  await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
-  // A conta acabou de nascer: "Primeiros passos" pode ainda estar carregando quando o tour fecha logo no primeiro cartão.
-  await p.getByRole('heading', { name: 'Primeiros passos', exact: true }).filter({ visible: true }).first().waitFor({ timeout: 6000 }).catch(() => {});
-  ok('Tutorial tour: "Pular" no cartão 1 fecha a janela e o Resumo fica como antes', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(j1Baseline), JSON.stringify(await headingList()));
-  await j1Tab('Metas').click(); await waitText('Você consegue guardar algum valor por mês?'); await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(900);
-  ok('Tutorial tour: depois de "Pular", não volta ao passar por outras abas', await j1TourGone());
-  await j1NewAccount('Lia Tutorial', 'lia@exemplo.com');
-  await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
+  ok('Tutorial tour: "Pular" fecha o tour, e o guia continua aberto', (await j1TourGone()) && j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo');
+  await btn('Ver o tour do app').click(); await j1Dialog(j1TOUR).first().waitFor({ timeout: 6000 });
   const j1Focus = [];
   for (let i = 0; i < 6; i++) { await p.keyboard.press('Tab'); j1Focus.push((await j1TourState())?.focusInside === true); }
   ok('Tutorial tour: o Tab fica preso na janela (seis toques, o foco nunca sai dela)', j1Focus.every(Boolean), JSON.stringify(j1Focus));
   await p.keyboard.press('Escape');
-  ok('Tutorial tour: Esc pula o tour', await j1TourGone());
-  await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(700);
-  ok('Tutorial tour: depois de Esc, não volta', await j1TourGone());
+  ok('Tutorial tour: Esc fecha o tour', await j1TourGone());
 
-  // ---- 4. Demonstração: o tour também abre (sempre pulável); a demonstração não muda ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await j1TourOn();
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
-  await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 }).catch(() => {});
-  j1s = await j1TourState();
-  ok('Tutorial tour: na demonstração o tour também abre, com "Pular"', j1s !== null && j1s.title === 'Resumo do mês' && j1s.buttons.includes('Pular'), JSON.stringify(j1s));
-  await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
-  ok('Tutorial tour: a demonstração segue com os títulos de sempre', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
-
-  // ---- 5. Nunca sobre "Seus últimos meses" (D-030) nem sobre formulários ----
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira'); await j1TourOn();
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
-  await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {}); await p.waitForTimeout(1500);
-  ok('Tutorial tour: com a faixa "Seus últimos meses" no Resumo, o tour não abre', (await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
-  await btn('Seguir adiante').click(); await waitText('Combinado.'); await p.waitForTimeout(1200);
-  ok('Tutorial tour: nem logo depois de a faixa sair (a faixa foi vista neste Resumo)', !(await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
-  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Cuidar da vida financeira'); await j1TourOn();
+  // ---- 3. Demonstração e formulários: o tour também não abre sozinho ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await p.waitForTimeout(1500);
+  ok('Tutorial (D-125): a demonstração abre direto no Resumo, sem o tour, com os títulos de sempre', (await j1Dialog(j1TOUR).count()) === 0 && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Cuidar da vida financeira');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Noa Tutorial'); await field('E-mail').fill('noa@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
   await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
   await btn('Começar meu mês').click(); await waitText('Será salvo em', 12000); await p.waitForTimeout(1200);
-  ok('Tutorial tour: com o formulário "Anotar gasto" aberto pelo endereço, o tour não abre sobre ele', j1Path() === '/registro/novo' && (await j1Dialog(j1TOUR).count()) === 0, p.url());
-  await btn('Cancelar').click(); await waitText('Diferença do mês'); await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 }).catch(() => {});
-  ok('Tutorial tour: ao voltar ao Resumo, o tour aparece (ainda não visto)', (await j1TourState())?.title === 'Resumo do mês');
-  await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click(); await j1TourGone();
+  ok('Tutorial: com o formulário "Anotar gasto" aberto pelo endereço, a conta nova chega a ele, sem o tour', j1Path() === '/registro/novo' && (await j1Dialog(j1TOUR).count()) === 0, p.url());
+  await btn('Cancelar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(1200);
+  ok('Tutorial (D-125): de volta ao Resumo, o tour não abre', (await j1Dialog(j1TOUR).count()) === 0);
 
   // ---- 6. Aprender: o card "Como usar o Clarevo" no topo, antes das calculadoras ----
   await j1Demo();
@@ -8604,12 +8778,12 @@ setInterval(async () => {
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
   // ---- 7. A lista do guia: cinco grupos, quarenta e duas entradas ("Espaço Negócio", D-113, "Assinatura e teste grátis", D-083, 28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
-  ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
-    (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
+  ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour do app"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
+    (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour do app')) === 1);
   ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 9, 2 e 12 entradas (Conta e privacidade ganhou "Espaço Negócio", D-113, e "Nível da conta", Planejar ganhou "Investimentos", Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
     JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 9, 2, 12]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
@@ -8634,7 +8808,7 @@ setInterval(async () => {
   ok('Tutorial guia: "Abrir Cartões" abre a tela de Cartões (/cartoes), com o botão "?"', j1Path() === '/cartoes' && (await h1Name()) === 'Cartões' && (await visibleCount('button', 'Como usar esta tela')) === 1);
   await btn('Voltar').click(); await waitText('Para que serve');
   ok('Tutorial guia: voltar da tela aberta devolve a entrada', j1Path() === '/aprender/guia/cartoes');
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
 
   // As três funções novas (Buscar, Exportar, Importar) e as abas (Metas, Resumo): o caminho e o botão "Abrir {tela}" levam à tela certa.
   const j1Open = [
@@ -8654,11 +8828,11 @@ setInterval(async () => {
     // De volta à lista: a aba Aprender e o card do guia (as abas não deixam a entrada na pilha).
     for (let i = 0; i < 6 && (await p.getByRole('tab', { name: 'Aprender e dúvidas' }).filter({ visible: true }).count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
     await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
-    await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+    await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   }
   await j1Entry('Importar extrato ou fatura').click(); await waitText('Também em');
   ok('Tutorial guia: "Importar extrato ou fatura" tem "Também em: Conta › Bancos e carteira › Importar extrato"', (await body()).includes('Conta › Bancos e carteira › Importar extrato'));
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
 
   // As calculadoras, cada uma em uma linha, e a lista abre a calculadora.
   await j1Entry('Calculadoras').click(); await waitText('Uma por uma');
@@ -8668,16 +8842,16 @@ setInterval(async () => {
   await shot('323_guia_entrada_calculadoras');
   await p.getByRole('button', { name: /^Quanto custa por ano\? / }).filter({ visible: true }).first().click(); await waitText('Hipóteses').catch(() => {}); await p.waitForTimeout(500);
   ok('Tutorial guia: a linha "Quanto custa por ano?" abre a calculadora (/calcular/custo-por-ano)', j1Path() === '/calcular/custo-por-ano', j1Path());
-  await btn('Voltar').click(); await waitText('Uma por uma'); await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Uma por uma'); await btn('Voltar').click(); await waitText('Ver o tour do app');
 
   // ---- 9. Endereços do guia abertos direto (ENTRY_PATH) e entrada que não existe ----
   await p.goto(`http://localhost:${PORT}/aprender/guia/cartoes`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Para que serve', 12000); await p.waitForTimeout(400);
+  await btn('Ver a demonstração').click(); await waitText('Para que serve', 12000); await p.waitForTimeout(400);
   ok('Tutorial guia: o endereço /aprender/guia/cartoes aberto direto, depois de entrar, mostra a entrada', j1Path() === '/aprender/guia/cartoes' && (await h1Name()) === 'Cartões e faturas', p.url());
   await p.goto(`http://localhost:${PORT}/aprender/guia/nao-existe`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Esta função não está no guia.', 12000);
+  await btn('Ver a demonstração').click(); await waitText('Esta função não está no guia.', 12000);
   ok('Tutorial guia: uma entrada que não existe mostra "Esta função não está no guia." com "Ver o guia"', (await visibleCount('button', 'Ver o guia')) === 1);
-  await btn('Ver o guia').click(); await waitText('Ver o tour de novo');
+  await btn('Ver o guia').click(); await waitText('Ver o tour do app');
   ok('Tutorial guia: "Ver o guia" abre a lista', j1Path() === '/aprender/guia');
 
   // ---- 10. A busca de Aprender inclui as entradas do guia (grupo "Como usar") ----
@@ -8756,7 +8930,7 @@ setInterval(async () => {
   await j1Help('Fatura', 'Cartões e faturas', 'Toque em "Cadastrar cartão"');
   // Orçamento por categoria
   await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento');
-  await j1Org('Orçamento por categoria').click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra');
+  await j1Org('Orçamento por categoria').click(); await waitBudget();
   await j1Help('Orçamento por categoria', 'Orçamento por categoria', 'Em "Definir orçamento", escolha uma categoria');
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   // Importar extrato
@@ -8826,10 +9000,20 @@ setInterval(async () => {
   });
   await btn('Cancelar').click(); await waitText('Diferença do mês');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
-  // Nas abas, o selo "Demonstração" fica ao lado do logotipo e a pílula diz só o contexto (revisão de 16/11/2026: sem os dois selos juntos).
-  ok('CL-11 Metas: o cabeçalho mostra o selo da demonstração e o contexto "Pessoal", sem repetir "Demonstração" na pílula', (await p.locator('[aria-label="Espaço: Pessoal"]').filter({ visible: true }).count()) === 1 &&
-    (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 0 &&
-    (await p.locator('[aria-label^="Demonstração: acesso simulado"]').filter({ visible: true }).count()) === 1);
+  // Nas abas, o selo "Demonstração" fica ao lado do logotipo. Uma só indicação do espaço por tela (D-125, sinal 22: "Pessoal" aparecia duas
+  // vezes em Metas, na pílula e no seletor): só com o Pessoal, nenhuma pílula nem seletor; com mais de um espaço, só o seletor.
+  const clMetasSpace = await p.evaluate(() => {
+    const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const band = [...document.querySelectorAll('[data-band]')].find(shown);
+    return {
+      pills: [...document.querySelectorAll('[aria-label^="Espaço:"]')].filter(shown).length,
+      selector: [...document.querySelectorAll('[role=tab]')].filter((e) => shown(e) && /^Ver dados d/.test(e.getAttribute('aria-label') || '')).length,
+      pessoal: band ? (band.innerText.match(/\bPessoal\b/g) || []).length : -1,
+      demo: [...document.querySelectorAll('[aria-label^="Demonstração: acesso simulado"]')].filter(shown).length,
+    };
+  });
+  ok('CL-11 e D-125 Metas: o selo da demonstração no cabeçalho e o espaço dito no máximo uma vez (só com o Pessoal: nenhuma pílula nem seletor)',
+    clMetasSpace.pills === 0 && clMetasSpace.selector === 0 && clMetasSpace.pessoal === 0 && clMetasSpace.demo === 1, JSON.stringify(clMetasSpace));
   await atWidths(async (w) => { await layoutChecks(`CL-11 Metas ${w}px`); if (w === 320) await shot('CL11_metas_demonstracao_320px'); });
   await goResumo();
   // Resultado incerto (gravado, resposta perdida): o texto manda conferir; sair do formulário e anotar o mesmo gasto de novo não duplica.
@@ -9602,11 +9786,11 @@ setInterval(async () => {
 
   // ---- 6. Endereços: /seu-mes?mes=AAAA-MM aberto direto, e meses que não valem ----
   await p.goto(`http://localhost:${PORT}/seu-mes?mes=2026-09`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(500);
+  await btn('Ver a demonstração').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(500);
   ok('K1 endereço: /seu-mes?mes=2026-09 aberto direto, depois de entrar, mostra setembro', k1Path() === '/seu-mes' && (await body()).includes('Pessoal · Setembro de 2026'), p.url());
   for (const bad of ['2026-11', 'banana']) {
     await p.goto(`http://localhost:${PORT}/seu-mes?mes=${bad}`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(400);
+    await btn('Ver a demonstração').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(400);
     ok(`K1 endereço: ?mes=${bad} não vale e a tela abre em outubro (o mês de hoje)`, (await body()).includes('Pessoal · Outubro de 2026'), p.url());
   }
 
@@ -9634,7 +9818,6 @@ setInterval(async () => {
 
   // ---- 8. Movimento reduzido: o cartão novo aparece no lugar, sem deslizar nem esmaecer ----
   const k1Rm = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
-  await k1Rm.addInitScript(() => { window.__clarevoSemTour = true; });
   const k1Rp = await k1Rm.newPage();
   const k1Sample = (page) => page.evaluate(async () => {
     const next = [...document.querySelectorAll('[role=button]')].find((e) => e.textContent === 'Próximo' && e.getBoundingClientRect().width > 0);
@@ -9646,14 +9829,14 @@ setInterval(async () => {
   });
   await k1Rp.goto(`http://localhost:${PORT}/seu-mes`);
   await k1Rp.getByText('Cuidar da vida financeira').first().waitFor();
-  await k1Rp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).click();
+  await k1Rp.getByRole('button', { name: 'Ver a demonstração', exact: true }).click();
   await k1Rp.getByText('Entrou e saiu').first().waitFor({ timeout: 12000 }); await k1Rp.waitForTimeout(700);
   const k1RmSample = await k1Sample(k1Rp);
   ok('K1 movimento reduzido: o cartão 2 aparece já inteiro (opacidade 1, sem deslocamento nem animação)', k1RmSample.title === 'Para onde foi' && k1RmSample.moving.length === 0, JSON.stringify(k1RmSample));
   await k1Rm.close();
   // Com movimento normal, o mesmo clique desliza e esmaece o cartão novo (a conferência acima não é vazia).
   await p.goto(`http://localhost:${PORT}/seu-mes`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(700);
+  await btn('Ver a demonstração').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(700);
   const k1Normal = await k1Sample(p);
   ok('K1 movimento normal: o cartão novo entra deslizando e esmaecendo (a animação existe)', k1Normal.title === 'Para onde foi' && k1Normal.moving.length > 0, JSON.stringify(k1Normal));
 
@@ -9739,7 +9922,7 @@ setInterval(async () => {
   ok('K1 aberta pela busca, a tela mostra a aba de Aprender marcada (a de onde a pessoa veio)', (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1);
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await k1Box().fill('');
   // O guia: a entrada, "Onde fica" e "Abrir Seu mês em 30 segundos".
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   await p.getByRole('button', { name: /^Seu mês em 30 segundos\. Resume o mês/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await k1Keep();
   ok('K1 guia: a entrada "Seu mês em 30 segundos" (/aprender/guia/seu-mes) tem as três seções, "Movimentos › Análises › Seu mês em 30 segundos", seis passos e o botão "Abrir Seu mês em 30 segundos"', k1Path() === '/aprender/guia/seu-mes' && (await h1Name()) === 'Seu mês em 30 segundos' &&
@@ -9749,11 +9932,11 @@ setInterval(async () => {
   await btn('Abrir Seu mês em 30 segundos').click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
   ok('K1 guia: "Abrir Seu mês em 30 segundos" abre a tela (/seu-mes)', k1Path() === '/seu-mes' && (await h1Name()) === 'Seu mês em 30 segundos', k1Path());
   await btn('Voltar').click(); await waitText('Para que serve');
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
   await p.getByRole('button', { name: /^Ocultar valores e biometria\. / }).filter({ visible: true }).first().click(); await waitText('Também em'); await p.waitForTimeout(300);
   t = await k1Keep();
   ok('K1 guia: "Ocultar valores e biometria" ganhou "Também em: Conta › Widget na tela inicial" e o passo do widget', t.includes('Conta › Widget na tela inicial') && t.includes('"Mostrar valores no widget" começa desligado'));
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
 
   // ---- 14. A estrutura do Resumo, a aba Metas e os totais seguem como eram ----
   await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
@@ -9952,14 +10135,14 @@ setInterval(async () => {
   ok('K2 busca: ao limpar, o card "Neste mês" volta com as mesmas três linhas', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]), JSON.stringify(await cardButtons('Neste mês')));
 
   // ---- 6. O guia (D-049): a entrada "Aprender" ganhou o passo ----
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   await p.getByRole('button', { name: /^Aprender\. Explicações curtas sobre contas, juros e o próprio app/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await k2Keep();
   ok('K2 guia: a entrada "Aprender" tem o passo "Neste mês" (13º salário, volta às aulas, Imposto de Renda e férias, e o card que some nos meses sem tema) e seis passos', k2Path() === '/aprender/guia/aprender' &&
     t.includes('Em "Neste mês", veja os temas do mês: 13º salário e contas do começo do ano no fim do ano, volta às aulas no começo, Imposto de Renda de fevereiro a maio e férias em junho e julho. O card some nos meses sem tema.') &&
     (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6, `${k2Path()} ${t.slice(0, 200)}`);
   await shot('388_guia_aprender_neste_mes');
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
   await btn('Voltar').click(); await waitText('Neste mês');
 
   // ---- 7. Conta nova: o mesmo card (conteúdo público; nada de exemplo da pessoa) ----
@@ -10054,7 +10237,7 @@ setInterval(async () => {
   const d54OpenBudget = async () => {
     await d54Tab('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click();
-    await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(500);
+    await waitBudget(); await p.waitForTimeout(500);
   };
   const d54Step = async (name, label) => { await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText(`Pessoal · ${label}`); await p.waitForTimeout(500); };
   // Cartões: Movimentos › Organizar › Cartões › o cartão › a fatura do mês.
@@ -10293,11 +10476,11 @@ setInterval(async () => {
 
   // ---- 8. O guia (D-049): os passos que mudaram ----
   await d54Tab('Aprender e dúvidas').click(); await waitText('Como usar o app da Clarevo'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   const d54Guide = async (name, text) => {
     await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
     const x = await d54Keep();
-    await btn('Voltar').click(); await waitText('Ver o tour de novo');
+    await btn('Voltar').click(); await waitText('Ver o tour do app');
     return text.every((s) => x.includes(s));
   };
   ok('D54 guia: "Resumo do mês" diz que a diferença é até hoje e que a legenda lembra que não é saldo', await d54Guide(/^Resumo do mês\./, ['recebeu menos o que já pagou até hoje, e a legenda lembra que não é saldo']));
@@ -10374,16 +10557,8 @@ setInterval(async () => {
 
   // ---- 1. Vera cria a conta: sem Família, o Resumo não tem seletor e o Pessoal é o único contexto ----
   await famCreateAccount('Vera Lima', 'vera.familia@exemplo.com');
-  ok('Família (D-113b): sem Família, o seletor do Resumo mostra só "Pessoal" e o "+" oferece o Negócio e a Família', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 &&
-    (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
-  // O "+" abre a folha "Criar um espaço": o Espaço Negócio e a Família, cada um com a frase de para quem é; "Família" abre a tela Família.
-  await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
-  t = await dialogText().catch(() => '');
-  ok('Família (D-113b): a folha "Criar um espaço" tem "Espaço Negócio" e "Família", com as frases, e "Fechar"', t.includes('Criar um espaço') && t.includes('Espaço Negócio') && t.includes('Para quem tem CNPJ ou trabalha por conta.') &&
-    t.includes('Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.') && (await visibleCount('button', 'Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.')) === 1 && (await visibleCount('button', 'Fechar')) === 1, t.slice(0, 300));
-  await btn('Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.').click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(300);
-  ok('Família (D-113b): "Família" na folha abre a tela Família, com "Criar Família"', new URL(p.url()).pathname === '/familia' && (await visibleCount('button', 'Criar Família')) === 1, p.url());
-  await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
+  ok('Família (D-125): sem Família nem negócio, o Resumo não mostra o seletor de espaço nem o "+"', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0 &&
+    (await visibleCount('button', /^Criar um espaço/)) === 0);
   await famConta();
   t = await body();
   ok('Família: Conta tem o card "Família" com a explicação e "Criar Família"', t.includes('Crie uma Família para ver e anotar as contas da casa em conjunto, com até 6 pessoas.') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 200));
@@ -10449,8 +10624,10 @@ setInterval(async () => {
   await famTab('Metas').click(); await waitUntil(async () => (await famSelectorCount()) === 2, 8000); await p.waitForTimeout(600);
   ok('Metas: o seletor também aparece (a pílula do contexto acompanha a escolha)', (await famSelectorCount()) === 2);
   await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
-  // Nas abas, o selo "Demonstração" fica no cabeçalho e a pílula diz só o contexto (revisão das telas, 16/11/2026).
-  ok('Metas na Família: a pílula diz "Família" (o selo "Demonstração" fica no cabeçalho)', (await p.locator('[aria-label="Espaço: Família"]').filter({ visible: true }).count()) === 1 && !(await body()).includes('Demonstração · Família'));
+  // Nas abas, o selo "Demonstração" fica no cabeçalho. Uma só indicação do espaço (D-125, sinal 22): o seletor, com a Família escolhida, sem a
+  // pílula ao lado do título (antes, "Família" aparecia na pílula e no seletor).
+  ok('Metas na Família (D-125): o seletor diz o espaço (Família escolhida), sem pílula ao lado do título, e o selo "Demonstração" fica no cabeçalho',
+    (await p.locator('[aria-label^="Espaço:"]').filter({ visible: true }).count()) === 0 && (await famTab('Ver dados de Família').getAttribute('aria-selected')) === 'true' && !(await body()).includes('Demonstração · Família'));
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(400);
 
   // ---- 3b. Um item da Família aberto com o seletor em Pessoal usa as contas e o "Salvando em" DO ITEM ----
@@ -10548,7 +10725,7 @@ setInterval(async () => {
   // ---- 5. Mauro recebe o link: cola em "Tenho um convite", vê a prévia e aceita ----
   await famSignOut();
   await famCreateAccount('Mauro Dias', 'mauro.familia@exemplo.com');
-  ok('Mauro (conta nova, sem Família): o seletor do Resumo mostra só "Pessoal"', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
+  ok('Mauro (conta nova, sem Família, D-125): só com o Pessoal, o Resumo não mostra o seletor de espaço', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
   await famGoFamilia();
   await field('Link do convite').fill('isto não é um convite');
   await btn('Ver convite').click(); await waitText('Não há um convite neste texto.');
@@ -10564,7 +10741,7 @@ setInterval(async () => {
   await famKeep();
   await famShots('407_convite_previa');
   await btn('Agora não').click(); await waitText('Diferença do mês');
-  ok('Convite: "Agora não" volta ao início e não entra na Família (o seletor mostra só "Pessoal")', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
+  ok('Convite: "Agora não" volta ao início e não entra na Família (só com o Pessoal, sem seletor de espaço)', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
   await famGoFamilia();
   await field('Link do convite').fill(famLink1); await btn('Ver convite').click(); await waitText('Aceitar convite');
   await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Lima.'); await p.waitForTimeout(500);
@@ -10704,7 +10881,7 @@ setInterval(async () => {
   t = await body();
   ok('Saiu: aviso e a tela volta ao estado sem Família ("Anotar a casa em conjunto", "Criar Família")', t.includes('Você saiu da Família.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
   await famGoResumo();
-  ok('Saiu: a Família sai do seletor e o Resumo volta a ser o Pessoal', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && !(await body()).includes('Mercado da casa'));
+  ok('Saiu (D-125): a Família sai, o seletor some (só com o Pessoal) e o Resumo volta a ser o Pessoal', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && !(await body()).includes('Mercado da casa'));
   // Entrar em outra Família depois de sair é possível, e a pessoa não volta direto para o contexto Família.
 
   // ---- 8. O titular que ficou encerra a Família ----
@@ -10721,13 +10898,13 @@ setInterval(async () => {
   t = await body();
   ok('Encerrada: aviso e a tela volta ao estado sem Família, com "Criar Família"', t.includes('Família encerrada.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
   await famGoResumo();
-  ok('Encerrada: a Família sai do seletor (fica só "Pessoal", com o "+")', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
+  ok('Encerrada (D-125): a Família sai e, só com o Pessoal, o seletor e o "+" somem', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await visibleCount('button', /^Criar um espaço/)) === 0);
 
   // ---- 9. A demonstração com dados fictícios: sem Família de exemplo, sem seletor e sem criar ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
-  ok('Demonstração: o seletor mostra só "Pessoal" (sem Família de exemplo) e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
+  ok('Demonstração (D-125): sem Família de exemplo, só com o Pessoal e sem seletor de espaço, e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 0 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
   await famConta();
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(400);
   t = await body();
@@ -10790,7 +10967,7 @@ setInterval(async () => {
 
   // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await empStubClipboard();
   await famConta(); await waitText('Abrir painel da empresa'); await waitText('Na demonstração não há benefício de exemplo.');
@@ -10913,7 +11090,7 @@ setInterval(async () => {
   ok('Painel da demonstração: nenhuma escrita na rede (a empresa de exemplo vive só na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
   // A demonstração de novo: nada do que foi feito fica (cada visita refaz a empresa de exemplo) e os totais não mudam.
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('Demonstração de novo: os totais de outubro seguem 6.000 / 3.900 / 2.100 e o Resumo não ganhou nada da empresa', (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00') && !(await body()).includes('Empresa Exemplo'));
   await empGoPanel();
@@ -11123,7 +11300,7 @@ setInterval(async () => {
   };
   const evEnter = async (scenario) => {
     await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
   // Revisão das telas (16/11/2026): a Evolução abre pelas Análises ("Ver análises do mês", depois da lista de Movimentos › aba Evolução ›
@@ -11380,7 +11557,7 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Evolução\. Recebido e pago mês a mês/ }).filter({ visible: true }).first().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
   ok('Evolução busca: a linha "No app" abre /evolucao, com a aba de Aprender marcada (a de onde a pessoa veio)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1, evPath());
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await evBox().fill('');
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   await p.getByRole('button', { name: /^Evolução\. Mostra o Recebido ou o Pago/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await evKeep();
   ok('Evolução guia: a entrada "Evolução" (/aprender/guia/evolucao) tem as três seções, "Movimentos › Análises › Evolução", seis passos e o botão "Abrir Evolução"', evPath() === '/aprender/guia/evolucao' && (await h1Name()) === 'Evolução' &&
@@ -11389,11 +11566,11 @@ setInterval(async () => {
   await btn('Abrir Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
   ok('Evolução guia: "Abrir Evolução" abre a tela (/evolucao)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução');
   await btn('Voltar').click(); await waitText('Para que serve');
-  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Ver o tour do app');
 
   // ---- 8. O endereço direto: /evolucao aberto direto, depois de entrar, abre a tela ----
   await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
+  await btn('Ver a demonstração').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
   // Na demonstração (só setembro e outubro com registros), a tela abre em 3 meses (auditoria de 18/11/2026).
   ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar"), em 3 meses', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 3 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 5 && (await visibleCount('button', 'Voltar')) === 1, p.url());
@@ -12336,7 +12513,7 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Análises\. Categorias em barras ou bolhas/ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(600);
   ok('Análises busca: a linha "No app" abre /analises, com a aba de Aprender marcada (a de onde a pessoa veio)', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1);
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await evBox().fill('');
-  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour do app');
   await p.getByRole('button', { name: /^Análises\. Reúne, em quatro abas/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await anKeep();
   ok('Análises guia: a entrada "Análises" (/aprender/guia/analises) tem as três seções, "Movimentos › Análises", seis passos e o botão "Abrir Análises"', anPath() === '/aprender/guia/analises' && (await h1Name()) === 'Análises' &&
@@ -12346,11 +12523,11 @@ setInterval(async () => {
   await btn('Abrir Análises').click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(500);
   ok('Análises guia: "Abrir Análises" abre a tela (/analises)', anPath() === '/analises' && (await h1Name()) === 'Análises');
   await p.goto(`http://localhost:${PORT}/analises`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
+  await btn('Ver a demonstração').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: /analises aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await anTabs()).length === 4 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 9 && (await visibleCount('button', 'Voltar')) === 1, p.url());
   await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
+  await btn('Ver a demonstração').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: ?aba=orcamento&mes=2026-09 abre na aba Orçamento, em setembro de 2026', (await anTabs()).map((x) => x.selected).join() === 'false,false,false,true' && (await anMonthLabel()).includes('Setembro de 2026'));
 
   // ---- 12. Conta nova (nada de exemplo), Família e o que fica no aparelho ----
@@ -12653,7 +12830,7 @@ setInterval(async () => {
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
 
   // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   const delDemoBefore = await body();
   await delOpen();
@@ -12727,7 +12904,7 @@ setInterval(async () => {
 
   // ---- 1. A demonstração: nada em outubro cai em dia que não é útil; em "Próximos meses", as faturas do Cartão Exemplo de 10/01, 10/04 e 10/07/2027 (domingo e sábados) levam o aviso ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   t = await body();
   const duResumoSemVencida = !/vencida/i.test(t);
   ok('Dia útil, demonstração: os totais de outubro seguem 6.000 / 3.900 / 2.100 / 650 (invariantes)', ['R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00'].every((x) => t.includes(x)), t.slice(0, 300));
@@ -13109,7 +13286,7 @@ setInterval(async () => {
 
   // ---- 8. "Seus últimos meses": o mês conferido deixa de ser lacuna ----
   await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
-  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
+  await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await evSpyStart();
   const mcBand = async () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seus últimos meses' && e.getBoundingClientRect().width > 0); let box = h?.parentElement; while (box && !box.querySelector('[role=button]')) box = box.parentElement; return box ? box.innerText.replace(/ /g, ' ') : null; });
   const mcReturnState = () => otherDevice(async (repo, ctx) => JSON.stringify(await repo.getReturnReviewState(ctx)));
@@ -14309,6 +14486,23 @@ setInterval(async () => {
         }
         return out;
       },
+      // Valor em reais quebrado no meio (D-125, sinal 20: "R$ 2.100 / ,00"): o trecho do valor ocupa mais de uma linha.
+      brokenMoney() {
+        const out = []; const re = /R\\$\\s?-?[\\d.]+,\\d{2}/g;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const el = n.parentElement; if (!el || el.closest('svg') || !this.shown(el)) continue;
+          re.lastIndex = 0; let m;
+          while ((m = re.exec(n.textContent))) {
+            const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+            const tops = new Set([...r.getClientRects()].filter((b) => b.width > 0).map((b) => Math.round(b.top)));
+            if (tops.size > 1) out.push(m[0] + ' em "' + n.textContent.slice(0, 40) + '"');
+          }
+        }
+        return out.slice(0, 5);
+      },
+      // Rótulos das abas com reticências (D-125, sinal 20: "Resu…", "Movi…"): com a letra grande, o rótulo encolhe ou some (só o ícone).
+      tabsCut() { return [...document.querySelectorAll('[role=tab] *')].filter((e) => this.shown(e) && e.children.length === 0 && (e.textContent || '').trim() && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent); },
       // Letra grande do aparelho: tamanho e altura da linha de todo texto vezes k (rótulos das abas e avatar: no máximo 1,3, como no app).
       // Os títulos com limite de linhas ficam sem limite, como o app faz com a escala acima de 1 (clampLines).
       scale(k) {
@@ -14352,11 +14546,11 @@ setInterval(async () => {
   }, { route, params });
   const acEnter = async () => { await evEnter(); await acInstall(); };
   // Tela atual: o que cada conferência acha, juntando por categoria (com o nome da tela para achar o problema).
-  const acFound = { contraste: [], nome: [], papel: [], alvo: [], largura: [], cortado: [], cruzado: [], titulos: [] };
+  const acFound = { contraste: [], nome: [], papel: [], alvo: [], largura: [], cortado: [], cruzado: [], titulos: [], quebrado: [], abas: [] };
   const acCount = { texto: 0, alvo: 0, telas: 0 };
   const acScan = async (name) => {
     await p.waitForTimeout(800);
-    const r = await p.evaluate(() => ({ c: window.__acc.contrast(), t: window.__acc.targets(), role: window.__acc.noRole(), o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap() }));
+    const r = await p.evaluate(() => ({ c: window.__acc.contrast(), t: window.__acc.targets(), role: window.__acc.noRole(), o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap(), bm: window.__acc.brokenMoney(), tc: window.__acc.tabsCut() }));
     const names = await acNoName();
     // D-063: cada tela tem um só título de nível 1 e nenhum salto de nível (a janela aberta, se houver, conta à parte).
     for (const x of headingIssues(await headingsOnPage(), true)) acFound.titulos.push(`${name}: ${x}`);
@@ -14368,6 +14562,8 @@ setInterval(async () => {
     for (const x of r.o) acFound.largura.push(`${name}: ${x}`);
     for (const x of r.cut) acFound.cortado.push(`${name}: ${x}`);
     for (const x of r.ov) acFound.cruzado.push(`${name}: ${x}`);
+    for (const x of r.bm) acFound.quebrado.push(`${name}: ${x}`);
+    for (const x of r.tc) acFound.abas.push(`${name}: ${x}`);
     return r;
   };
   const acResetFound = () => { for (const k of Object.keys(acFound)) acFound[k] = []; acCount.texto = 0; acCount.alvo = 0; acCount.telas = 0; };
@@ -14520,10 +14716,9 @@ setInterval(async () => {
   // ---- 5. Reduzir movimento: sem animação de entrada, sem escala ao tocar ----
   const acMotion = async (reduce) => {
     const c2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, reducedMotion: reduce ? 'reduce' : 'no-preference' });
-    await c2.addInitScript(() => { window.__clarevoSemTour = true; });
     const q = await c2.newPage();
     await q.goto(`http://localhost:${PORT}/`); await q.getByText('Cuidar da vida financeira', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
-    await q.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).filter({ visible: true }).first().click();
+    await q.getByRole('button', { name: 'Ver a demonstração', exact: true }).filter({ visible: true }).first().click();
     await q.getByText('Diferença do mês', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     await q.waitForTimeout(1500);
     const parado = await q.evaluate(() => document.getAnimations().length);
@@ -14558,6 +14753,7 @@ setInterval(async () => {
     ...AC_INVEST.map(([name, route, params]) => [name, null, route, params]),
   ];
   let acShotN = 592;
+  const acHero = [];
   for (const [scale, width, suffix] of [[1.3, 360, '130'], [2, 359, '200']]) {
     acResetFound();
     await acEnter();
@@ -14569,13 +14765,42 @@ setInterval(async () => {
       await p.evaluate((k) => window.__acc.scale(k), scale);
       await p.waitForTimeout(500);
       await acScan(`${name} ${scale}x`);
+      if (name === 'resumo') {
+        // O valor do topo do Resumo (D-125, sinal 20): uma linha só, que diminui a letra para caber (na web, pelo zoom do próprio texto).
+        acHero.push([scale, await p.evaluate(() => {
+          const btn = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Diferença do mês,') && e.getBoundingClientRect().width > 0);
+          const el = btn && [...btn.querySelectorAll('*')].find((x) => x.children.length === 0 && /^R\$\s?-?[\d.]+,\d{2}$/.test((x.textContent || '').replace(/\u00a0/g, ' ').trim()));
+          if (!el) return null;
+          const r = document.createRange(); r.selectNodeContents(el);
+          return { text: el.textContent, lines: new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size, sw: el.scrollWidth, cw: el.clientWidth, ws: getComputedStyle(el).whiteSpace, right: Math.round(el.getBoundingClientRect().right), w: innerWidth };
+        })]);
+      }
       if (['resumo', 'movimentações', 'registrar gasto', 'contas a pagar', 'fatura', 'metas', 'cartão', 'conta'].includes(name)) await shot(`${acShotN++}_letra_grande_${suffix}_${name.replace(/ /g, '_').replace(/ç/g, 'c').replace(/õ/g, 'o').replace(/ã/g, 'a')}_${width}px`);
     }
     ok(`Acessibilidade, letra grande ${scale}x em ${width} px (${AC_BIG.length} telas): nada passa da largura da tela`, acFound.largura.length === 0, acFound.largura.slice(0, 4).join(' | '));
     ok(`Acessibilidade, letra grande ${scale}x em ${width} px: nenhum texto cortado (fora os rótulos das abas, que têm teto de 1,3 e encolhem no aparelho)`, acFound.cortado.length === 0, acFound.cortado.slice(0, 4).join(' | '));
     ok(`Acessibilidade, letra grande ${scale}x em ${width} px: nenhum texto por cima de outro`, acFound.cruzado.length === 0, acFound.cruzado.slice(0, 4).join(' | '));
     ok(`Acessibilidade, letra grande ${scale}x em ${width} px: os botões e campos seguem com 44 x 44 px ou mais`, acFound.alvo.length === 0, acFound.alvo.slice(0, 4).join(' | '));
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px (D-125): nenhum valor em reais quebrado no meio ("R$ 2.100 / ,00")`, acFound.quebrado.length === 0, acFound.quebrado.slice(0, 4).join(' | '));
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px (D-125): nenhum rótulo de aba com reticências ("Resu…")`, acFound.abas.length === 0, acFound.abas.slice(0, 4).join(' | '));
     await acKeep();
+  }
+  ok('Acessibilidade, letra grande (D-125): o valor do topo do Resumo fica numa linha só, sem quebrar no meio nem cortar, a 1,3 e a 2,0 vezes',
+    acHero.length === 2 && acHero.every(([, h]) => h !== null && h.lines === 1 && h.sw <= h.cw + 1 && h.ws === 'nowrap' && h.right <= h.w), JSON.stringify(acHero));
+  // Revisão de 26/11/2026: os rótulos das abas continuam à vista com a letra a 2,0 vezes, também em 320 px (até 1,3 vez, encolhendo para
+  // caber, como no aparelho; antes, acima de 1,3, a barra ficava só com os ícones). No iPhone, tocar e segurar mostra o nome grande.
+  {
+    await acEnter();
+    await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(500);
+    await p.evaluate((k) => window.__acc.scale(k), 2); await p.waitForTimeout(600);
+    const tabs = await p.evaluate(() => [...document.querySelectorAll('[role=tablist] [role=tab]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => {
+      const leaf = [...e.querySelectorAll('*')].find((x) => x.children.length === 0 && (x.textContent || '').trim() && !x.closest('svg'));
+      const r = leaf ? leaf.getBoundingClientRect() : null; const tr = e.getBoundingClientRect();
+      return { label: leaf ? leaf.textContent.trim() : '', cut: leaf ? leaf.scrollWidth > leaf.clientWidth + 1 : true, inside: r !== null && r.height > 0 && r.left >= tr.left - 1 && r.right <= tr.right + 1 };
+    }));
+    ok('Acessibilidade, letra grande 2,0x em 320 px (revisão de 26/11/2026): as cinco abas mostram o rótulo inteiro, sem reticências e dentro da aba',
+      JSON.stringify(tabs.map((x) => x.label)) === JSON.stringify(['Resumo', 'Movimentos', 'Metas', 'Investir', 'Aprender']) && tabs.every((x) => !x.cut && x.inside), JSON.stringify(tabs));
+    await shot('599b_letra_grande_200_abas_320px');
   }
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   acResetFound();
@@ -14674,7 +14899,7 @@ setInterval(async () => {
     t = await body();
     ok('WhatsApp: sem card em Conta na demonstração', !(await headingShown('WhatsApp')) && (await visibleCount('button', 'Anotar pelo WhatsApp')) === 0 && !t.includes('WhatsApp'), t.slice(0, 300));
     await p.goto(`http://localhost:${PORT}/conta/whatsapp`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Na demonstração, o WhatsApp não é ligado.', 12000); await p.waitForTimeout(400);
+    await btn('Ver a demonstração').click(); await waitText('Na demonstração, o WhatsApp não é ligado.', 12000); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
     ok('WhatsApp: a tela pelo endereço, com título, exemplos, privacidade e o aviso da demonstração',
       new URL(p.url()).pathname === '/conta/whatsapp' && (await h1Name()) === 'WhatsApp' && t.includes('mercado 52,30') && t.includes('recebi 1500 salário') &&
@@ -14695,7 +14920,7 @@ setInterval(async () => {
     t = await body();
     ok('Telegram: sem card em Conta na demonstração', !(await headingShown('Telegram')) && (await visibleCount('button', 'Anotar pelo Telegram')) === 0 && !t.includes('Telegram'), t.slice(0, 300));
     await p.goto(`http://localhost:${PORT}/conta/telegram`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Na demonstração, o Telegram não é ligado.', 12000); await p.waitForTimeout(400);
+    await btn('Ver a demonstração').click(); await waitText('Na demonstração, o Telegram não é ligado.', 12000); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
     ok('Telegram: a tela pelo endereço, com título, exemplos, privacidade e o aviso da demonstração, sem falar em WhatsApp nem em número',
       new URL(p.url()).pathname === '/conta/telegram' && (await h1Name()) === 'Telegram' && t.includes('mercado 52,30') && t.includes('recebi 1500 salário') &&
@@ -14730,27 +14955,25 @@ setInterval(async () => {
     ok('Assinatura: a tela /conta/assinatura com título, situação, os dois planos e os preços',
       new URL(p.url()).pathname === '/conta/assinatura' && (await h1Name()) === 'Assinatura' && t.includes('Teste grátis') &&
       t.includes('Individual') && t.includes('R$ 29,90 por mês') && t.includes('Família') && t.includes('R$ 69,90 por mês') && t.includes('até 6 pessoas'), t.slice(0, 700));
-    ok('Assinatura: como pagar, cancelar quando quiser, a compra ainda fechada e o que é "só ver e exportar"',
-      t.includes('No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.') && t.includes('Cancele quando quiser.') &&
-      t.includes('A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.') && t.includes('você vê tudo, exporta e pode excluir a conta') &&
-      (await visibleCount('button', 'Assinar')) === 0);
+    // Revisão de 26/11/2026 (diretriz 3.1.1 da App Store): o app das lojas abre esta demonstração ("Ver a demonstração"), então ela nunca
+    // mostra botão de assinar ou de pagar nem como pagar na web; fica a nota neutra.
+    ok('Assinatura na demonstração: os planos com "14 dias grátis, sem cartão" e "Cancele quando quiser", a nota "Na demonstração não há assinatura nem pagamento." no lugar de como pagar, e o que é "só ver e exportar"',
+      t.includes('Toda conta começa com 14 dias grátis, sem cartão. Cancele quando quiser.') && t.includes('Na demonstração não há assinatura nem pagamento.') &&
+      !/cartão ou Pix|App Store|Google Play|abre no lançamento/.test(t) && t.includes('você vê tudo, exporta e pode excluir a conta'), t.slice(0, 900));
+    ok('Assinatura na demonstração: nenhum botão de assinar, pagar ou restaurar compra', (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0);
     ok('Assinatura: os planos são lidos inteiros pelo leitor de tela',
       (await p.locator('[aria-label="Plano Individual, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
-    // O teste da equipe no sandbox (`?assinar=teste`, docs/39): com a compra fechada, os botões do cartão e, desde D-093 (caminho B), os de
-    // pagar um mês com Pix. Na demonstração não há Asaas: tocar diz que não está disponível, sem ir à rede.
+    // O teste da equipe no sandbox (`?assinar=teste`, docs/39) mostra os botões do cartão e do Pix numa conta de verdade. Na demonstração,
+    // nem com ele (revisão de 26/11/2026, diretriz 3.1.1): nenhum botão de compra, só a nota neutra.
     await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Ou pague um mês por vez, com Pix', 15000); await p.waitForTimeout(600);
+    await btn('Ver a demonstração').click(); await waitText('Na demonstração não há assinatura nem pagamento.', 15000); await p.waitForTimeout(600);
     t = await body(); screenTexts.push(t);
-    ok('Assinatura (teste do sandbox): os botões do cartão e os de pagar um mês com Pix, com o que muda no Pix (não renova sozinho)',
-      (await visibleCount('button', 'Assinar o plano Individual')) === 1 && (await visibleCount('button', 'Pagar um mês do plano Individual com Pix')) === 1 &&
-        (await visibleCount('button', 'Pagar um mês do plano Família com Pix')) === 1 && t.includes('Ou pague um mês por vez, com Pix') &&
-        t.includes('Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.'), t.slice(0, 900));
-    await btn('Pagar um mês do plano Individual com Pix').click(); await waitText('não está disponível agora'); await p.waitForTimeout(300);
-    ok('Assinatura (teste do sandbox): na demonstração, o Pix diz que não está disponível, e a tela continua', new URL(p.url()).pathname === '/conta/assinatura' &&
-      (await body()).includes('A assinatura pela web não está disponível agora. Tente de novo mais tarde.'));
-    await atWidths(async (w) => { await layoutChecks(`Assinatura com Pix ${w}px`); if (w === 390) await shot('616_assinatura_pix_teste'); });
+    ok('Assinatura na demonstração, mesmo com "?assinar=teste": nenhum botão de assinar ou de pagar com cartão ou Pix, sem o texto do Pix, e a nota neutra',
+      new URL(p.url()).pathname === '/conta/assinatura' && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !t.includes('Ou pague um mês por vez, com Pix') &&
+        !/cartão ou Pix/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
 
@@ -15121,7 +15344,7 @@ setInterval(async () => {
 
     // ---- D-111: o cenário FICTÍCIO ?cenario=nivel: nada anotado desde 20/05/2026, a regra contando desde 23/08/2026 (Prata pelos marcos) ----
     await p.goto(`http://localhost:${PORT}/?cenario=nivel`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
     const WARN_PRATA = 'Faz 140 dias que nada é anotado. Em 15 dias, o nível passa de Prata para Bronze. Anotar um gasto ou recebimento mantém o nível.';
     await p.waitForTimeout(600);
     t = await body();
@@ -16217,7 +16440,7 @@ setInterval(async () => {
     ok('D-104 Detalhe e formulários: nada vai à rede na demonstração', writes.length === fhWrites0, writes.slice(fhWrites0).join(' | '));
     // A tela do lembrete, como o toque no aviso do celular a abre (na web, pelo endereço).
     await p.goto(`http://localhost:${PORT}/investimento/lembrete?tipo=aporte_investimentos`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Lembrete dos investimentos', 12000); await p.waitForTimeout(800);
+    await btn('Ver a demonstração').click(); await waitText('Lembrete dos investimentos', 12000); await p.waitForTimeout(800);
     t = await body(); investTexts.push(t);
     ok('D-104 Tela do lembrete: o fato com o plano e o que já foi aportado, os atalhos de cada investimento, adiar e pausar, sem cobrança',
       (await h1Name()) === 'Lembrete dos investimentos' && t.includes('O seu plano de investimentos é de R$ 600,00 por mês, com o lembrete no dia 5. Quer registrar um aporte?') &&
@@ -16682,7 +16905,7 @@ setInterval(async () => {
     await goResumo();
     // ---- 8. Evolução com 24 e 36 meses (Recebido e Pago) ----
     await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(800);
+    await btn('Ver a demonstração').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(800);
     ok('D-105 Evolução: "24 meses" e "36 meses" entre as janelas de Pago', (await visibleCount('radio', '24 meses')) === 1 && (await visibleCount('radio', '36 meses')) === 1);
     await radio('36 meses').click(); await p.waitForTimeout(900);
     const d5Cols = () => p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] [role=button], [role=group][aria-label^="Meses do gráfico"] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || ''));
@@ -16704,7 +16927,7 @@ setInterval(async () => {
     await demoHome(); await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(500);
     ok('D-105 Metas na demonstração padrão (metas criadas hoje): sem o convite para rever', !(await body()).includes('Quer rever as suas metas?'));
     await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await tabByName('Metas').click(); await waitText('Quer rever as suas metas?', 8000).catch(() => {}); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
     ok('D-105 Metas (cenário "metas"): o convite "Quer rever as suas metas?" depois das metas, opcional, com "Rever metas" e "Agora não"',
@@ -16724,7 +16947,7 @@ setInterval(async () => {
     await btn('Concluir revisão').click(); await waitText('Revisão concluída. O próximo convite vem em três meses.'); await p.waitForTimeout(400);
     ok('D-105 Rever metas: "Concluir revisão" volta para Metas com o aviso, e o convite some', !(await body()).includes('Quer rever as suas metas?'));
     await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
     await tabByName('Metas').click(); await waitText('Quer rever as suas metas?', 8000).catch(() => {}); await p.waitForTimeout(400);
     await btn('Agora não: o convite para rever as metas volta em três meses').click(); await waitText('Combinado. O convite volta em três meses.'); await p.waitForTimeout(300);
     ok('D-105 Metas: "Agora não" esconde o convite por três meses, sem cobrança', !(await body()).includes('Quer rever as suas metas?'));
@@ -16785,42 +17008,22 @@ setInterval(async () => {
     const ngChips = (group) => p.evaluate((g) => [...document.querySelectorAll(`[role=radiogroup][aria-label="${g}"] [role=radio]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent), group);
     const ngEnter = async () => {
       await p.goto(`http://localhost:${PORT}/?cenario=negocio`); await waitText('Cuidar da vida financeira');
-      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
       await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
     };
     // As telas empilhadas escondem a barra de abas: goResumo volta até ela aparecer e abre o Resumo.
     const ngToResumo = async () => { await goResumo(); await p.waitForTimeout(500); };
 
-    // 1. Demonstração padrão: o seletor só com o Pessoal e o "+" (D-113b) e os totais de sempre; o card em Conta; criar um negócio na memória.
+    // 1. Demonstração padrão: só com o Pessoal, sem seletor nem "+" (D-125, sinal 22; antes, D-113b, o seletor aparecia sempre) e os totais de
+    // sempre; o card em Conta; criar um negócio na memória (depois dele, o seletor e o "+" aparecem).
+    let t = '';
     await demoHome();
-    ok('Negócio (D-113b), demonstração padrão: sem negócio de exemplo, o seletor mostra "Pessoal" escolhido e o "+" ("Criar um espaço: Negócio ou Família")',
-      JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']) && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await ngSpaceTabs()));
-    // O seletor cabe em 320 px (o "+" com 44 px ou mais) e a pílula do Pessoal e o "+" ficam na mesma linha.
+    ok('Negócio (D-125), demonstração padrão: sem negócio de exemplo e só com o Pessoal, o Resumo não mostra o seletor de espaço nem o "+"',
+      JSON.stringify(await ngSpaceTabs()) === '[]' && (await visibleCount('button', /^Criar um espaço/)) === 0, JSON.stringify(await ngSpaceTabs()));
     await atWidths(async (w) => {
-      const sw = await p.evaluate(() => {
-        const tabs = [...document.querySelectorAll('[role=tablist]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Escolher o espaço:'));
-        const plus = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Criar um espaço'));
-        if (!tabs || !plus) return null;
-        const a = tabs.getBoundingClientRect(), b = plus.getBoundingClientRect();
-        return { sameRow: Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 2, plusW: Math.round(b.width), plusH: Math.round(b.height), right: Math.round(b.right), w: window.innerWidth };
-      });
-      ok(`Negócio (D-113b): o seletor e o "+" na mesma linha, com alvo de 44 px, dentro da tela (${w}px)`, sw !== null && sw.sameRow && sw.plusW >= 44 && sw.plusH >= 44 && sw.right <= sw.w, JSON.stringify(sw));
-      await layoutChecks(`Negócio (D-113b), Resumo com o seletor e o "+" ${w}px`);
-      await shot(w === 390 ? '740_seletor_so_pessoal' : '740_seletor_so_pessoal_320px');
+      await layoutChecks(`Negócio (D-125), Resumo só com o Pessoal ${w}px`);
+      await shot(w === 390 ? '740_resumo_so_pessoal' : '740_resumo_so_pessoal_320px');
     });
-    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(500);
-    let t = await dialogText().catch(() => '');
-    const ngSheetButtons = await p.getByRole('dialog').filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
-    ok('Negócio (D-113b): o "+" abre a folha "Criar um espaço" com o Espaço Negócio primeiro (com "Para quem tem CNPJ ou trabalha por conta.") e a Família, e "Fechar"',
-      t.includes('Criar um espaço') && JSON.stringify(ngSheetButtons) === JSON.stringify(['Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.', 'Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.', 'Fechar']),
-      `${JSON.stringify(ngSheetButtons)} ${t.slice(0, 300)}`);
-    await shot('741_folha_criar_espaco');
-    await btn('Fechar').click(); await p.waitForTimeout(400);
-    ok('Negócio (D-113b): "Fechar" fecha a folha sem mudar nada', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0 && JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']));
-    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
-    await btn('Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.').click(); await waitText('Nome do negócio'); await p.waitForTimeout(300);
-    ok('Negócio (D-113b): "Espaço Negócio" na folha abre a criação do espaço Negócio (/negocio/novo)', new URL(p.url()).pathname === '/negocio/novo' && (await h1Name()) === 'Espaço Negócio', p.url());
-    await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
     await expectTotals('Negócio, demonstração padrão: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
     await openConta();
     await p.getByRole('heading', { name: 'Espaço Negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
@@ -16850,6 +17053,27 @@ setInterval(async () => {
       JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:false', 'Ver dados do negócio Conserto de ar-condicionado:true']) && (await body()).includes('Seu negócio') &&
         (await visibleCount('button', 'Criar um espaço: Família')) === 1 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 0,
       JSON.stringify(await ngSpaceTabs()));
+    // Com dois espaços, o seletor e o "+" cabem em 320 px (o "+" com 44 px ou mais) e ficam na mesma linha.
+    await atWidths(async (w) => {
+      const sw = await p.evaluate(() => {
+        const tabs = [...document.querySelectorAll('[role=tablist]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Escolher o espaço:'));
+        const plus = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Criar um espaço'));
+        if (!tabs || !plus) return null;
+        const a = tabs.getBoundingClientRect(), b = plus.getBoundingClientRect();
+        return { sameRow: Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 2, plusW: Math.round(b.width), plusH: Math.round(b.height), right: Math.round(b.right), w: window.innerWidth };
+      });
+      ok(`Negócio (D-113b): o seletor e o "+" na mesma linha, com alvo de 44 px, dentro da tela (${w}px)`, sw !== null && sw.sameRow && sw.plusW >= 44 && sw.plusH >= 44 && sw.right <= sw.w, JSON.stringify(sw));
+      await layoutChecks(`Negócio (D-113b), Resumo com o seletor e o "+" ${w}px`);
+      await shot(w === 390 ? '740_seletor_dois_espacos' : '740_seletor_dois_espacos_320px');
+    });
+    await btn('Criar um espaço: Família').click(); await p.waitForTimeout(500);
+    let ngSheet = await dialogText().catch(() => '');
+    const ngSheetButtons = await p.getByRole('dialog').filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Negócio (D-113b): o "+" abre a folha "Criar um espaço" com o que ainda dá para criar (a Família, com a frase de para quem é) e "Fechar"',
+      ngSheet.includes('Criar um espaço') && JSON.stringify(ngSheetButtons) === JSON.stringify(['Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.', 'Fechar']), `${JSON.stringify(ngSheetButtons)} ${ngSheet.slice(0, 300)}`);
+    await shot('741_folha_criar_espaco');
+    await btn('Fechar').click(); await p.waitForTimeout(400);
+    ok('Negócio (D-113b): "Fechar" fecha a folha sem mudar nada', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0 && (await ngSpaceTabs()).length === 2);
     await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
     await expectTotals('Negócio criado: no Pessoal, outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
 
@@ -17077,8 +17301,8 @@ setInterval(async () => {
     ok('Negócio encerrado: Conta volta a oferecer "Criar o espaço Negócio"', (await visibleCount('button', 'Criar o espaço Negócio')) === 1);
     await btn('Voltar').click().catch(() => {}); await p.waitForTimeout(400);
     await ngToResumo().catch(() => {});
-    ok('Negócio encerrado: o negócio sai do seletor (fica só "Pessoal", com o "+" para o Negócio e a Família, D-113b)', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']) &&
-      (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await ngSpaceTabs()));
+    ok('Negócio encerrado (D-125): o negócio sai e, só com o Pessoal, o seletor e o "+" somem', JSON.stringify(await ngSpaceTabs()) === '[]' &&
+      (await visibleCount('button', /^Criar um espaço/)) === 0, JSON.stringify(await ngSpaceTabs()));
     await expectTotals('Negócio encerrado: o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
 
     // 8. Letra grande (1,3 vez, 360 px) e modo escuro em "Seu negócio".
@@ -17094,12 +17318,11 @@ setInterval(async () => {
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
     {
       const ngDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
-      await ngDark.addInitScript(() => { window.__clarevoSemTour = true; });
       const dp = await ngDark.newPage();
       const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
       const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('button', { name: 'Ver a demonstração', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: NG_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
       await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.waitForTimeout(800);
@@ -17142,7 +17365,7 @@ setInterval(async () => {
     const nmTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
     const nmEnter = async () => {
       await p.goto(`http://localhost:${PORT}/?cenario=negocio`); await waitText('Cuidar da vida financeira');
-      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
       await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
     };
     // As telas empilhadas escondem a barra de abas: goResumo volta até ela aparecer e abre o Resumo (no negócio, depois de "Seu negócio").
@@ -17352,13 +17575,12 @@ setInterval(async () => {
     // 8. Modo escuro: "Seu negócio" com o limite do MEI e o resumo do ano.
     {
       const nmDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
-      await nmDark.addInitScript(() => { window.__clarevoSemTour = true; });
       const dp = await nmDark.newPage();
       const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
       const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
       const dbtn = (name) => dp.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dbtn('Ver demonstração com dados fictícios').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dbtn('Ver a demonstração').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: NM_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
       await dbtn('Ver seu negócio').click(); await dp.getByText('Últimos meses', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.getByRole('radio', { name: 'MEI', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Tipo do negócio salvo.').filter({ visible: true }).first().waitFor({ timeout: 8000 });
@@ -17410,7 +17632,7 @@ setInterval(async () => {
     const arTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
     const arEnter = async (cenario = 'negocio') => {
       await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
-      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
       await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
     };
     const arBack = async () => { await goResumo(); await p.waitForTimeout(500); };
@@ -17662,14 +17884,13 @@ setInterval(async () => {
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
     {
       const arDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
-      await arDark.addInitScript(() => { window.__clarevoSemTour = true; });
       const dp = await arDark.newPage();
       const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
       const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
       const dbtn = (name) => dp.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
       const dfield = (name) => dp.getByLabel(name, { exact: true }).filter({ visible: true }).first();
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dbtn('Ver demonstração com dados fictícios').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dbtn('Ver a demonstração').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: AR_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
       await dbtn('Ver seu negócio').click(); await dp.getByText('Últimos meses', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dbtn('Anotar valor a receber').click(); await dp.getByText('Quem deve (opcional)').filter({ visible: true }).first().waitFor({ timeout: 8000 });
@@ -17723,7 +17944,7 @@ setInterval(async () => {
     const npTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
     const npEnter = async (cenario) => {
       await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
-      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
       await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
     };
     // "Seu negócio" pelo card do Resumo do negócio (o seletor no negócio).
@@ -17764,8 +17985,8 @@ setInterval(async () => {
 
     // 1. Plus fechado: a demonstração padrão (negócio criado na memória) e o cenário "negocio" ficam como antes.
     await demoHome();
-    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
-    await btn('Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.').click(); await waitText('Nome do negócio'); await p.waitForTimeout(400);
+    // Só com o Pessoal não há seletor nem "+" (D-125): o espaço Negócio se cria em Conta.
+    await openConta(); await btn('Criar o espaço Negócio').click(); await waitText('Nome do negócio'); await p.waitForTimeout(400);
     t = await body();
     ok('Negócio compartilhado (D-120), Plus fechado: criar o espaço Negócio não oferece "Tenho um convite para um negócio"', !NP_PLUS.test(t), t.match(NP_PLUS)?.[0] ?? '');
     await field('Nome do negócio').fill('Conserto do bairro');
@@ -18073,12 +18294,11 @@ setInterval(async () => {
     // 9. Modo escuro e computador (1280 px).
     {
       const npDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
-      await npDark.addInitScript(() => { window.__clarevoSemTour = true; });
       const dp = await npDark.newPage();
       const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
       const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('button', { name: 'Ver a demonstração', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: NP_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
       await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.getByRole('heading', { name: 'Pessoas do negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(800);
@@ -18139,7 +18359,7 @@ setInterval(async () => {
     const eqTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
     const eqEnter = async (cenario) => {
       await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
-      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await btn('Ver a demonstração').click(); await waitText('Diferença do mês');
       await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
     };
     const eqOpen = async () => {
@@ -18354,8 +18574,8 @@ setInterval(async () => {
     // Na demonstração, cada conta guarda os próprios dados: a conta nova não vê os lançamentos de Maria (no banco, vê).
     ok('Aceitar como Contabilidade (demonstração): cada conta guarda os próprios dados, então o ano aparece sem lançamentos', t.includes('Nada anotado no negócio em 2026.'), t.slice(0, 900));
     await eqBack();
-    ok('Aceitar como Contabilidade: o negócio acompanhado não entra no seletor de espaço (só "Pessoal" e o "+")',
-      JSON.stringify(await eqSpaces()) === JSON.stringify(['Ver dados de Pessoal']) && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await eqSpaces()));
+    ok('Aceitar como Contabilidade (D-125): o negócio acompanhado não entra no seletor de espaço (só com o Pessoal, nem seletor nem "+")',
+      JSON.stringify(await eqSpaces()) === '[]' && (await visibleCount('button', /^Criar um espaço/)) === 0, JSON.stringify(await eqSpaces()));
     await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(400);
     await p.getByRole('heading', { name: 'Negócios que você acompanha', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded().catch(() => {}); await p.waitForTimeout(300);
     t = await eqKeep();
@@ -18433,12 +18653,11 @@ setInterval(async () => {
     // 6. Modo escuro, computador (1280 px), letra grande e o Plus fechado depois.
     {
       const eqDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
-      await eqDark.addInitScript(() => { window.__clarevoSemTour = true; });
       const dp = await eqDark.newPage();
       const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
       const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus-contabilidade`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('button', { name: 'Ver a demonstração', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await dp.getByText('Privacidade neste aparelho').filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.getByRole('button', { name: 'Ver os negócios que você acompanha', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Você acompanha estes negócios como Contabilidade').filter({ visible: true }).first().waitFor({ timeout: 10000 }); await dp.waitForTimeout(700);
       await dp.evaluate(AC_SRC);
@@ -18453,7 +18672,7 @@ setInterval(async () => {
       await dp.screenshot({ path: `${OUT}/876_escuro_contabilidade_resumo_ano.png` });
       // "Pessoas do negócio" com a pergunta da sociedade, no cenário "negocio-plus".
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
-      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('button', { name: 'Ver a demonstração', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: EQ_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
       await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.getByRole('radiogroup', { name: 'O negócio é uma sociedade?' }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(700);
@@ -18570,14 +18789,14 @@ setInterval(async () => {
     await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('');
     // 5. Contas vencidas no Resumo (cenário "retorno"): texto neutro, com o calendário, sem a cor de erro.
     await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(800);
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(800);
     const auRed = await p.evaluate((red) => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && e.children.length === 0 && getComputedStyle(e).color === red).map((e) => e.textContent.slice(0, 40)), RED);
     t = await body();
     ok('Auditoria, Resumo com contas vencidas: a linha das vencidas em texto neutro (sem a cor de erro), como manda a D-030', /\d+ contas? vencidas?/.test(t) && auRed.length === 0, `${auRed.join(' | ')} ${(t.match(/.{0,40}vencid.{0,40}/) ?? [''])[0]}`);
     await shot('754_auditoria_resumo_vencidas');
     // 6. Metas (cenário "metas"): o ritmo sem "atrás do plano".
     await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
-    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+    await btn('Ver a demonstração').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
     await tabByName('Metas').click(); await waitText('Suas metas'); await p.waitForTimeout(700);
     t = await body();
     ok('Auditoria, Metas: o ritmo das metas diz o fato ("Para chegar em ..." ou "chega lá em ..."), sem "atrás do plano"', !t.includes('atrás do plano') && /Para chegar em [a-zç]+ de \d{4}: R\$ [\d.]+,\d{2} por mês|chega lá em [a-zç]+ de \d{4}/.test(t), (t.match(/.{0,60}(Para chegar em|chega lá em).{0,60}/) ?? [''])[0]);
@@ -18625,7 +18844,7 @@ setInterval(async () => {
     const tmToCard = async () => { await p.getByRole('heading', { name: 'Tema', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(250); };
     // Recarregar a demonstração volta às boas-vindas; ao entrar de novo, o app retoma Conta (o endereço da página).
     const tmBackToConta = async () => {
-      await btn('Ver demonstração com dados fictícios').click(); await p.waitForTimeout(1500);
+      await btn('Ver a demonstração').click(); await p.waitForTimeout(1500);
       if ((await p.getByText('Privacidade neste aparelho', { exact: true }).filter({ visible: true }).count()) === 0) { await waitText('Diferença do mês', 12000); await openConta(); }
       await waitText('Privacidade neste aparelho'); await tmToCard();
     };
@@ -18719,7 +18938,6 @@ setInterval(async () => {
   {
     const dkCtx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
     await dkCtx.addInitScript(() => {
-      window.__clarevoSemTour = true;
       window.__dkRepo = async () => {
         const root = document.getElementById('root');
         const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
@@ -18805,7 +19023,7 @@ setInterval(async () => {
     ok('Modo escuro: com o navegador no tema escuro, a página declara os dois temas e o fundo da página é o azul-marinho (antes de o app desenhar)',
       dkScheme.media && dkScheme.meta === 'light dark' && dkScheme.body === 'rgb(19, 30, 62)', JSON.stringify(dkScheme));
     await dkScan('entrada', '700_escuro_entrada');
-    await dkBtn('Ver demonstração com dados fictícios').click(); await dkWait('Diferença do mês'); await dkWait('Ainda a pagar neste mês', 12000).catch(() => {});
+    await dkBtn('Ver a demonstração').click(); await dkWait('Diferença do mês'); await dkWait('Ainda a pagar neste mês', 12000).catch(() => {});
     const dkHeader = await dp.evaluate(() => {
       const logo = [...document.querySelectorAll('[role=img][aria-label="Clarevo"]')].find((e) => e.getBoundingClientRect().width > 0);
       let bg = null;

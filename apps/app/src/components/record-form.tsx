@@ -137,6 +137,7 @@ import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, PixelRatio, Platform
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { STORE_CAPTURE } from '@/lib/capture';
 import { AccountPicker } from '@/components/account-picker';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ConfirmDialog } from '@/components/dialog';
@@ -2404,7 +2405,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               )}
             </View>
           )}
-          {auth.mode === 'demo' ? (
+          {auth.mode === 'demo' && !STORE_CAPTURE ? (
             <Txt variant="label" color={colors.textSecondary}>
               {DEMO_TEXT.saveNote}
             </Txt>

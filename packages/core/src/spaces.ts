@@ -8,6 +8,10 @@ import type { ContextKind } from './records';
  * pede o seletor à vista: nas abas que dependem do espaço (Resumo, Movimentos e Metas), o seletor aparece sempre, mesmo só com o
  * Pessoal, com um "+" enquanto houver um espaço para criar (o Negócio e a Família); nas telas de consulta, a pílula do espaço abre a
  * mesma folha, para trocar de espaço e criar. Formulários e detalhes continuam com a pílula fixa.
+ *
+ * Mudança do estudo de 25/11/2026 (D-125, sinal 22): o seletor para quem só tem o Pessoal e o "Pessoal" repetido em Metas pareciam
+ * descuido. O seletor das abas e a pílula que troca de espaço só aparecem com mais de um espaço, e cada tela diz o espaço uma vez só. Só com
+ * o Pessoal, o espaço Negócio e a Família se criam em Conta e pelo atalho "Tem um negócio?" dos Primeiros passos do Resumo.
  */
 
 /** Um espaço que a pessoa pode criar pela folha, na ordem da folha. */

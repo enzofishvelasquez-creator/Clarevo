@@ -1,7 +1,7 @@
 import { formatTenths } from '../learn/format';
 import { percentTenths, sharesCents } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseMoney } from './inputs';
 
 /**
@@ -142,10 +142,10 @@ export function calcDividirContas(input: DividirInput): CalcOutcome<DividirResul
       people,
       resultLines: ['Com estes números, a divisão fica assim:', ...people.map((p) => p.line)],
       hypotheses,
-      notes: [
-        ...(aboveIncome ? [DIVIDIR_NOTES.aboveIncome] : []),
-        modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.',
-      ],
+      ...calcNotes(
+        aboveIncome && ['warning', DIVIDIR_NOTES.aboveIncome],
+        ['info', modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.'],
+      ),
     },
   };
 }

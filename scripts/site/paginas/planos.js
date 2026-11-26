@@ -28,10 +28,48 @@
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, icone } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, icone, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
+const { avisoDaAssinatura, estadoEmVigor, rotuloDosPrecos, sistemas } = require('../estado');
 
 const ARQUIVO = 'planos.html';
+/** "R$ 29,90" → "29.90", para os dados estruturados. */
+const precoDecimal = (texto) => texto.replace(/[^\d,]/g, '').replace(',', '.');
+
+/**
+ * Os dados estruturados de app (SoftwareApplication, D-125), na página inicial e em Planos: o nome, a categoria, onde funciona hoje (pelo
+ * estado do produto) e, depois do lançamento, os dois planos com o preço mensal, do núcleo. Sem nota nem avaliação (a Clarevo ainda não
+ * tem). Só os planos mensais que existem hoje.
+ * Antes do lançamento, sem `offers`: os preços são os do lançamento ("Preços no lançamento" na página) e ninguém consegue assinar ainda, e
+ * uma oferta sem disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
+ */
+function dadosDoApp(valores, estado, descricao) {
+  const { PLANOS } = catalogo();
+  const dominio = dominioDe(valores);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Clarevo',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: sistemas(estado),
+    inLanguage: 'pt-BR',
+    description: descricao,
+    ...(dominio ? { url: `https://${dominio}/` } : {}),
+    ...(estado.lancado
+      ? {
+          offers: PLANOS.texto.plans.map((p) => ({
+            '@type': 'Offer',
+            name: `Plano ${PLANOS.nome[p.plan]}`,
+            price: precoDecimal(PLANOS.preco(p.plan)),
+            priceCurrency: 'BRL',
+            // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
+            description: `${p.who} ${PLANOS.texto.plansNote}`,
+          })),
+        }
+      : {}),
+  };
+}
+
 /** A página de cada plano, pelo `plan` do núcleo (`individual` e `familiar`). */
 const PAGINA_DO_PLANO = { individual: 'planos/individual.html', familiar: 'planos/familia.html' };
 /** O outro plano, para o link do fim de cada página. */
@@ -149,8 +187,18 @@ ${g.itens.map((r) => cartaoDoRecurso(r, u)).join('\n')}
     .join('\n');
 }
 
+/**
+ * As duas perguntas da página do plano Família, que não repetem o resto da página: a conta de quem é convidado e o que fica na Família de
+ * quem sai (o guia da Família e `FAMILY_TEXT.exMember` de family.ts: "Nina (saiu da Família)"). Vão também nos dados estruturados.
+ * Texto fixo e sem marcação, escrito aqui: entra na página sem `esc`, para as aspas continuarem aspas.
+ */
+const PERGUNTAS_DA_FAMILIA = [
+  { id: 'conta', pergunta: 'Quem eu convido precisa ter conta?', resposta: 'Precisa ter uma conta na Clarevo. Quem ainda não tem cria a conta ao abrir o link do convite.' },
+  { id: 'sair', pergunta: 'O que acontece com o que eu anotei se eu sair da Família?', resposta: 'O que você anotou na Família continua lá, como histórico da casa, com o seu primeiro nome e "saiu da Família" ao lado. O seu Pessoal continua só seu.' },
+];
+
 /** A página de um plano (`individual` ou `familiar`). */
-function paginaDoPlano(plano, { valores }) {
+function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const arquivo = PAGINA_DO_PLANO[plano];
   const u = (d) => rel(arquivo, d);
   const { PLANOS } = catalogo();
@@ -158,14 +206,18 @@ function paginaDoPlano(plano, { valores }) {
   const nome = PLANOS.nome[plano];
   const outro = OUTRO[plano];
   const familia = plano === 'familiar';
-  const aindaNao = PLANOS.aberta ? '' : `<p class="nota">${esc(t.notOpenYet)}</p>\n`;
+  // A frase da assinatura fechada segue o estado do produto (`avisoDaAssinatura`): nunca aparece no site lançado.
+  const aviso = avisoDaAssinatura(estado);
+  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
   // No fim da página: o outro plano e o resumo dos dois.
   const caminhos = `<p class="acoes"><a class="botao botao-principal" href="${u(PAGINA_DO_PLANO[outro])}">Ver o plano ${esc(PLANOS.nome[outro])}</a> <a class="botao botao-suave" href="${u(ARQUIVO)}">Comparar os planos</a></p>`;
 
   // O preço fica na capa, ao lado do nome: "R$" com número só aqui nesta página (o teste do site confere).
+  // Antes do lançamento (D-125), o preço leva a etiqueta "Preços no lançamento", como na página inicial e no resumo.
+  const rotulo = rotuloDosPrecos(estado);
   const capa = `<p class="migalha"><a href="${u(ARQUIVO)}">Planos</a></p>
 <h1>Plano ${esc(nome)}</h1>
-<p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}</p>
+<p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${rotulo ? ` <span class="etiqueta etiqueta-capa">${esc(rotulo)}</span>` : ''}</p>
 <p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>`;
 
   const assinatura = `<h2 id="assinatura">Como funciona a assinatura</h2>
@@ -203,14 +255,10 @@ ${listaDeRecursos(plano, u)}
           bloco(
             `<h2 id="perguntas">Perguntas sobre a Família</h2>
 <div class="perguntas-planos">
-<article class="pergunta" aria-labelledby="q-conta">
-<h3 id="q-conta">Quem eu convido precisa ter conta?</h3>
-<p>Precisa ter uma conta na Clarevo. Quem ainda não tem cria a conta ao abrir o link do convite.</p>
-</article>
-<article class="pergunta" aria-labelledby="q-sair">
-<h3 id="q-sair">O que acontece com o que eu anotei se eu sair da Família?</h3>
-<p>O que você anotou na Família continua lá, como histórico da casa, com o seu primeiro nome e "saiu da Família" ao lado. O seu Pessoal continua só seu.</p>
-</article>
+${PERGUNTAS_DA_FAMILIA.map((q) => `<article class="pergunta" aria-labelledby="q-${q.id}">
+<h3 id="q-${q.id}">${q.pergunta}</h3>
+<p>${q.resposta}</p>
+</article>`).join('\n')}
 </div>
 ${caminhos}`,
             { variante: 'alt', rotulo: 'perguntas' },
@@ -218,9 +266,19 @@ ${caminhos}`,
         ]
       : [bloco(`${assinatura}\n${caminhos}`, { rotulo: 'assinatura' })]),
   ];
+  // As duas perguntas da Família também como dados estruturados (FAQPage, D-125): o mesmo texto da página.
+  const faq = familia
+    ? [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: PERGUNTAS_DA_FAMILIA.map((q) => ({ '@type': 'Question', name: q.pergunta, acceptedAnswer: { '@type': 'Answer', text: q.resposta } })),
+        },
+      ]
+    : [];
   return montarPagina({
     arquivo,
-    titulo: `Plano ${nome}`,
+    titulo: `Plano ${nome}: ${familia ? 'controle de gastos da família' : 'controle de gastos para uma pessoa'}`,
     descricao: familia
       ? `O plano Família da Clarevo: até ${pessoasNaFamilia()} pessoas numa assinatura paga pela pessoa titular, convite por link, papéis, o Pessoal de cada uma e todos os recursos.`
       : 'O plano Individual da Clarevo: para uma pessoa, com o Pessoal só dela, todos os recursos do app, o teste grátis e como funciona a assinatura.',
@@ -229,6 +287,7 @@ ${caminhos}`,
     fonte: brutas.join('\n') + capa,
     valores,
     classeCapa: 'capa-simples',
+    jsonld: faq,
   });
 }
 
@@ -240,11 +299,13 @@ function oQueMuda(plano) {
 }
 
 /** `planos.html`: o resumo curto, com os dois cartões (cada um leva à página do plano, por um link só) e o que muda entre eles. */
-function paginaPlanos({ valores }) {
+function paginaPlanos({ valores, estado = estadoEmVigor() }) {
   const u = (d) => rel(ARQUIVO, d);
   const { PLANOS } = catalogo();
   const t = PLANOS.texto;
-  const aindaNao = PLANOS.aberta ? '' : `<p class="nota">${esc(t.notOpenYet)}</p>\n`;
+  const aviso = avisoDaAssinatura(estado);
+  const aindaNao = aviso ? `<p class="nota">${esc(aviso)}</p>\n` : '';
+  const rotulo = rotuloDosPrecos(estado);
 
   // Um link só por cartão, que cobre o cartão inteiro (como na página inicial): nada interativo dentro de outro.
   const cartoes = t.plans
@@ -265,17 +326,19 @@ function paginaPlanos({ valores }) {
   const brutas = [
     bloco(
       `<h2 id="comparar">Os dois planos</h2>
-<div class="grade">
+${rotulo ? `<p class="etiqueta-precos"><span class="etiqueta">${esc(rotulo)}</span></p>\n` : ''}<div class="grade">
 ${cartoes}
 </div>
 ${aindaNao}<p class="nota">${esc(t.plansNote)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
       { rotulo: 'comparar' },
     ),
   ];
+  const descricao = `Planos e preços da Clarevo, o app de controle de gastos: Individual e Família, com os mesmos recursos e ${PLANOS.diasDeTeste} dias grátis, sem cartão.`;
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'Planos da Clarevo',
-    descricao: 'Os planos Individual e Família da Clarevo: os mesmos recursos do app, o que muda entre eles e a página de cada plano, com o que ele inclui.',
+    titulo: 'Planos e preços: Individual e Família',
+    descricao,
+    jsonld: [dadosDoApp(valores, estado, descricao)],
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,
@@ -289,4 +352,4 @@ function paginasPlanos(ctx) {
   return [paginaPlanos(ctx), paginaDoPlano('individual', ctx), paginaDoPlano('familiar', ctx)];
 }
 
-module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };
+module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };

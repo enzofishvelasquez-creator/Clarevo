@@ -1,6 +1,6 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/custo-por-ano.ts. Não edite: rode "node scripts/gerar-site.js".
 import { MAX_RECORD_CENTS, formatBRL, roundDiv } from '../money.js';
-import { FieldReader, moneyField } from './common.js';
+import { FieldReader, calcNotes, moneyField } from './common.js';
 import { parseMoney } from './inputs.js';
 export const WORKDAYS_PER_MONTH = 22;
 export const WEEKS_PER_YEAR = 52;
@@ -65,7 +65,7 @@ export function calcCustoPorAno(input) {
             noteParams: monthlyCents <= MAX_RECORD_CENTS ? { tipo: 'mensal', valor: monthlyCents } : null,
             resultLines,
             hypotheses,
-            notes: [],
+            ...calcNotes(),
         },
     };
 }

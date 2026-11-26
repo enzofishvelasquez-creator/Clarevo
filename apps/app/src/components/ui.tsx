@@ -1,6 +1,6 @@
-import { DEMO_PILL_MAX_FONT_SCALE, clampedLines, formatBRL } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, clampedLines, formatBRL, maskMoneyEdit, moneyTextOnBlur } from '@clarevo/core';
 import { Check, Eye, EyeOff, type LucideIcon } from 'lucide-react-native';
-import { Children, forwardRef, useEffect, useId, useState, type ReactElement, type ReactNode, type Ref } from 'react';
+import { Children, forwardRef, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   FlatList,
   PixelRatio,
@@ -31,6 +31,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBrowseBarInset } from '@/lib/bar-inset';
+import { STORE_CAPTURE } from '@/lib/capture';
 import { WIDE_GUTTER, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
@@ -42,11 +43,58 @@ type Variant = keyof typeof type;
 const glueMoney = (children: ReactNode) =>
   Children.map(children, (c) => (typeof c === 'string' ? c.replace(/(R\$|≈) /g, '$1\u00a0') : c));
 
-export function Txt({ variant = 'body', color = colors.text, style, children, ...props }: TextProps & { variant?: Variant; color?: string }) {
+export function Txt({ variant = 'body', color = colors.text, style, children, ...props }: TextProps & { variant?: Variant; color?: string; ref?: Ref<Text> }) {
   return (
     <Text {...props} style={[type[variant], { color }, style]}>
       {glueMoney(children)}
     </Text>
+  );
+}
+
+/**
+ * Na web, o texto de uma linha diminui para caber, como o `adjustsFontSizeToFit` do celular (que a web não tem): o texto é medido e o
+ * próprio elemento ganha `zoom`, sem mudar a fonte pedida pela tela. Mede de novo quando a caixa muda (largura da tela, letra maior) e
+ * quando o texto muda. A medida roda no quadro seguinte, fora do aviso de tamanho. No celular, não faz nada.
+ */
+function useWebFit(min: number, content: unknown) {
+  const ref = useRef<Text>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const el = ref.current as unknown as HTMLElement | null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      el.style.zoom = '';
+      const box = el.clientWidth;
+      const need = el.scrollWidth;
+      if (box > 0 && need > box + 0.5) el.style.zoom = String(Math.max(min, Math.floor((box / need) * 1000) / 1000));
+    };
+    fit();
+    const observer = new ResizeObserver(() => {
+      if (!frame) frame = requestAnimationFrame(fit);
+    });
+    observer.observe(el);
+    if (el.parentElement) observer.observe(el.parentElement);
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [min, content]);
+  return ref;
+}
+
+/**
+ * Texto de uma linha só que diminui a letra para caber (estudo de 25/11/2026, sinal 20): um valor em reais nunca quebra no meio
+ * ("R$ 2.100 / ,00") nem termina em "…", também com a letra grande do aparelho. No celular, `adjustsFontSizeToFit` com
+ * `minimumFontScale`; na web, `useWebFit`. O texto tem de caber na largura do pai (numa linha com outro texto, sem `flexShrink: 0`).
+ */
+export function FitTxt({ minimumFontScale = 0.5, style, children, ...props }: Omit<ComponentProps<typeof Txt>, 'ref'> & { minimumFontScale?: number }) {
+  const ref = useWebFit(minimumFontScale, children);
+  return (
+    <Txt {...props} ref={ref} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={minimumFontScale} style={[styles.fit, style]}>
+      {children}
+    </Txt>
   );
 }
 
@@ -56,7 +104,10 @@ export function Txt({ variant = 'body', color = colors.text, style, children, ..
  */
 export const clampLines = (lines: number): number | undefined => clampedLines(lines, PixelRatio.getFontScale());
 
-/** Valor em reais. Com valores ocultos (lib/privacy.ts), mostra "R$ ••••" e o leitor de tela diz "valor oculto". */
+/**
+ * Valor em reais, numa linha só que diminui a letra para caber (`FitTxt`): nos cards e nas listas, o valor nunca quebra no meio. Com
+ * valores ocultos (lib/privacy.ts), mostra "R$ ••••" e o leitor de tela diz "valor oculto".
+ */
 export function Money({
   cents,
   variant = 'amount',
@@ -68,37 +119,30 @@ export function Money({
   const hidden = useValuesHidden();
   const label = hidden ? (accessibilityLabel ? maskMoneyLabel(accessibilityLabel, true) : HIDDEN_MONEY_A11Y) : accessibilityLabel;
   return (
-    <Txt variant={variant} color={color} style={[tabular, style]} {...props} accessibilityLabel={label}>
+    <FitTxt variant={variant} color={color} style={[tabular, style]} {...props} accessibilityLabel={label}>
       {hidden ? HIDDEN_MONEY : formatBRL(cents)}
-    </Txt>
+    </FitTxt>
   );
 }
 
 /**
- * Valor de destaque que nunca é cortado: reduz a fonte em degraus até caber na largura disponível.
- * (adjustsFontSizeToFit não funciona na web.)
+ * Valor de destaque (o topo do Resumo, a meta, a fatura): uma linha só, que diminui a letra para caber na largura (`FitTxt`), também com a
+ * letra grande do aparelho, que faz o texto crescer até 1,4 vez. `minSize` é o menor tamanho, no celular, sem a letra grande.
  */
 export function FitMoney({ cents, color = colors.text, maxSize = 36, minSize = 22 }: { cents: number; color?: string; maxSize?: number; minSize?: number }) {
-  const [width, setWidth] = useState(0);
   const hidden = useValuesHidden();
   const text = hidden ? HIDDEN_MONEY : formatBRL(cents);
-  // Letra grande do aparelho: o texto cresce até 1,4 vez (maxFontSizeMultiplier abaixo), e a conta precisa levar isso em conta, senão
-  // o valor quebra no meio ("R$ 2.100 / ,00"). Na web, a escala é sempre 1.
-  const scale = Math.min(PixelRatio.getFontScale() || 1, 1.4);
-  // Manrope ExtraBold com números tabulares: ~0,62 em por caractere.
-  const fits = (size: number) => text.length * size * scale * 0.62 <= width;
-  let size = maxSize;
-  if (width > 0) while (size > minSize && !fits(size)) size -= 2;
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ alignSelf: 'stretch' }}>
-      <Txt
+    <View style={{ alignSelf: 'stretch' }}>
+      <FitTxt
         variant="hero"
         color={color}
-        style={[tabular, { fontSize: size, lineHeight: Math.round(size * 1.22) }]}
+        style={[tabular, { fontSize: maxSize, lineHeight: Math.round(maxSize * 1.22) }]}
         maxFontSizeMultiplier={1.4}
+        minimumFontScale={Math.min(0.5, minSize / maxSize)}
         accessibilityLabel={hidden ? HIDDEN_MONEY_A11Y : undefined}>
         {text}
-      </Txt>
+      </FitTxt>
     </View>
   );
 }
@@ -400,8 +444,51 @@ export function LinkButton({
 export const TextField = forwardRef<
   TextInput,
   TextInputProps & { label: string; error?: string; hint?: string; moneyHint?: boolean; large?: boolean; prefix?: string }
->(function TextField({ label, error, hint, moneyHint, large, prefix, style, onFocus, onBlur, secureTextEntry, ...props }, ref) {
+>(function TextField({ label, error, hint, moneyHint, large, prefix, style, onFocus, onBlur, onChangeText, onKeyPress, secureTextEntry, ...props }, ref) {
   const hidden = useValuesHidden();
+  // Campo de valor em reais (prefixo "R$"): a mesma máscara em todos (estudo de 25/11/2026, sinal 26). Os milhares ganham o ponto durante a
+  // digitação ("2000" vira "2.000") e o valor fica completo ao sair do campo ("2.000,00"); colar segue a leitura de parseBRL
+  // (core/money-input.ts).
+  const money = prefix === 'R$';
+  const current = typeof props.value === 'string' ? props.value : '';
+  const input = useRef<TextInput | null>(null);
+  const setInput = useCallback(
+    (node: TextInput | null) => {
+      input.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+  // A última tecla (Delete apaga para a frente) e, na web, onde o cursor fica depois da máscara: sem isso, o navegador o leva para o fim
+  // sempre que os pontos mudam de lugar.
+  const lastKey = useRef<string | null>(null);
+  const caretAfterMask = useRef<{ text: string; caret: number } | null>(null);
+  const placeCaret = () => {
+    const want = caretAfterMask.current;
+    const el = input.current as unknown as HTMLInputElement | null;
+    if (!want || !el || typeof el.setSelectionRange !== 'function' || el.value !== want.text) return;
+    caretAfterMask.current = null;
+    if (document.activeElement === el) el.setSelectionRange(want.caret, want.caret);
+  };
+  useLayoutEffect(() => {
+    if (Platform.OS === 'web') placeCaret();
+  });
+  const changeText =
+    money && onChangeText
+      ? (text: string) => {
+          const el = Platform.OS === 'web' ? (input.current as unknown as HTMLInputElement | null) : null;
+          const caret = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
+          const edit = maskMoneyEdit(current, text, caret, { forward: lastKey.current === 'Delete' });
+          lastKey.current = null;
+          if (el) {
+            caretAfterMask.current = edit;
+            // O texto mascarado igual ao de antes (um ponto ignorado) não desenha o campo de novo: o cursor volta depois do quadro.
+            requestAnimationFrame(placeCaret);
+          }
+          onChangeText(edit.text);
+        }
+      : onChangeText;
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const id = useId().replace(/:/g, '');
@@ -422,19 +509,28 @@ export const TextField = forwardRef<
           </Txt>
         ) : null}
         <TextInput
-          ref={ref}
+          ref={setInput}
           accessibilityLabel={label}
           accessibilityHint={spokenHint === undefined ? undefined : yearA11y(spokenHint)}
           placeholderTextColor={colors.placeholder}
           secureTextEntry={secureTextEntry && !revealed}
           {...aria}
           {...props}
+          onChangeText={changeText}
+          onKeyPress={(e) => {
+            lastKey.current = e.nativeEvent.key;
+            onKeyPress?.(e);
+          }}
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
           }}
           onBlur={(e) => {
             setFocused(false);
+            // O valor completo ao sair ("2.000" vira "2.000,00"), só quando o texto muda e sem erro na tela (`moneyTextOnBlur`): o formulário
+            // apaga o erro do campo a cada mudança, e completar "0" para "0,00" tiraria o "maior que zero" com o valor ainda inválido.
+            const complete = money && onChangeText ? moneyTextOnBlur(current, Boolean(error)) : null;
+            if (complete !== null) onChangeText?.(complete);
             onBlur?.(e);
           }}
           style={[styles.inputText, large && styles.inputTextLarge, style]}
@@ -583,8 +679,9 @@ export function Skeleton({ width, height, onBrand, style }: { width: number | `$
   );
 }
 
-/** Selo compacto da demonstração (acesso simulado e dados fictícios). */
+/** Selo compacto da demonstração (acesso simulado e dados fictícios). Só as capturas das lojas o escondem (`STORE_CAPTURE`). */
 export function DemoPill() {
+  if (STORE_CAPTURE) return null;
   return (
     <View style={styles.demo} accessible accessibilityLabel="Demonstração: acesso simulado e dados fictícios">
       <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }} maxFontSizeMultiplier={DEMO_PILL_MAX_FONT_SCALE}>
@@ -595,6 +692,10 @@ export function DemoPill() {
 }
 
 export const styles = StyleSheet.create({
+  // Texto de uma linha que encolhe para caber (`FitTxt`): pode ficar mais estreito que o conteúdo, para a medida da web achar o excesso, e não
+  // corta nada (na web, a linha única do React Native Web esconde o excesso; aqui o texto já cabe pela medida, e as pontas das letras de um
+  // valor grande, que passam da altura da linha, continuam à vista).
+  fit: { minWidth: 0, overflow: 'visible' },
   screen: { flex: 1, backgroundColor: colors.background },
   // Versão para computador: a barra de rolagem do navegador reserva o mesmo espaço dos dois lados, para o conteúdo que rola ficar
   // alinhado com o cabeçalho fixo de cima (pedido do Enzo, 23/11/2026: em Conta, o cartão azul ficava meia barra à direita dos cartões).

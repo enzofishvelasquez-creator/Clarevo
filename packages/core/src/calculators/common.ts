@@ -12,6 +12,27 @@ export interface CalcTexts {
   hypotheses: string[];
   /** Avisos que acompanham o resultado (teto do cheque especial, CET, estimativa, boleto atualizado). */
   notes: string[];
+  /** O tipo de cada aviso de `notes`, na mesma ordem (`calcNotes` monta os dois juntos). */
+  noteKinds: CalcNoteKind[];
+}
+
+/**
+ * Tipo de um aviso do resultado (revisão de 26/11/2026, que trocou a leitura do texto por um tipo dito em cada calculadora):
+ * - 'estimate': diz que o valor é estimado ou que o valor exato é outro ("O valor exato é o do boleto atualizado.");
+ * - 'warning': diz que algo informado sai de uma regra ou muda a leitura da conta (multa acima de 2%, taxa acima do teto do cheque
+ *   especial, saldo que não diminui, total acima da soma das rendas);
+ * - 'info': explicação de apoio (onde fica outra conta, o que não é gravado, uma referência geral).
+ * Os de estimativa e de aviso ficam à vista, logo abaixo da resposta; só os de apoio vão para "Como a conta é feita", com as hipóteses.
+ */
+export type CalcNoteKind = 'estimate' | 'warning' | 'info';
+
+/** Um aviso com o tipo; `null`, `false` e `undefined` ficam de fora (avisos que só valem em um caso). */
+export type CalcNoteItem = readonly [CalcNoteKind, string] | null | false | undefined;
+
+/** Os avisos de um resultado, com o tipo de cada um: `{ notes, noteKinds }`, na ordem dada. */
+export function calcNotes(...items: readonly CalcNoteItem[]): { notes: string[]; noteKinds: CalcNoteKind[] } {
+  const kept = items.filter((i): i is readonly [CalcNoteKind, string] => Boolean(i));
+  return { notes: kept.map(([, text]) => text), noteKinds: kept.map(([kind]) => kind) };
 }
 
 export type CalcFieldKind = 'dinheiro' | 'taxa' | 'inteiro' | 'opcao' | 'sim_nao' | 'texto';

@@ -9,6 +9,7 @@ import {
   type BudgetRow,
   type IsoMonth,
   budgetCategoriesFor,
+  budgetRuleNotes,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, PieChart } from 'lucide-react-native';
@@ -24,7 +25,7 @@ import { MonthStepper } from '@/components/month-stepper';
 import { EmptyArt, ErrorState } from '@/components/states';
 import { Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { useBudgetNotices } from '@/lib/budget-notices';
-import { useMonthBudget, useMonthRefunds, useWork } from '@/state/data';
+import { useCards, useMonthBudget, useMonthRefunds, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { cardShadowOpacity, colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -40,6 +41,10 @@ import { cardShadowOpacity, colors, fonts, radius, space, tabular } from '@/them
  * "R$ X acima" (o leitor de tela diz "R$ X acima do orçamento"); de 80% a menos de 100% o card mostra "Chegou a 84% do orçamento." com
  * "Dispensar aviso" (por categoria e mês, só neste aparelho; volta no mês seguinte); e a categoria com estorno informado numa fatura do
  * mês explica o estorno em uma linha (`BUDGET_TEXT.refundNote`, a frase do core).
+ *
+ * Estudo de 25/11/2026 (sinal 23, menos texto antes do conteúdo): as regras de contagem não abrem mais a tela. Vêm no fim, junto das
+ * outras notas: a dos gastos e contas pagas (mês da data do pagamento) sempre, porque vale com ou sem cartão; a das compras no cartão só
+ * quando o espaço tem algum cartão. Os cartões são lidos no espaço aberto, qualquer que seja o tipo (o Negócio também tem o dele, docs/52).
  */
 export default function OrcamentoScreen() {
   const { today } = useSession();
@@ -62,6 +67,8 @@ export default function OrcamentoScreen() {
   const without = s ? s.without.filter((c) => budgetable.includes(c)) : [];
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
+  const cards = useCards(contextId);
+  const cardRule = (cards.data?.length ?? 0) > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -81,7 +88,6 @@ export default function OrcamentoScreen() {
             <LinkButton label={PAYABLES_NAV_TEXT.backToCurrent(currentMonth)} style={styles.inlineLink} onPress={() => setMonth(currentMonth)} />
           ) : null}
         </View>
-        <Txt color={colors.textSecondary}>{BUDGET_TEXT.rule}</Txt>
 
         {budget.isPending ? (
           <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando o orçamento">
@@ -139,6 +145,11 @@ export default function OrcamentoScreen() {
             ) : null}
 
             <Card style={{ gap: space[2] }}>
+              {budgetRuleNotes(cardRule).map((rule) => (
+                <Txt key={rule} variant="caption" color={colors.textSecondary}>
+                  {rule}
+                </Txt>
+              ))}
               <Txt variant="caption" color={colors.textSecondary}>
                 {BUDGET_TEXT.versusPaid}
               </Txt>

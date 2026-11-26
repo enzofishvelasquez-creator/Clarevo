@@ -1,4 +1,4 @@
-import { anyMeiReminder, anyRoutineReminder, legalAcceptanceNeeded, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
+import { anyMeiReminder, anyRoutineReminder, biometricOfferFits, legalAcceptanceNeeded, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
@@ -14,7 +14,7 @@ import { authenticate, biometricsAvailable, DEVICE_FEATURES, listenToReminders, 
 import { deviceLock } from '@/lib/device-lock';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { externalScreenOpen } from '@/lib/external-screen';
-import { signOutIntent } from '@/lib/nav';
+import { firstStepTarget, signOutIntent } from '@/lib/nav';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
 import { enableReminders, queueReminders } from '@/lib/reminders';
 import { queueWidget } from '@/lib/widget-sync';
@@ -292,13 +292,19 @@ function NativeFeatures() {
   // ---- Oferta da biometria logo depois de entrar na conta --------------------------------------
   // Só depois de um login neste uso do app (`signInMark`; quem abre o app já com a sessão, ou com a sessão guardada que volta depois de
   // abrir sem conexão, não é perguntado), com biometria cadastrada no aparelho, uma vez por pessoa e aparelho, e sem atropelar o aviso
-  // dos termos, o tour de boas-vindas nem a tela de trava.
+  // dos termos nem a tela de trava. Só no Resumo e sem um atalho do primeiro passo à espera (`biometricOfferFits`, revisão de 26/11/2026):
+  // numa conta nova que começou por importar ou pelo Telegram, a pergunta espera a volta ao Resumo, em vez de cobrir a tela pedida.
   const legal = useLegalAcceptance(status === 'pronto' && !demo);
   const legalPending = !legal.data || legalAcceptanceNeeded(legal.data);
   const [bioOffer, setBioOffer] = useState(false);
   const [bioBusy, setBioBusy] = useState(false);
   const [bioMsg, setBioMsg] = useState<string | null>(null);
   const bioChecked = useRef<string | null>(null);
+  const bioFits = biometricOfferFits(pathname, firstStepTarget.pending());
+  const bioFitsNow = useRef(bioFits);
+  useEffect(() => {
+    bioFitsNow.current = bioFits;
+  });
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -318,17 +324,19 @@ function NativeFeatures() {
       bioChecked.current = userId;
       return;
     }
-    if (status !== 'pronto' || locked || legalPending || !prefs.tourSeen) return;
+    if (status !== 'pronto' || locked || legalPending || !bioFits) return;
     bioChecked.current = userId;
     const forUser = userId;
     biometricsAvailable().then((ok) => {
       if (!ok) return;
-      // Depois de a tela de destino aparecer.
+      // Depois de a tela de destino aparecer. Se a pessoa saiu do Resumo nesse meio tempo, a oferta espera a próxima volta.
       setTimeout(() => {
-        if (mounted.current && lockState.current.userId === forUser) setBioOffer(true);
+        if (!mounted.current || lockState.current.userId !== forUser) return;
+        if (bioFitsNow.current) setBioOffer(true);
+        else if (bioChecked.current === forUser) bioChecked.current = null;
       }, 900);
     });
-  }, [demo, userId, prefs, status, locked, legalPending]);
+  }, [demo, userId, prefs, status, locked, legalPending, bioFits]);
 
   const answerBioOffer = async (accept: boolean) => {
     if (bioBusy) return;

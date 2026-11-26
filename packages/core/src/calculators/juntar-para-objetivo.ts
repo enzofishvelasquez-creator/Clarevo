@@ -1,6 +1,6 @@
 import { monthlyShareCents, monthsToReach } from '../learn/math';
 import { formatBRL, type Cents } from '../money';
-import { FieldReader, countField, monthsDuration, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField, type CalcFieldSpec, type CalcOutcome, type CalcTexts } from './common';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
 /**
@@ -82,7 +82,7 @@ export function calcJuntarParaObjetivo(input: ObjetivoInput): CalcOutcome<Objeti
         months: 0,
         resultLines: ['Com estes números, você já tem o valor do objetivo: meta atingida, sem precisar guardar mais por mês.'],
         hypotheses,
-        notes: [],
+        ...calcNotes(),
       },
     };
   }
@@ -98,7 +98,7 @@ export function calcJuntarParaObjetivo(input: ObjetivoInput): CalcOutcome<Objeti
         months: meses!,
         resultLines: [`Com estes números, são ${formatBRL(monthly)} por mês, por ${monthsDuration(meses!)}.`, faltam],
         hypotheses: [...hypotheses, 'Valor por mês arredondado para cima, no centavo.'],
-        notes: [],
+        ...calcNotes(),
       },
     };
   }
@@ -112,7 +112,7 @@ export function calcJuntarParaObjetivo(input: ObjetivoInput): CalcOutcome<Objeti
       months,
       resultLines: [`Com estes números, guardando ${formatBRL(mensal!)} por mês, você chega lá em ${monthsDuration(months)}.`, faltam],
       hypotheses: [...hypotheses, ...(missing % mensal! === 0 ? [] : ['No último mês, falta menos que o valor de cada mês.'])],
-      notes: [],
+      ...calcNotes(),
     },
   };
 }

@@ -8,7 +8,7 @@ import { centsToInput, formatBRL } from '../money.js';
 import { INSTALLMENT_NATURES } from '../records.js';
 import { remainingInstallments } from '../series.js';
 import { charCount } from '../validation.js';
-import { FieldReader, LIMIT_TEXT, countField, moneyField, monthsCount, monthsDuration, rateField } from './common.js';
+import { FieldReader, calcNotes, LIMIT_TEXT, countField, moneyField, monthsCount, monthsDuration, rateField } from './common.js';
 import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './inputs.js';
 export const PLANO_MAX_DEBTS = 10;
 export const PLANO_MAX_MONTHS = 600;
@@ -637,11 +637,7 @@ export function calcPlanoDividas(input, today) {
     if (included.length > 0)
         hypotheses.push(H.cents);
     const unknown = infos.filter((d) => d.unknownRate).map((d) => d.name);
-    const notes = [
-        PLANO_ESTIMATE_TEXT,
-        ...(unknown.length > 0 ? [PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)] : []),
-        ...infos.filter((d) => d.stays).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)),
-    ];
+    const notes = calcNotes(['estimate', PLANO_ESTIMATE_TEXT], unknown.length > 0 && ['warning', PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)], ...infos.filter((d) => d.stays).map((d) => ['warning', PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)]));
     return {
         ok: true,
         result: {
@@ -658,7 +654,7 @@ export function calcPlanoDividas(input, today) {
             sameOutcome: same,
             resultLines: lines,
             hypotheses,
-            notes,
+            ...notes,
         },
     };
 }

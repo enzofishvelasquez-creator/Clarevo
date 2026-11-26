@@ -5,7 +5,7 @@ import { formatBpCompact } from '../learn/format.js';
 import { installmentCents, percentTenths, roundDivBig } from '../learn/math.js';
 import { MAX_RECORD_CENTS, formatBRL } from '../money.js';
 import { SIMULATE_MONTHS_MAX, monthlyRateText, monthsForTarget } from '../simulate.js';
-import { FieldReader, countField, moneyField, monthsCount, monthsDuration, rateField } from './common.js';
+import { FieldReader, calcNotes, countField, moneyField, monthsCount, monthsDuration, rateField } from './common.js';
 import { parseCount, parseMoney, parsePercentBp } from './inputs.js';
 export const ANTES_PARCELAS = { min: 1, max: 480 };
 export const ANTES_RATE_RANGE = { min: 0, max: 9_999 };
@@ -220,7 +220,7 @@ export function calcAntesDeFinanciar(input, today) {
                     `Você paga ${brl(preco)} na compra, sem ${cet ? 'custo adicional' : 'juros'}.`,
                 ],
                 hypotheses: [],
-                notes: [],
+                ...calcNotes(),
             },
         };
     }
@@ -249,7 +249,7 @@ export function calcAntesDeFinanciar(input, today) {
     let parcelaPermille = null;
     let beforePermille = null;
     let afterPermille = null;
-    const notes = [estimateNote];
+    const notes = [['estimate', estimateNote]];
     const showImpact = !paidAtPurchase;
     const heaviest = Math.max(parcela, lastParcela);
     if (showImpact && renda !== null) {
@@ -260,7 +260,7 @@ export function calcAntesDeFinanciar(input, today) {
             afterPermille = percentTenths(committed + heaviest, renda);
             resultLines.push(`Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + heaviest)} enquanto durar o financiamento.`);
         }
-        notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
+        notes.push(['info', `${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`]);
     }
     else if (showImpact && committed !== null && committed > 0) {
         resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + heaviest)} enquanto durar o financiamento.`);
@@ -389,7 +389,7 @@ export function calcAntesDeFinanciar(input, today) {
             goalParams,
             resultLines,
             hypotheses,
-            notes,
+            ...calcNotes(...notes),
         },
     };
 }

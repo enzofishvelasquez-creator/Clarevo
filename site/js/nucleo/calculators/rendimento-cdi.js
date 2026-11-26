@@ -2,7 +2,7 @@
 import { formatBpCompact, formatInteger, formatRate } from '../learn/format.js';
 import { fixedIncomeTaxBp, fixedIncomeTaxCents } from '../learn/math.js';
 import { formatBRL } from '../money.js';
-import { FieldReader, countField, monthsDuration, moneyField, rateField } from './common.js';
+import { FieldReader, calcNotes, countField, monthsDuration, moneyField, rateField } from './common.js';
 import { parseCount, parseMoney, parsePercentBp } from './inputs.js';
 export const RENDIMENTO_CDI_PERCENT_MIN_BP = 100;
 export const RENDIMENTO_CDI_PERCENT_MAX_BP = 30_000;
@@ -101,7 +101,7 @@ export function calcRendimentoCdi(input) {
             netCents,
             netYieldCents,
             resultLines,
-            notes: imposto === 'regressivo' ? [T.noteTable(), T.noteCdi] : [T.noteCdi],
+            ...calcNotes(imposto === 'regressivo' && ['info', T.noteTable()], ['estimate', T.noteCdi]),
             hypotheses: T.hypotheses(cdi, percentual, calendarDays, imposto),
         },
     };
