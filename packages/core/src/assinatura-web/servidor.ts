@@ -49,7 +49,7 @@
  * segredo entra no app nem no repositório, e nenhum identificador da pessoa vai para o registro (logs).
  */
 import { addDays, addMonthsToDate, todayIn, type IsoDate } from '../dates';
-import { PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, type BillingPeriod, type PlanKind } from '../plano-precos';
+import { PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSCRIBE_OPEN, type BillingPeriod, type PlanKind } from '../plano-precos';
 import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
 import { sha256Hex, utf8Bytes } from '../sha256';
 import { parsePixReference, pixCanPayNext, pixReference } from './pix';
@@ -158,6 +158,8 @@ export interface AsaasSubscription {
   cycle: string;
   value: number | null;
   nextDueDate: IsoDate | null;
+  /** O dia em que a assinatura foi criada no Asaas (D-129: a primeira cobrança de quem assinou no teste é num dia depois dele). */
+  dateCreated: IsoDate | null;
   externalReference: string | null;
   checkoutSession: string | null;
 }
@@ -192,6 +194,7 @@ export function asaasSubscriptionFrom(raw: unknown): AsaasSubscription | null {
     cycle: text(s.cycle) ?? 'MONTHLY',
     value: typeof s.value === 'number' && Number.isFinite(s.value) ? s.value : null,
     nextDueDate: isoDate(s.nextDueDate),
+    dateCreated: isoDate(s.dateCreated),
     externalReference: text(s.externalReference),
     checkoutSession: text(s.checkoutSession),
   };
@@ -202,7 +205,7 @@ export function asaasSubscriptionFrom(raw: unknown): AsaasSubscription | null {
  * o aviso troca pelo do período já aplicado no banco, depois de achar a pessoa (D-127).
  */
 export function goneSubscription(id: string): AsaasSubscription {
-  return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
+  return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, dateCreated: null, externalReference: null, checkoutSession: null };
 }
 
 export function asaasPaymentFrom(raw: unknown): AsaasPayment | null {
@@ -276,24 +279,37 @@ export interface WebValidity {
   validUntil: Date;
 }
 
+/** Situações de uma primeira cobrança ainda por acontecer: pendente ou em análise de risco (a análise do cartão no dia da cobrança). */
+const FIRST_CHARGE_PENDING: ReadonlySet<string> = new Set(['PENDING', 'AWAITING_RISK_ANALYSIS']);
+/** Os avisos de cartão recusado na primeira cobrança: o acesso acaba (o teste já acabou), sem a janela do dia da cobrança. */
+export const REFUSED_EVENTS: ReadonlySet<string> = new Set(['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']);
+
 /**
- * O dia da primeira cobrança de quem assinou no teste grátis (D-129), quando ela ainda está por vir: a assinatura ativa, nenhuma cobrança paga
- * nem com outro desfecho (vencida, estornada), e a cobrança já gerada pelo Asaas, pendente, marcada para depois de hoje, em até
- * SCHEDULED_FIRST_CHARGE_MAX_DAYS dias. null nas outras situações: a cobrança de hoje (a de quem assina fora do teste, cobrada no Checkout)
- * e a assinatura sem cobrança gerada (o aviso da cobrança, quando ela for gerada, refaz a conta).
+ * O dia da primeira cobrança de quem assinou no teste grátis (D-129), enquanto ela ainda não foi paga: a assinatura ativa, nenhuma cobrança
+ * paga nem com outro desfecho (vencida, estornada), e a cobrança já gerada pelo Asaas, pendente (ou em análise de risco), marcada para
+ * depois de hoje, em até SCHEDULED_FIRST_CHARGE_MAX_DAYS dias, ou para hoje numa assinatura criada antes de hoje (o próprio dia da
+ * cobrança: qualquer aviso antes da confirmação do cartão, como o da cobrança atualizada ou uma repetição, mantém a janela, e o acesso não
+ * acaba antes da hora). null nas outras situações: a cobrança de hoje numa assinatura de hoje (a de quem assina fora do teste, cobrada no
+ * Checkout), o aviso de cartão recusado (`refused`), a cobrança vencida (OVERDUE, no dia seguinte) e a assinatura sem cobrança gerada (o
+ * aviso da cobrança, quando ela for gerada, refaz a conta).
  */
-export function scheduledFirstCharge(sub: AsaasSubscription, payments: readonly AsaasPayment[], now: Date): IsoDate | null {
-  if (sub.status !== 'ACTIVE' || sub.deleted) return null;
+export function scheduledFirstCharge(sub: AsaasSubscription, payments: readonly AsaasPayment[], now: Date, refused = false): IsoDate | null {
+  if (refused || sub.status !== 'ACTIVE' || sub.deleted) return null;
   const live = payments.filter((p) => !p.deleted);
-  if (live.length === 0 || live.some((p) => p.status !== 'PENDING')) return null;
+  if (live.length === 0 || live.some((p) => !FIRST_CHARGE_PENDING.has(p.status))) return null;
   const due = live.map((p) => p.dueDate).filter((d): d is IsoDate => d !== null).sort()[0];
   if (!due) return null;
   const today = todayIn(ASAAS_TIME_ZONE, now);
-  return due > today && due <= addDays(today, SCHEDULED_FIRST_CHARGE_MAX_DAYS) ? due : null;
+  if (due > addDays(today, SCHEDULED_FIRST_CHARGE_MAX_DAYS)) return null;
+  if (due > today) return due;
+  return due === today && sub.dateCreated !== null && sub.dateCreated < due ? due : null;
 }
 
-/** Até quando o acesso vale, pelo estado atual da assinatura e das cobranças dela no Asaas. */
-export function webValidity(sub: AsaasSubscription, payments: readonly AsaasPayment[], now: Date): WebValidity {
+/**
+ * Até quando o acesso vale, pelo estado atual da assinatura e das cobranças dela no Asaas. `refused`: o aviso é de cartão recusado (D-129:
+ * a primeira cobrança recusada não guarda a janela do dia da cobrança).
+ */
+export function webValidity(sub: AsaasSubscription, payments: readonly AsaasPayment[], now: Date, refused = false): WebValidity {
   let paidThrough: IsoDate | null = null;
   for (const p of payments) {
     if (p.deleted || !p.dueDate || !PAID_STATUSES.has(p.status)) continue;
@@ -303,7 +319,7 @@ export function webValidity(sub: AsaasSubscription, payments: readonly AsaasPaym
   if (!paidThrough) {
     // Assinou no teste grátis (D-129): vale do começo do dia da primeira cobrança ao fim dele mais a tolerância, para não haver buraco entre
     // o fim do teste e a confirmação do cartão. Antes desse dia, o banco continua no teste.
-    const first = scheduledFirstCharge(sub, payments, now);
+    const first = scheduledFirstCharge(sub, payments, now, refused);
     if (first) return { paidThrough: null, validFrom: startOfDayBrasilia(first), validUntil: endOfDayBrasilia(addDays(first, WEB_GRACE_DAYS)) };
     return { paidThrough: null, validFrom: null, validUntil: now };
   }
@@ -449,12 +465,27 @@ function supabaseClient(config: AssinaturaWebConfig, fetcher: HttpFetch, timeLef
 }
 
 /**
+ * A volta da página do Asaas para a tela Assinatura (`?pagamento=sucesso|cancelado|expirado`). No sandbox (D-129), com `&assinar=teste`:
+ * o teste da equipe continua vendo a área de compra e o cancelamento depois de pagar.
+ */
+function backUrl(appUrl: string, sandbox: boolean): (result: string) => string {
+  return (result) => `${appUrl}/conta/assinatura?pagamento=${result}${sandbox ? '&assinar=teste' : ''}`;
+}
+
+/**
  * O corpo do Checkout recorrente: cartão, mensal ou anual (D-127), a primeira cobrança no dia `firstDue` (hoje ou, para quem assina no teste
  * grátis, o dia do fim do teste, D-129), a referência da pessoa e a volta para a tela Assinatura. A referência é a mesma nos dois períodos:
  * o período da assinatura é o ciclo dela no Asaas.
  */
-export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string, firstDue: IsoDate, period: BillingPeriod = 'mensal'): Record<string, unknown> {
-  const back = (result: string) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+export function checkoutRequest(
+  personId: string,
+  plan: PlanKind,
+  appUrl: string,
+  firstDue: IsoDate,
+  period: BillingPeriod = 'mensal',
+  sandbox = false,
+): Record<string, unknown> {
+  const back = backUrl(appUrl, sandbox);
   return {
     billingTypes: ['CREDIT_CARD'],
     chargeTypes: ['RECURRENT'],
@@ -477,8 +508,8 @@ export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string
  * O corpo do Checkout de um mês (ou, no anual, de um ano, D-127) com Pix (D-093, caminho B): Pix avulso, a referência de Pix da pessoa e a
  * mesma volta para a tela Assinatura. O nome do item tem até 30 caracteres (documentação do Asaas).
  */
-export function checkoutPixRequest(personId: string, plan: PlanKind, appUrl: string, period: BillingPeriod = 'mensal'): Record<string, unknown> {
-  const back = (result: string) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+export function checkoutPixRequest(personId: string, plan: PlanKind, appUrl: string, period: BillingPeriod = 'mensal', sandbox = false): Record<string, unknown> {
+  const back = backUrl(appUrl, sandbox);
   return {
     billingTypes: ['PIX'],
     chargeTypes: ['DETACHED'],
@@ -550,6 +581,7 @@ export type AssinaturaWebResult =
       result:
         | 'ja_assinante'
         | 'cartao_ativo'
+        | 'assinatura_marcada'
         | 'ja_pago'
         | 'sem_necessidade'
         | 'muitas_tentativas'
@@ -721,7 +753,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
     const data = obj(list.json)?.data;
     const payments = (Array.isArray(data) ? data : []).map(asaasPaymentFrom).filter((p): p is AsaasPayment => p !== null);
-    const { validFrom, validUntil } = webValidity(sub, payments, now());
+    const { validFrom, validUntil } = webValidity(sub, payments, now(), REFUSED_EVENTS.has(ev.event));
     const applied = await db.rpcService('billing_apply', {
       p_event_id: ev.id,
       p_provider: 'web',
@@ -816,6 +848,9 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
         }
         return reply(200, { result: removed > 0 ? 'cancelada' : 'sem_assinatura' });
       }
+      // A compra fechada (SUBSCRIBE_OPEN, D-129): com a chave de produção, nenhum Checkout, nem com `?assinar=teste` na tela; só o sandbox
+      // do Asaas (o teste da equipe, que não cobra ninguém) cria Checkout antes de a compra abrir.
+      if (!SUBSCRIBE_OPEN && !config.sandbox) return reply(503, { result: 'indisponivel' });
       const access = await db.rpcAsUser('my_access', auth[1] ?? '');
       if (access.status === 401 || access.status === 403) return reply(401, { result: 'nao_autenticado' });
       if (access.status !== 200) throw new TransientError(`banco respondeu ${access.status} em my_access`);
@@ -828,16 +863,20 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       if (status === 'beneficio' || status === 'cortesia') return reply(200, { result: 'sem_necessidade' });
       const currentPeriod: BillingPeriod = current?.period === 'anual' ? 'anual' : 'mensal';
       if (status === 'assinatura' && !pixCanPayNext(typeof current?.until === 'string' ? current.until : null, now(), currentPeriod)) return reply(200, { result: 'ja_pago' });
-      // Assinatura no cartão ainda ativa no Asaas: com o acesso valendo, já assinante; sem ele (cobrança recusada ou em aberto), a tela
-      // oferece cancelar a do cartão antes de pagar de outro jeito (revisão independente de 11/11/2026).
-      if ((await activeSubscriptions(asaas, personId)).length > 0) return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
+      // Assinatura no cartão ainda ativa no Asaas: com o acesso valendo, já assinante; no teste grátis, a assinatura feita no teste, com a
+      // primeira cobrança no fim dele (D-129), "assinatura_marcada"; sem acesso (cobrança recusada ou em aberto), a tela oferece cancelar a do
+      // cartão antes de pagar de outro jeito (revisão independente de 11/11/2026). (O próximo vencimento do Asaas não serve para separar os
+      // dois: ele já é o do ciclo seguinte quando a primeira cobrança é gerada.)
+      if ((await activeSubscriptions(asaas, personId)).length > 0) {
+        return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : status === 'teste' ? 'assinatura_marcada' : 'cartao_ativo' });
+      }
       const chosen: BillingPeriod = period ?? 'mensal';
       // No cartão, a primeira cobrança é hoje ou, no teste grátis, no dia do fim do teste (D-129), pelo my_access lido acima, do banco.
       const firstDue = paidStartDay(status, current?.until, now()) ?? todayIn(ASAAS_TIME_ZONE, now());
       const request =
         action === 'pix'
-          ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl, chosen)
-          : checkoutRequest(personId, plan as PlanKind, config.appUrl, firstDue, chosen);
+          ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl, chosen, config.sandbox)
+          : checkoutRequest(personId, plan as PlanKind, config.appUrl, firstDue, chosen, config.sandbox);
       const created = await asaas('POST', '/checkouts', request);
       const checkoutId = text(obj(created.json)?.id);
       const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;

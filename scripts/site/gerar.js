@@ -158,7 +158,7 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
   // O estado do produto com a assinatura simulada (`simularAssinaturaAberta` no JSON do --estado, só para testes): o site diria o contrário
   // do app. Aviso no console, e o --final recusa.
   if (estado.assinaturaSimulada) {
-    const p = `o estado do produto simula a assinatura ${estado.assinaturaAberta ? 'aberta' : 'fechada'} (simularAssinaturaAberta), ao contrário do SUBSCRIBE_OPEN de packages/core/src/plano.ts: só para testes`;
+    const p = `o estado do produto simula a assinatura ${estado.assinaturaAberta ? 'aberta' : 'fechada'} (simularAssinaturaAberta), ao contrário do SUBSCRIBE_OPEN de packages/core/src/plano-precos.ts: só para testes`;
     avisos.push(`o --final recusaria: ${p}`);
     problemasFinais.push(p);
   }

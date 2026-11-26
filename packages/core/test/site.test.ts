@@ -2588,6 +2588,23 @@ describe('site público: gerar-site.js na linha de comando', () => {
     return legal;
   };
 
+  it('--estado com a assinatura simulada nunca grava na pasta site/ (D-129): sem --saida para outra pasta, recusa antes de gerar', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-simulado-'));
+    try {
+      const estado = join(dir, 'estado.json');
+      writeFileSync(estado, JSON.stringify({ lancado: true, simularAssinaturaAberta: true }));
+      const antes = statSync(join(ROOT, 'site', 'index.html')).mtimeMs;
+      for (const args of [['--estado', estado], ['--estado', estado, '--saida', join(ROOT, 'site')]]) {
+        const r = rodar(args);
+        expect(r.status, args.join(' ')).toBe(1);
+        expect(r.stderr).toContain('use --saida com outra pasta');
+      }
+      expect(statSync(join(ROOT, 'site', 'index.html')).mtimeMs).toBe(antes);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('--final falha (código 1) e lista o que falta, sem gravar nada, enquanto sobrar marcador ou [A DEFINIR]; passa e grava o site todo quando está limpo', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-'));
     const pastas: string[] = [];

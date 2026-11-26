@@ -1,14 +1,18 @@
 -- Assinar na web durante o teste grátis (D-129; migração 0048): no cartão, a assinatura marcada para o fim do teste vai ao banco valendo só a
 -- partir do dia da primeira cobrança (billing_apply com p_valid_from), e o acesso continua no teste até lá; cancelada antes, o acesso acaba
 -- com o teste; com Pix, o pagamento feito no teste começa no fim do teste (billing_pix_payments.starts_on), e o feito depois do teste continua
--- como antes. A chamada antiga (sem p_valid_from) continua valendo. Pessoas FICTÍCIAS: Ana e Edu (cartão, no 3º dia do teste), Bia e Caio
--- (Pix mensal e anual, no 3º dia do teste) e Davi (Pix e cartão, depois do teste). Tudo em uma transação desfeita no fim.
+-- como antes; o dia de começo vem do dia pago e do fim do teste (a conta de my_access), e não da situação na hora do aviso (o aviso atrasado e o
+-- segundo pagamento feito no teste começam no mesmo dia). A chamada antiga (sem p_valid_from) continua valendo. Pessoas FICTÍCIAS: Ana e Edu
+-- (cartão, no 3º dia do teste), Bia e Caio (Pix mensal e anual, no 3º dia do teste), Davi (Pix e cartão, depois do teste), Fê (Pix pago no
+-- teste, com o aviso chegando depois do fim dele) e Gil (dois Pix pagos no teste). Tudo em uma transação desfeita no fim.
 \set ON_ERROR_STOP 1
 \set ana '''00000000-0000-0000-0000-0000000000c1'''
 \set bia '''00000000-0000-0000-0000-0000000000c2'''
 \set caio '''00000000-0000-0000-0000-0000000000c3'''
 \set davi '''00000000-0000-0000-0000-0000000000c4'''
 \set edu '''00000000-0000-0000-0000-0000000000c5'''
+\set fe '''00000000-0000-0000-0000-0000000000c6'''
+\set gil '''00000000-0000-0000-0000-0000000000c7'''
 
 begin;
 
@@ -34,6 +38,8 @@ create function pg_temp.bia() returns uuid language sql as $$ select '00000000-0
 create function pg_temp.caio() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000c3'::uuid $$;
 create function pg_temp.davi() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000c4'::uuid $$;
 create function pg_temp.edu() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000c5'::uuid $$;
+create function pg_temp.fe() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000c6'::uuid $$;
+create function pg_temp.gil() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000c7'::uuid $$;
 create function pg_temp.sha(p_text text) returns text language sql as $$ select encode(sha256(convert_to(p_text, 'UTF8')), 'hex') $$;
 create function pg_temp.hoje() returns date language sql as $$ select (now() at time zone 'America/Sao_Paulo')::date $$;
 -- O fim do acesso esperado para o último dia pago com Pix: mais 3 dias de tolerância, até o fim do dia em Brasília.
@@ -65,24 +71,27 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:bia, 'bia.teste@exemplo.test', now(), '{"display_name":"Bia"}'),
   (:caio, 'caio.teste@exemplo.test', now(), '{"display_name":"Caio"}'),
   (:davi, 'davi.teste@exemplo.test', now(), '{"display_name":"Davi"}'),
-  (:edu, 'edu.teste@exemplo.test', now(), '{"display_name":"Edu"}');
+  (:edu, 'edu.teste@exemplo.test', now(), '{"display_name":"Edu"}'),
+  (:fe, 'fe.teste@exemplo.test', now(), '{"display_name":"Fê"}'),
+  (:gil, 'gil.teste@exemplo.test', now(), '{"display_name":"Gil"}');
 set role authenticated;
 do $$
 declare
   p uuid;
 begin
-  foreach p in array array[pg_temp.ana(), pg_temp.bia(), pg_temp.caio(), pg_temp.davi(), pg_temp.edu()] loop
+  foreach p in array array[pg_temp.ana(), pg_temp.bia(), pg_temp.caio(), pg_temp.davi(), pg_temp.edu(), pg_temp.fe(), pg_temp.gil()] loop
     perform pg_temp.as_(p);
     perform public.ensure_personal_space('Conta principal');
   end loop;
 end $$;
 reset role;
 
--- A cobrança começou há 20 dias. Ana, Bia, Caio e Edu criaram a conta há 2 dias (estão no 3º dia do teste, que acaba daqui a 12 dias);
--- Davi, há 60 dias (o teste dele já acabou: só ver e exportar).
+-- A cobrança começou há 20 dias. Ana, Bia, Caio, Edu e Gil criaram a conta há 2 dias (estão no 3º dia do teste, que acaba daqui a 12 dias);
+-- Davi, há 60 dias (o teste dele já acabou: só ver e exportar); Fê, há 18 dias (o teste dela acabou há 4 dias).
 select public.clarevo_staff_set_billing_start(now() - interval '20 days');
-update public.persons set created_at = now() - interval '2 days' where id in (:ana, :bia, :caio, :edu);
+update public.persons set created_at = now() - interval '2 days' where id in (:ana, :bia, :caio, :edu, :gil);
 update public.persons set created_at = now() - interval '60 days' where id = :davi;
+update public.persons set created_at = now() - interval '18 days' where id = :fe;
 
 -- ---------------------------------------------------------------------------
 -- 1. O esquema: starts_on, a assinatura nova de billing_apply (a antiga saiu), os privilégios e nada novo para o app.
@@ -211,6 +220,22 @@ begin
   r := public.billing_pix_apply('nt-pix-6', pg_temp.davi(), 'familiar', pg_temp.sha('nt_pay_davi_1'), pg_temp.hoje(), now());
   assert (r ->> 'paid_through')::date = (pg_temp.hoje() + interval '1 month')::date and pg_temp.starts_on(pg_temp.sha('nt_pay_davi_1')) is null,
     'depois do teste, como antes: ' || r::text;
+
+  -- Fê: pagou com Pix há 6 dias, no teste, e o aviso só chega hoje, quando o teste dela já acabou (há 4 dias): o dia de começo vem do dia pago
+  -- e do fim do teste, e não da situação de agora. O mês vai do fim do teste a um mês depois.
+  assert pg_temp.access(pg_temp.fe()) ->> 'status' = 'leitura', 'Fê já passou do teste: ' || pg_temp.access(pg_temp.fe())::text;
+  r := public.billing_pix_apply('nt-pix-7', pg_temp.fe(), 'individual', pg_temp.sha('nt_pay_fe_1'), pg_temp.hoje() - 6, now());
+  assert pg_temp.starts_on(pg_temp.sha('nt_pay_fe_1')) = ((now() - interval '18 days' + interval '14 days') at time zone 'America/Sao_Paulo')::date
+     and (r ->> 'paid_through')::date = (pg_temp.starts_on(pg_temp.sha('nt_pay_fe_1')) + interval '1 month')::date and r #>> '{access,status}' = 'assinatura',
+    'aviso atrasado: do fim do teste a um mês depois: ' || r::text;
+
+  -- Gil: dois Pix pagos hoje, no teste (o segundo aplicado já com a situação "assinatura", pelo primeiro): os dois começam no fim do teste, e
+  -- os dois meses vão do fim do teste a dois meses depois (sem um deles começar hoje e encurtar o período).
+  r := public.billing_pix_apply('nt-pix-8', pg_temp.gil(), 'individual', pg_temp.sha('nt_pay_gil_1'), pg_temp.hoje(), now());
+  assert r #>> '{access,status}' = 'assinatura' and (r ->> 'paid_through')::date = (pg_temp.hoje() + 12 + interval '1 month')::date, 'o primeiro Pix: ' || r::text;
+  r := public.billing_pix_apply('nt-pix-9', pg_temp.gil(), 'individual', pg_temp.sha('nt_pay_gil_2'), pg_temp.hoje(), now());
+  assert pg_temp.starts_on(pg_temp.sha('nt_pay_gil_2')) = pg_temp.hoje() + 12 and (r ->> 'paid_through')::date = (pg_temp.hoje() + 12 + interval '2 months')::date,
+    'o segundo Pix do teste também começa no fim do teste: ' || r::text;
 end $$;
 reset role;
 

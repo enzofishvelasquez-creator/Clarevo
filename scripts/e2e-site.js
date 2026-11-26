@@ -1803,7 +1803,7 @@ function varrerPagina() {
       if (!catalogo().PLANOS.aberta) {
         const recusado = gerarLancado('site-lancado-recusado', { lancado: true, lojas: { appStore: APP_STORE } });
         ok('estado do produto: com a assinatura fechada no núcleo, o gerador recusa "lancado": true, diz qual constante mudar e não grava nada',
-          recusado.status === 1 && /SUBSCRIBE_OPEN = false em packages\/core\/src\/plano\.ts/.test(recusado.stderr) && /"lancado" para true em scripts\/site\/config\.js/.test(recusado.stderr) && !fs.existsSync(path.join(dir, 'site-lancado-recusado')),
+          recusado.status === 1 && /SUBSCRIBE_OPEN = false em packages\/core\/src\/plano-precos\.ts/.test(recusado.stderr) && /"lancado" para true em scripts\/site\/config\.js/.test(recusado.stderr) && !fs.existsSync(path.join(dir, 'site-lancado-recusado')),
           recusado.stderr.slice(-400));
       }
       const saidaLancada = path.join(dir, 'site-lancado');

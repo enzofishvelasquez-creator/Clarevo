@@ -3,8 +3,8 @@ import {
   DELETE_TEXT,
   FAMILY_TEXT,
   STORE_SUBSCRIPTION_TEXT,
-  SUBSCRIBE_OPEN,
   WEB_SUBSCRIPTION_TEXT,
+  hasLiveWebEntitlement,
   BUSINESS_TEXT,
   canSubmitDelete,
   deleteBusinessHow,
@@ -27,7 +27,7 @@ import { useWideLayout } from '@/lib/layout';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { signOutIntent } from '@/lib/nav';
 import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
-import { useAccess } from '@/state/access';
+import { useAccess, useOwnWebEntitlements } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
 import { useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
@@ -60,6 +60,9 @@ export default function ExcluirContaScreen() {
   const { user, auth, signOut } = useSession();
   const repo = useRepo();
   const access = useAccess();
+  // D-129: a assinatura no cartão da web pelo próprio direito no banco (paga ou marcada para o fim do teste), qualquer que seja a situação
+  // de agora: quem assinou no teste e depois entrou numa Família ou ganhou o benefício fica "familia" ou "beneficio", sem provedor.
+  const webEntitlements = useOwnWebEntitlements(auth.mode !== 'demo');
   const family = useFamily();
   // Computador: as notas pequenas param em 560 px (com 720 px, a linha passava de 120 letras).
   const note = useWideLayout() ? { maxWidth: 560 } : undefined;
@@ -92,13 +95,17 @@ export default function ExcluirContaScreen() {
     setBusy(true);
     // Assinatura feita na web (D-084): cancela no Asaas antes (em qualquer plataforma; a chamada não tem tela), para não cobrar uma
     // conta que já não existe. Sem conseguir, não exclui ainda: a rede de segurança (o próximo aviso do Asaas encontra a conta excluída
-    // e a função do servidor cancela) chegaria depois de mais uma cobrança. Com a compra aberta, também no teste grátis (D-129): quem
-    // assinou no cartão durante o teste continua no teste até a primeira cobrança, que seria a primeira cobrança depois da exclusão.
-    if (access.data?.provider === 'web' || (SUBSCRIBE_OPEN && access.data?.status === 'teste')) {
+    // e a função do servidor cancela) chegaria depois de mais uma cobrança. Desde a D-129, decide pelo dado, e não pela situação: o próprio
+    // direito pela web que vale ou vai valer (a assinatura paga ou a marcada para o fim do teste, mesmo de quem depois entrou numa Família ou
+    // ganhou o benefício), ou o provedor "web" da situação. Sem conseguir ler o direito, confere direto no Asaas: se não der, não exclui,
+    // com um aviso neutro (não se sabe se há assinatura).
+    const known = access.data?.provider === 'web' || (webEntitlements.data ? hasLiveWebEntitlement(webEntitlements.data, new Date()) : false);
+    const unknown = !known && !webEntitlements.data;
+    if (known || unknown) {
       const cancelled = await repo.cancelWebSubscription().catch(() => 'tente_de_novo' as const);
       if (cancelled !== 'cancelada' && cancelled !== 'sem_assinatura') {
         setBusy(false);
-        setMsg({ tone: 'erro', text: WEB_SUBSCRIPTION_TEXT.cancelBeforeDeleteFailed });
+        setMsg({ tone: 'erro', text: known ? WEB_SUBSCRIPTION_TEXT.cancelBeforeDeleteFailed : WEB_SUBSCRIPTION_TEXT.cancelBeforeDeleteUnknown });
         return;
       }
     }

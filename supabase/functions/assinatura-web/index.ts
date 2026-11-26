@@ -12,7 +12,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TransientError = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.TransientError = exports.REFUSED_EVENTS = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
     exports.paymentsLookbackMonths = paymentsLookbackMonths;
     exports.periodOfCycle = periodOfCycle;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
@@ -111,12 +111,13 @@ const __mods = [
             cycle: text(s.cycle) ?? 'MONTHLY',
             value: typeof s.value === 'number' && Number.isFinite(s.value) ? s.value : null,
             nextDueDate: isoDate(s.nextDueDate),
+            dateCreated: isoDate(s.dateCreated),
             externalReference: text(s.externalReference),
             checkoutSession: text(s.checkoutSession),
         };
     }
     function goneSubscription(id) {
-        return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
+        return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, dateCreated: null, externalReference: null, checkoutSession: null };
     }
     function asaasPaymentFrom(raw) {
         const p = (0, servidor_comum_1.obj)(raw);
@@ -165,19 +166,25 @@ const __mods = [
         return new Date(`${day}T00:00:00.000${ASAAS_OFFSET}`);
     }
     exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = 31;
-    function scheduledFirstCharge(sub, payments, now) {
-        if (sub.status !== 'ACTIVE' || sub.deleted)
+    const FIRST_CHARGE_PENDING = new Set(['PENDING', 'AWAITING_RISK_ANALYSIS']);
+    exports.REFUSED_EVENTS = new Set(['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'PAYMENT_REPROVED_BY_RISK_ANALYSIS']);
+    function scheduledFirstCharge(sub, payments, now, refused = false) {
+        if (refused || sub.status !== 'ACTIVE' || sub.deleted)
             return null;
         const live = payments.filter((p) => !p.deleted);
-        if (live.length === 0 || live.some((p) => p.status !== 'PENDING'))
+        if (live.length === 0 || live.some((p) => !FIRST_CHARGE_PENDING.has(p.status)))
             return null;
         const due = live.map((p) => p.dueDate).filter((d) => d !== null).sort()[0];
         if (!due)
             return null;
         const today = (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now);
-        return due > today && due <= (0, dates_1.addDays)(today, exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS) ? due : null;
+        if (due > (0, dates_1.addDays)(today, exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS))
+            return null;
+        if (due > today)
+            return due;
+        return due === today && sub.dateCreated !== null && sub.dateCreated < due ? due : null;
     }
-    function webValidity(sub, payments, now) {
+    function webValidity(sub, payments, now, refused = false) {
         let paidThrough = null;
         for (const p of payments) {
             if (p.deleted || !p.dueDate || !exports.PAID_STATUSES.has(p.status))
@@ -187,7 +194,7 @@ const __mods = [
                 paidThrough = end;
         }
         if (!paidThrough) {
-            const first = scheduledFirstCharge(sub, payments, now);
+            const first = scheduledFirstCharge(sub, payments, now, refused);
             if (first)
                 return { paidThrough: null, validFrom: startOfDayBrasilia(first), validUntil: endOfDayBrasilia((0, dates_1.addDays)(first, exports.WEB_GRACE_DAYS)) };
             return { paidThrough: null, validFrom: null, validUntil: now };
@@ -289,8 +296,11 @@ const __mods = [
             },
         };
     }
-    function checkoutRequest(personId, plan, appUrl, firstDue, period = 'mensal') {
-        const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+    function backUrl(appUrl, sandbox) {
+        return (result) => `${appUrl}/conta/assinatura?pagamento=${result}${sandbox ? '&assinar=teste' : ''}`;
+    }
+    function checkoutRequest(personId, plan, appUrl, firstDue, period = 'mensal', sandbox = false) {
+        const back = backUrl(appUrl, sandbox);
         return {
             billingTypes: ['CREDIT_CARD'],
             chargeTypes: ['RECURRENT'],
@@ -308,8 +318,8 @@ const __mods = [
             subscription: { cycle: exports.ASAAS_CYCLE[period], nextDueDate: firstDue },
         };
     }
-    function checkoutPixRequest(personId, plan, appUrl, period = 'mensal') {
-        const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+    function checkoutPixRequest(personId, plan, appUrl, period = 'mensal', sandbox = false) {
+        const back = backUrl(appUrl, sandbox);
         return {
             billingTypes: ['PIX'],
             chargeTypes: ['DETACHED'],
@@ -486,7 +496,7 @@ const __mods = [
                 throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
             const data = (0, servidor_comum_1.obj)(list.json)?.data;
             const payments = (Array.isArray(data) ? data : []).map(asaasPaymentFrom).filter((p) => p !== null);
-            const { validFrom, validUntil } = webValidity(sub, payments, now());
+            const { validFrom, validUntil } = webValidity(sub, payments, now(), exports.REFUSED_EVENTS.has(ev.event));
             const applied = await db.rpcService('billing_apply', {
                 p_event_id: ev.id,
                 p_provider: 'web',
@@ -586,6 +596,8 @@ const __mods = [
                     }
                     return reply(200, { result: removed > 0 ? 'cancelada' : 'sem_assinatura' });
                 }
+                if (!plano_precos_1.SUBSCRIBE_OPEN && !config.sandbox)
+                    return reply(503, { result: 'indisponivel' });
                 const access = await db.rpcAsUser('my_access', auth[1] ?? '');
                 if (access.status === 401 || access.status === 403)
                     return reply(401, { result: 'nao_autenticado' });
@@ -601,13 +613,14 @@ const __mods = [
                 const currentPeriod = current?.period === 'anual' ? 'anual' : 'mensal';
                 if (status === 'assinatura' && !(0, pix_1.pixCanPayNext)(typeof current?.until === 'string' ? current.until : null, now(), currentPeriod))
                     return reply(200, { result: 'ja_pago' });
-                if ((await activeSubscriptions(asaas, personId)).length > 0)
-                    return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
+                if ((await activeSubscriptions(asaas, personId)).length > 0) {
+                    return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : status === 'teste' ? 'assinatura_marcada' : 'cartao_ativo' });
+                }
                 const chosen = period ?? 'mensal';
                 const firstDue = (0, primeira_cobranca_1.paidStartDay)(status, current?.until, now()) ?? (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now());
                 const request = action === 'pix'
-                    ? checkoutPixRequest(personId, plan, config.appUrl, chosen)
-                    : checkoutRequest(personId, plan, config.appUrl, firstDue, chosen);
+                    ? checkoutPixRequest(personId, plan, config.appUrl, chosen, config.sandbox)
+                    : checkoutRequest(personId, plan, config.appUrl, firstDue, chosen, config.sandbox);
                 const created = await asaas('POST', '/checkouts', request);
                 const checkoutId = text((0, servidor_comum_1.obj)(created.json)?.id);
                 const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
@@ -863,8 +876,9 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.PERIOD_NAME = exports.PLAN_NAME = exports.PLAN_PERIOD_PRICE_CENTS = exports.PLAN_PRICE_CENTS = exports.PERIOD_MONTHS = exports.BILLING_PERIODS = void 0;
+    exports.PERIOD_NAME = exports.PLAN_NAME = exports.PLAN_PERIOD_PRICE_CENTS = exports.PLAN_PRICE_CENTS = exports.PERIOD_MONTHS = exports.BILLING_PERIODS = exports.SUBSCRIBE_OPEN = void 0;
     exports.parseBillingPeriod = parseBillingPeriod;
+    exports.SUBSCRIBE_OPEN = false;
     exports.BILLING_PERIODS = ['mensal', 'anual'];
     exports.PERIOD_MONTHS = { mensal: 1, anual: 12 };
     exports.PLAN_PRICE_CENTS = { individual: 2990, familiar: 6990 };
@@ -1057,10 +1071,17 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.BILLING_TIME_ZONE = void 0;
+    exports.FIRST_CHARGE_WINDOW_MS = exports.BILLING_TIME_ZONE = void 0;
     exports.paidStartDay = paidStartDay;
+    exports.trialEndRelation = trialEndRelation;
+    exports.trialEndPhrase = trialEndPhrase;
+    exports.parseOwnWebEntitlements = parseOwnWebEntitlements;
+    exports.hasLiveWebEntitlement = hasLiveWebEntitlement;
+    exports.pendingFirstCharge = pendingFirstCharge;
     const dates_1 = __req(1);
     exports.BILLING_TIME_ZONE = 'America/Sao_Paulo';
+    const DAY_MS = 86_400_000;
+    exports.FIRST_CHARGE_WINDOW_MS = 4 * DAY_MS;
     function paidStartDay(status, until, now) {
         if (status !== 'teste' || typeof until !== 'string')
             return null;
@@ -1069,6 +1090,51 @@ const __mods = [
             return null;
         const day = (0, dates_1.todayIn)(exports.BILLING_TIME_ZONE, new Date(end));
         return day > (0, dates_1.todayIn)(exports.BILLING_TIME_ZONE, now) ? day : null;
+    }
+    function trialEndRelation(firstChargeDay, until, timeZone) {
+        if (!until || Number.isNaN(Date.parse(until)))
+            return 'mesmo-dia';
+        const local = (0, dates_1.todayIn)(timeZone, new Date(until));
+        if ((0, dates_1.addDays)(local, 1) === firstChargeDay)
+            return 'dia-seguinte';
+        if ((0, dates_1.addDays)(firstChargeDay, 1) === local)
+            return 'vespera';
+        return 'mesmo-dia';
+    }
+    function trialEndPhrase(rel) {
+        return rel === 'dia-seguinte' ? 'no dia seguinte ao fim do teste grátis' : rel === 'vespera' ? 'na véspera do fim do teste grátis' : 'quando o teste grátis acaba';
+    }
+    function parseOwnWebEntitlements(raw) {
+        if (!Array.isArray(raw))
+            return [];
+        const out = [];
+        for (const r of raw) {
+            const o = r && typeof r === 'object' ? r : null;
+            if (!o || typeof o.valid_from !== 'string' || Number.isNaN(Date.parse(o.valid_from)))
+                continue;
+            const until = typeof o.valid_until === 'string' && !Number.isNaN(Date.parse(o.valid_until)) ? o.valid_until : null;
+            out.push({ validFrom: o.valid_from, validUntil: until });
+        }
+        return out;
+    }
+    function live(e, now) {
+        if (!e.validUntil)
+            return false;
+        const until = Date.parse(e.validUntil);
+        return until > now.getTime() && until > Date.parse(e.validFrom);
+    }
+    function hasLiveWebEntitlement(entitlements, now) {
+        return entitlements.some((e) => live(e, now));
+    }
+    function pendingFirstCharge(entitlements, now, cancelled = false) {
+        if (cancelled)
+            return null;
+        for (const e of entitlements) {
+            if (!live(e, now) || Date.parse(e.validUntil) - Date.parse(e.validFrom) > exports.FIRST_CHARGE_WINDOW_MS)
+                continue;
+            return (0, dates_1.todayIn)(exports.BILLING_TIME_ZONE, new Date(e.validFrom));
+        }
+        return null;
     }
   },
 ];

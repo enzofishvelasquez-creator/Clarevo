@@ -32,11 +32,13 @@ const { rel } = require('./util');
  */
 const PREFIXO_DA_LOJA = { appStore: 'https://apps.apple.com/', googlePlay: 'https://play.google.com/store/apps/details?id=' };
 const ENDERECO_DA_LOJA = {
-  appStore: /^https:\/\/apps\.apple\.com\/[^?#\s]*$/,
-  googlePlay: /^https:\/\/play\.google\.com\/store\/apps\/details\?id=[A-Za-z0-9._]+$/,
+  // A página de um app na App Store: o país (só "br"), o nome do app em letras minúsculas e o número, sem parâmetro nem âncora (D-129).
+  appStore: /^https:\/\/apps\.apple\.com\/(?:br\/)?app\/(?:[a-z0-9-]+\/)?id[0-9]+$/,
+  // O pacote do app no Google Play: partes separadas por ponto (pelo menos duas), cada uma começando por letra (D-129).
+  googlePlay: /^https:\/\/play\.google\.com\/store\/apps\/details\?id=[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/,
 };
 
-/** A assinatura pelo app está aberta no núcleo (`SUBSCRIBE_OPEN` de `packages/core/src/plano.ts`, lido por `catalogo().PLANOS.aberta`)? */
+/** A assinatura pelo app está aberta no núcleo (`SUBSCRIBE_OPEN` de `packages/core/src/plano-precos.ts`, lido por `catalogo().PLANOS.aberta`)? */
 function assinaturaAbertaNoNucleo() {
   return require('./catalogo').catalogo().PLANOS.aberta === true;
 }
@@ -48,7 +50,7 @@ function assinaturaAbertaNoNucleo() {
  */
 function estadoDoProduto(sobrescrever = {}) {
   for (const chave of ['assinaturaAberta', 'simularAssinaturaAberta', 'assinaturaSimulada']) {
-    if (chave in ESTADO_DO_PRODUTO) throw new Error(`estado do produto: "${chave}" não vai em scripts/site/config.js; a assinatura aberta vem só do SUBSCRIBE_OPEN de packages/core/src/plano.ts`);
+    if (chave in ESTADO_DO_PRODUTO) throw new Error(`estado do produto: "${chave}" não vai em scripts/site/config.js; a assinatura aberta vem só do SUBSCRIBE_OPEN de packages/core/src/plano-precos.ts`);
   }
   for (const chave of ['assinaturaAberta', 'assinaturaSimulada']) {
     if (chave in sobrescrever) throw new Error(`estado do produto: "${chave}" vem do núcleo (SUBSCRIBE_OPEN); para testar o site lançado antes de a assinatura abrir, use "simularAssinaturaAberta": true no JSON do --estado`);
@@ -64,8 +66,8 @@ function estadoDoProduto(sobrescrever = {}) {
     if (url && !ENDERECO_DA_LOJA[loja].test(url)) {
       throw new Error(
         loja === 'googlePlay'
-          ? 'estado do produto: o endereço de googlePlay é a página do app, https://play.google.com/store/apps/details?id=<pacote>, sem outro parâmetro nem âncora (nada de rastreamento)'
-          : `estado do produto: o endereço de ${loja} vai sem parâmetro nem âncora (nada de rastreamento)`,
+          ? 'estado do produto: o endereço de googlePlay é a página do app, https://play.google.com/store/apps/details?id=<pacote> (o pacote com partes separadas por ponto, cada uma começando por letra), sem outro parâmetro nem âncora (nada de rastreamento)'
+          : 'estado do produto: o endereço de appStore é a página do app, https://apps.apple.com/br/app/<nome>/id<número>, sem parâmetro nem âncora (nada de rastreamento)',
       );
     }
   }
@@ -76,7 +78,7 @@ function estadoDoProduto(sobrescrever = {}) {
   estado.assinaturaSimulada = estado.assinaturaAberta !== doNucleo;
   if (estado.lancado && !estado.assinaturaAberta) {
     throw new Error(
-      'estado do produto: "lancado: true" com a assinatura pelo app ainda fechada (SUBSCRIBE_OPEN = false em packages/core/src/plano.ts). ' +
+      'estado do produto: "lancado: true" com a assinatura pelo app ainda fechada (SUBSCRIBE_OPEN = false em packages/core/src/plano-precos.ts). ' +
         'O site lançado mandaria "Assine aqui" para a tela de criar conta com a compra ainda fechada. Abra a assinatura no núcleo ' +
         '(SUBSCRIBE_OPEN = true, com a compra pelas lojas e pela web funcionando) e só depois mude "lancado" para true em scripts/site/config.js.',
     );

@@ -4,14 +4,14 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { PixRenewCard, PlansCard, StoreManageCard, readsWebSubscription, useAccessNow, useAccessTimeZone } from '@/components/access-parts';
+import { PixRenewCard, PlansCard, StoreManageCard, useAccessNow, useAccessTimeZone, useWebSubscriptionState } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { BenefitsCard, SubscriptionHero } from '@/components/subscription-parts';
 import { Banner, Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
 import { useWideLayout } from '@/lib/layout';
-import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
+import { useAccess, useReloadAccess } from '@/state/access';
 import { useRepo } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -107,15 +107,21 @@ export default function AssinaturaScreen() {
     if (returned) void refetch();
   }, [returned, refetch]);
   const now = useAccessNow();
-  // A assinatura no cartão lida no Asaas: a de quem assina pelo cartão e a de quem pode ter assinado no teste grátis (D-129).
-  const webRead = readsWebSubscription(access.data, webTest);
-  const webStatus = useWebSubscriptionStatus(webRead);
-  const webCard = webRead && access.data?.status === 'assinatura';
-  // Assinou no cartão durante o teste: a primeira cobrança é no fim do teste, e o cancelamento fica logo abaixo, sem os planos.
-  const scheduled = webRead && access.data?.status === 'teste' && webStatus.data?.active === true;
-  const trialEnd = scheduled && access.data?.until ? formatDateBR(todayIn(timeZone, new Date(access.data.until))) : null;
+  const onWeb = Platform.OS === 'web';
+  // A assinatura no cartão: primeiro o próprio direito, no banco; a situação no Asaas só com um direito pela web que vale (D-129).
+  const web = useWebSubscriptionState(access.data, now);
+  const webStatus = web.status;
+  const webCard = onWeb && access.data?.status === 'assinatura' && access.data.provider === 'web';
+  // Assinou no cartão durante o teste e a primeira cobrança ainda não foi paga (antes do dia dela ou no próprio dia, até a confirmação do
+  // cartão): o cancelamento fica logo abaixo, sem os planos, com os textos do teste (nada é cobrado; o acesso acaba com o teste).
+  const pending = web.firstCharge;
+  const trialEnd = pending
+    ? access.data?.status === 'teste' && access.data.until
+      ? formatDateBR(todayIn(timeZone, new Date(access.data.until)))
+      : formatDateBR(pending)
+    : null;
   const view = access.data
-    ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webRead ? webStatus.data : null, cancelBelow: true })
+    ? accessView(access.data, now, timeZone, { web: onWeb, webSubscription: web.reads ? webStatus.data : null, cancelBelow: true, firstCharge: pending })
     : null;
   // Voltou do pagamento e o acesso já mudou: o alto da tela dá as boas-vindas, e o aviso da volta sai.
   const welcomed = returned === 'sucesso' && access.data?.status === 'assinatura';
@@ -145,8 +151,8 @@ export default function AssinaturaScreen() {
         ) : (
           <>
             <SubscriptionHero access={access.data} view={view} now={now} timeZone={timeZone} justPaid={welcomed} canceled={webCard && webStatus.data?.active === false} />
-            {webCard ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
-            {scheduled ? <WebCancelCard canceled={false} trialEnd={trialEnd} onTrialCanceled={setTrialCanceled} /> : null}
+            {webCard && !pending ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
+            {onWeb && pending ? <WebCancelCard canceled={false} trialEnd={trialEnd} onTrialCanceled={setTrialCanceled} /> : null}
             {access.data.status === 'assinatura' && access.data.provider === 'pix' && Platform.OS === 'web' ? (
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}

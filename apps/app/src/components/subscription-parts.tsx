@@ -83,11 +83,12 @@ export function SubscriptionHero({
   /** A assinatura no cartão foi cancelada (lida no Asaas): o período pago vale, sem comemoração. */
   canceled?: boolean;
 }) {
-  const celebrate = CELEBRATE.has(access.status) && !canceled;
+  // D-129: antes da primeira cobrança paga (quem assinou no teste), o selo da tela (`view.eyebrow`, "Assinatura feita"), sem comemoração.
+  const celebrate = CELEBRATE.has(access.status) && !canceled && !view.eyebrow;
   const welcome = justPaid && access.status === 'assinatura';
   const Icon = BADGE_ICON[access.status];
   const days = access.status === 'teste' ? (trialDaysLeft(access, now, timeZone) ?? 0) : null;
-  const eyebrow = welcome ? T.justPaidEyebrow : canceled ? T.eyebrowCanceled : T.eyebrow[access.status];
+  const eyebrow = welcome ? T.justPaidEyebrow : canceled ? T.eyebrowCanceled : (view.eyebrow ?? T.eyebrow[access.status]);
   const title = welcome ? T.justPaidTitle(access.plan ?? 'individual') : view.situation;
   // Computador: o texto de baixo para antes do canto do lima, qualquer que seja o tamanho da última linha.
   const clear = useWideLayout() ? styles.clearArt : undefined;

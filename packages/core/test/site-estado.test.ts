@@ -322,12 +322,31 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       'http://play.google.com/store/apps/details?id=app.clarevo',
       'https://play.google.com.golpe.test/store/apps/details?id=app.clarevo',
       'https://golpe.test/?https://play.google.com/store/apps/details?id=app.clarevo',
+      // O pacote: partes separadas por ponto (pelo menos duas), cada uma começando por letra (D-129, revisão).
+      'https://play.google.com/store/apps/details?id=clarevo',
+      'https://play.google.com/store/apps/details?id=1app.clarevo',
+      'https://play.google.com/store/apps/details?id=app..clarevo',
+      'https://play.google.com/store/apps/details?id=app.clarevo.',
     ]) {
       expect(() => estadoDoProduto({ lojas: { googlePlay: url } }), url).toThrow(/googlePlay/);
     }
-    for (const url of ['https://apps.apple.com/br/app/clarevo/id0000000000?mt=8', 'https://apps.apple.com/br/app/clarevo/id0000000000#x', 'https://golpe.test/apps.apple.com/']) {
+    for (const url of [
+      'https://apps.apple.com/br/app/clarevo/id0000000000?mt=8',
+      'https://apps.apple.com/br/app/clarevo/id0000000000#x',
+      'https://golpe.test/apps.apple.com/',
+      // Só a página de um app (D-129, revisão): nada de página de desenvolvedor, de busca ou da loja inteira.
+      'https://apps.apple.com/',
+      'https://apps.apple.com/br/developer/clarevo/id123',
+      'https://apps.apple.com/br/app/clarevo/',
+      'https://apps.apple.com/us/app/clarevo/id123',
+      'https://apps.apple.com/br/app/Clarevo/id123',
+    ]) {
       expect(() => estadoDoProduto({ lojas: { appStore: url } }), url).toThrow(/appStore/);
     }
+    for (const url of ['https://apps.apple.com/br/app/clarevo/id1234567890', 'https://apps.apple.com/app/id1234567890', 'https://apps.apple.com/br/app/clarevo-controle-de-gastos/id1']) {
+      expect(estadoDoProduto({ lojas: { appStore: url } }).lojas.appStore, url).toBe(url);
+    }
+    expect(estadoDoProduto({ lojas: { googlePlay: 'https://play.google.com/store/apps/details?id=br.com.clarevo_app' } }).lojas.googlePlay).toContain('br.com.clarevo_app');
     // Lançado, com o endereço oficial do Google Play, o selo leva a ele (o "?" escapado só no HTML).
     const comAsDuas = estadoDoProduto({ lancado: true, lojas: { appStore: APP_STORE, googlePlay: GOOGLE_PLAY }, simularAssinaturaAberta: true });
     expect(selosDasLojas(comAsDuas)).toContain(`<a class="selo-loja" href="${GOOGLE_PLAY}" rel="noopener noreferrer">Disponível no Google Play</a>`);
@@ -422,7 +441,7 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     expect(() => estadoDoProduto({ assinaturaAberta: true })).toThrow(/simularAssinaturaAberta/);
     expect(() => estadoDoProduto({ simularAssinaturaAberta: 'sim' })).toThrow(/true ou false/);
     if (!SUBSCRIBE_OPEN) {
-      expect(() => estadoDoProduto({ lancado: true })).toThrow(/SUBSCRIBE_OPEN = false em packages\/core\/src\/plano\.ts[\s\S]*mude "lancado" para true em scripts\/site\/config\.js/);
+      expect(() => estadoDoProduto({ lancado: true })).toThrow(/SUBSCRIBE_OPEN = false em packages\/core\/src\/plano-precos\.ts[\s\S]*mude "lancado" para true em scripts\/site\/config\.js/);
       expect(() => gerarSite({ referencia: REFERENCIA, estado: { lancado: true } })).toThrow(/assinatura pelo app ainda fechada/);
       expect(estadoDoProduto({ lancado: true, simularAssinaturaAberta: true })).toMatchObject({ lancado: true, assinaturaAberta: true, assinaturaSimulada: true });
       expect(lancado.problemasFinais.some((p) => /simula a assinatura aberta/.test(p))).toBe(true);

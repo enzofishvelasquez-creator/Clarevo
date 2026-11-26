@@ -41,7 +41,7 @@ const URL_ENTRAR = `${URL_APP}/entrar`;
  *     botão do menu é "Entrar" e leva à tela de entrar do app web (`URL_ENTRAR`).
  *   - `lancado: true`: "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas aparecem, cada
  *     um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto a assinatura pelo app estiver fechada
- *     (`SUBSCRIBE_OPEN` em `packages/core/src/plano.ts`): primeiro abre a assinatura, depois o site.
+ *     (`SUBSCRIBE_OPEN` em `packages/core/src/plano-precos.ts`): primeiro abre a assinatura, depois o site.
  * `lojas`: os endereços das páginas do app (só `https://apps.apple.com/...` e `https://play.google.com/...`), vazios até a publicação.
  * `prazoDeResposta`: o prazo de resposta do atendimento que a equipe consegue cumprir sempre (por exemplo, "até 1 dia útil, de segunda a
  * sexta"). Vazio, nenhuma página promete prazo; preenchido, entra em Sobre e em Suporte. Decisão do Enzo (pergunta do estudo de 25/11).

@@ -1,4 +1,13 @@
-import { FULL_ACCESS, shownAccountLevel, type Access, type AccountLevel, type AccountLevelState, type ShownAccountLevel, type WebSubscriptionStatus } from '@clarevo/core';
+import {
+  FULL_ACCESS,
+  shownAccountLevel,
+  type Access,
+  type AccountLevel,
+  type AccountLevelState,
+  type OwnWebEntitlement,
+  type ShownAccountLevel,
+  type WebSubscriptionStatus,
+} from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -12,7 +21,14 @@ import { useSession } from '@/state/session';
 export function useAccess() {
   const { repo, user } = useSession();
   const qc = useQueryClient();
-  useEffect(() => accessRefused.listen(() => void qc.invalidateQueries({ queryKey: ['access'] })), [qc]);
+  useEffect(
+    () =>
+      accessRefused.listen(() => {
+        void qc.invalidateQueries({ queryKey: ['access'] });
+        void qc.invalidateQueries({ queryKey: ['web-entitlements'] });
+      }),
+    [qc],
+  );
   return useQuery({
     queryKey: ['access', user?.id ?? null],
     queryFn: (): Promise<Access> => repo!.getMyAccess(),
@@ -31,7 +47,29 @@ export function useAccessCanWrite(): boolean {
 /** Recarregar a situação do acesso (depois de aceitar um benefício, entrar ou sair de uma Família) e a da assinatura no cartão. */
 export function useReloadAccess() {
   const qc = useQueryClient();
-  return () => Promise.all([qc.invalidateQueries({ queryKey: ['access'] }), qc.invalidateQueries({ queryKey: ['web-subscription'] })]);
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['access'] }),
+      qc.invalidateQueries({ queryKey: ['web-subscription'] }),
+      qc.invalidateQueries({ queryKey: ['web-entitlements'] }),
+    ]);
+}
+
+/**
+ * O próprio direito pela web (D-129, `plan_entitlements` com a RLS, sem chamar o Asaas): se há assinatura no cartão, paga ou marcada para o
+ * fim do teste, e se a primeira cobrança ainda não foi paga (`pendingFirstCharge`). Com ele, a situação no Asaas (`situacao`, que gasta a
+ * cota da API do Asaas) só é pedida quando há um direito pela web que vale. `enabled`: só para quem pode ter um (o teste e quem assina na
+ * web). Uma falha de leitura devolve erro (`isError`), e quem usa decide (excluir a conta não segue sem saber).
+ */
+export function useOwnWebEntitlements(enabled: boolean) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['web-entitlements', user?.id ?? null],
+    queryFn: (): Promise<OwnWebEntitlement[]> => repo!.getOwnWebEntitlements(),
+    enabled: Boolean(enabled && repo && user),
+    staleTime: 60_000,
+    retry: false,
+  });
 }
 
 /**

@@ -15004,7 +15004,7 @@ setInterval(async () => {
         t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
         t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
         // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
-        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago.') &&
+        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.') &&
         !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
         !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
     // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
@@ -15062,6 +15062,27 @@ setInterval(async () => {
       window.__clarevoTesteCompra = site;
       window.__abertas = [];
       window.open = (u) => { window.__abertas.push(String(u)); return null; };
+      // Só para o roteiro: o repositório da demonstração (em memória) e o QueryClient, para simular quem assinou no teste (D-129, revisão).
+      const find = () => {
+        const root = document.getElementById('root');
+        const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+        const stack = key ? [root[key].stateNode.current] : [];
+        let session = null;
+        let client = null;
+        while (stack.length > 0 && !(session && client)) {
+          const f = stack.pop();
+          const props = f.memoizedProps;
+          if (props && typeof props === 'object') {
+            const v = props.value;
+            if (!session && v && typeof v === 'object' && 'repo' in v && 'auth' in v && 'user' in v) session = v;
+            if (!client && props.client && typeof props.client.invalidateQueries === 'function') client = props.client;
+          }
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
+        return { session, client };
+      };
+      window.__cp = { repo: async () => await find().session.auth.demoRepo, refresh: () => find().client.invalidateQueries() };
     }, SITE);
     const fora = [];
     await cpCtx.route('**/*', (r) => {
@@ -15132,6 +15153,41 @@ setInterval(async () => {
           t.includes(`Com Pix, você paga um mês por vez, na página do Asaas. ${PIX_NAO_RENOVA}`) && (await cpCount('button', 'Assinar o plano Individual mensal')) === 1 &&
           fimDoTeste !== null && t.includes(`A primeira cobrança é em ${fimDoTeste}`), t.slice(0, 1800));
       await cpShot('619_assinatura_compra_web_mensal');
+      // 4. Quem assinou no cartão durante o teste (D-129, revisão): o próprio direito no banco tem a janela da primeira cobrança (o começo do
+      // dia do fim do teste, em Brasília, até o fim do terceiro dia seguinte), e o Asaas diz que a assinatura está ativa. Simulado no
+      // repositório da demonstração (em memória), sem rede. A situação continua "Teste grátis", com o selo "Assinatura feita", o dia da
+      // primeira cobrança, sem os planos nem os botões de assinar, e "Cancelar assinatura" logo abaixo, com a confirmação de que nada é cobrado.
+      const marcado = await cp.evaluate(async () => {
+        const repo = await window.__cp.repo();
+        const until = (await repo.getMyAccess()).until;
+        const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(until));
+        const validFrom = new Date(`${dia}T00:00:00.000-03:00`);
+        const validUntil = new Date(validFrom.getTime() + 4 * 86400000 - 1);
+        repo.getOwnWebEntitlements = async () => [{ validFrom: validFrom.toISOString(), validUntil: validUntil.toISOString() }];
+        repo.getWebSubscriptionStatus = async () => ({ active: true, nextDueDate: null });
+        await window.__cp.refresh();
+        return dia.split('-').reverse().join('/');
+      });
+      await cpWait('A assinatura no cartão já está feita');
+      await cp.waitForTimeout(600);
+      t = await cpBody();
+      ok('Assinatura de quem assinou no cartão durante o teste (D-129): "Teste grátis" com o selo "Assinatura feita", a primeira cobrança no fim do teste, nada cobrado até lá, sem os planos nem os botões de assinar, e "Cancelar assinatura" logo abaixo',
+        t.includes('Assinatura feita') && t.includes('Teste grátis') && !t.includes('Sem cartão e sem cobrança') &&
+          t.includes(`A assinatura no cartão já está feita: a primeira cobrança é em ${marcado}, quando o teste grátis acaba. Até lá, nada é cobrado.`) &&
+          (await cpCount('button', /^(Assinar|Pagar)/)) === 0 && !t.includes('Período da assinatura') && (await cpCount('button', 'Cancelar assinatura')) === 1 &&
+          !t.includes('Para mudar de plano ou passar do mensal para o anual'), JSON.stringify({ marcado, trecho: t.slice(0, 1200) }));
+      await cp.setViewportSize({ width: 390, height: 844 });
+      await cp.waitForTimeout(400);
+      await cpShot('621_assinatura_teste_com_assinatura_marcada');
+      await cp.getByRole('button', { name: 'Cancelar assinatura', exact: true }).filter({ visible: true }).first().click();
+      await cpWait('Cancelar a assinatura?');
+      t = await cpBody();
+      ok('Assinatura de quem assinou no teste (D-129): a confirmação do cancelamento diz que nada é cobrado e que o acesso completo acaba com o teste grátis (nada de "período já pago")',
+        /Nada é cobrado\. O acesso completo acaba com o teste grátis, em \d{2}\/\d{2}\/\d{4}; depois, sem assinatura, a conta fica só para ver e exportar, com os seus dados guardados\./.test(t) &&
+          !t.includes('O acesso completo continua até o fim do período já pago'), t.slice(0, 1400));
+      await cpShot('622_assinatura_teste_cancelar_confirmacao');
+      await cp.getByRole('button', { name: 'Manter a assinatura', exact: true }).filter({ visible: true }).first().click();
+      await cp.waitForTimeout(300);
       for (const w of [360, 1280]) {
         await cp.setViewportSize({ width: w, height: w === 1280 ? 900 : 780 });
         await cp.waitForTimeout(400);

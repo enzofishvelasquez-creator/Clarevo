@@ -12,14 +12,19 @@ import {
   demoInstant,
   deviceTimeZone,
   formatDateBR,
+  hasLiveWebEntitlement,
   isStoreSubscription,
   paidStartDay,
+  pendingFirstCharge,
   periodSuffix,
   pixCanPayNext,
   pixNextPaymentFrom,
   planPeriodPriceAmount,
   storeChangeDone,
   todayIn,
+  trialDaysLeft,
+  trialEndRelation,
+  TRIAL_WARNING_DAYS,
   type Access,
   type BillingPeriod,
   type PlanKind,
@@ -35,7 +40,7 @@ import { Banner, Button, Card, LinkButton, Txt, spaceKeyPress, styles as ui } fr
 import { PURCHASE_PREVIEW, PURCHASE_PREVIEW_SITE } from '@/lib/capture';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases, type StoreChoice } from '@/lib/store-purchases';
-import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
+import { useAccess, useOwnWebEntitlements, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
 import { useSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -83,7 +88,12 @@ export function AccessBanner() {
   const access = useAccess().data;
   const timeZone = useAccessTimeZone();
   const now = useAccessNow();
-  const banner = access ? accessBanner(access, now, timeZone, { web: Platform.OS === 'web' }) : null;
+  // Quem assinou no cartão durante o teste (D-129): nos últimos dias do teste, o aviso diz o dia da primeira cobrança. Só o próprio direito,
+  // no banco, e só quando o aviso do teste apareceria (nada do Asaas no Resumo).
+  const trialEnding = access?.status === 'teste' && (trialDaysLeft(access, now, timeZone) ?? Infinity) <= TRIAL_WARNING_DAYS;
+  const ents = useOwnWebEntitlements(trialEnding);
+  const firstCharge = trialEnding && ents.data ? pendingFirstCharge(ents.data, now) : null;
+  const banner = access ? accessBanner(access, now, timeZone, { web: Platform.OS === 'web', firstCharge }) : null;
   if (!banner) return null;
   return (
     <Banner tone="info" icon={access?.status === 'leitura' ? LockKeyhole : Hourglass} live={false}>
@@ -93,25 +103,36 @@ export function AccessBanner() {
   );
 }
 
+/** Quem pode ter assinatura no cartão da web: no teste grátis (pode ter assinado no teste, D-129) e quem assina pela web. */
+function mayHaveWebSubscription(access: Access | undefined): boolean {
+  return access?.status === 'teste' || (access?.status === 'assinatura' && access.provider === 'web');
+}
+
 /**
- * Na web, se a situação do acesso depende da assinatura no cartão lida no Asaas (`situacao`): a de quem assina pelo cartão e, com a compra
- * aberta, a de quem está no teste grátis (pode ter assinado no teste, com a primeira cobrança no fim dele, D-129). `webTest`: o teste da
- * equipe no sandbox (`?assinar=teste`).
+ * A assinatura no cartão da web de quem pode ter uma (D-129): primeiro o próprio direito, no banco (`useOwnWebEntitlements`, sem gastar a
+ * cota do Asaas); a situação no Asaas (`situacao`) só na web e só com um direito pela web que vale (ou quem o banco já diz assinar pela web).
+ * `firstCharge`: o dia da primeira cobrança ainda não paga de quem assinou no teste (antes do dia e no próprio dia, até a confirmação do
+ * cartão); cancelada no Asaas, nenhum.
  */
-export function readsWebSubscription(access: Access | undefined, webTest = false): boolean {
-  if (Platform.OS !== 'web' || !access) return false;
-  if (access.status === 'assinatura') return access.provider === 'web';
-  return access.status === 'teste' && (SUBSCRIBE_OPEN || webTest);
+export function useWebSubscriptionState(access: Access | undefined, now: Date) {
+  const may = mayHaveWebSubscription(access);
+  const entitlements = useOwnWebEntitlements(may);
+  const live = entitlements.data ? hasLiveWebEntitlement(entitlements.data, now) : false;
+  const reads = Platform.OS === 'web' && may && (live || (access?.status === 'assinatura' && access.provider === 'web'));
+  const status = useWebSubscriptionStatus(reads);
+  const firstCharge = may && entitlements.data ? pendingFirstCharge(entitlements.data, now, status.data?.active === false) : null;
+  return { entitlements, live, reads, status, firstCharge };
 }
 
 /** Card "Assinatura" em Conta: a situação, a explicação curta e o botão da tela Assinatura. */
 export function AccessCard() {
   const access = useAccess();
   const timeZone = useAccessTimeZone();
-  const webCard = readsWebSubscription(access.data);
-  const webStatus = useWebSubscriptionStatus(webCard);
   const now = useAccessNow();
-  const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
+  const web = useWebSubscriptionState(access.data, now);
+  const view = access.data
+    ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: web.reads ? web.status.data : null, firstCharge: web.firstCharge })
+    : null;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -153,6 +174,7 @@ function canSubscribeOnWeb(access: Access, webTest: boolean): boolean {
  */
 function WebSubscribeButtons({ access, webTest, period }: { access: Access; webTest: boolean; period: BillingPeriod }) {
   const now = useAccessNow();
+  const timeZone = useAccessTimeZone();
   const repo = useRepo();
   const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | 'cancelar' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -160,7 +182,8 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
   const [cardActive, setCardActive] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const show = (result: Exclude<WebSubscriptionStart['result'], 'checkout'>) => {
-    setCardActive(result === 'cartao_ativo');
+    // A assinatura no cartão ativa (com a cobrança em aberto ou marcada para o fim do teste, D-129): o botão de cancelar para escolher de novo.
+    setCardActive(result === 'cartao_ativo' || result === 'assinatura_marcada');
     setMsg(W.errors[result]);
   };
   const cancelCard = async () => {
@@ -182,6 +205,8 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
   // No teste grátis, o dia do fim do teste (em Brasília, como o vencimento do Asaas e o banco): a primeira cobrança e o período pago com Pix.
   const startDay = paidStartDay(access.status, access.until, now);
   const startDate = startDay ? formatDateBR(startDay) : null;
+  // O dia da cobrança é o de Brasília; o do fim do teste, o da pessoa: a frase diz quando os dois diferem (D-129).
+  const rel = startDay ? trialEndRelation(startDay, access.until, timeZone) : 'mesmo-dia';
   const subscribe = async (plan: PlanKind) => {
     if (busy) return;
     setMsg(null);
@@ -222,7 +247,7 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
     <View style={{ gap: space[3] }}>
       {startDate ? (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
-          {W.firstChargeOn(startDate)}
+          {W.firstChargeOn(startDate, rel)}
         </Txt>
       ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
@@ -248,7 +273,7 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
       </Txt>
       {startDate ? (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
-          {W.pixStartsOn(startDate)}
+          {W.pixStartsOn(startDate, rel)}
         </Txt>
       ) : null}
       {T.plans.map((p) => (

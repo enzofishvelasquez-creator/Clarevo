@@ -12,7 +12,11 @@
 --      direito ainda não começou: valid_from > agora). Cancelada antes da primeira cobrança, o direito acaba na hora (valid_until = agora),
 --      nada é cobrado e o acesso acaba com o teste.
 --   2. Pix: billing_pix_payments ganha starts_on, o dia em que o período daquele pagamento começa quando ele foi pago no teste grátis (o
---      dia, em Brasília, do fim do teste, pelo mesmo clarevo_access de my_access); nulo, o dia do pagamento (como antes). É gravado uma vez,
+--      dia, em Brasília, do fim do teste); nulo, o dia do pagamento (como antes). O fim do teste é a mesma conta de my_access (o maior entre a
+--      criação da pessoa e o início da cobrança, mais 14 dias), feita pelo dia pago, e não pela situação na hora do aviso: um aviso que chega
+--      atrasado, depois do fim do teste, ou um segundo pagamento feito no teste (a situação já é "assinatura" pelo primeiro) começam no mesmo
+--      dia que a tela mostrou antes de pagar. Conta quando o dia pago é do início da cobrança em diante e antes do fim do teste (antes do
+--      início da cobrança, a tela não mostra o dia, e o período começa no dia pago, como antes). É gravado uma vez,
 --      quando o pagamento aparece pago pela primeira vez, e não muda depois (um estorno seguido de nova confirmação mantém o dia). A
 --      sequência dos períodos pagos (billing_pix_apply) passa a contar do maior entre o dia pago e starts_on: pago no 3º dia do teste, o
 --      mês vai do fim do teste até um mês depois (ou 12 meses, no anual). O direito por Pix vale desde o pagamento (a pessoa vê "Pago com
@@ -110,7 +114,8 @@ declare
   v_owner uuid;
   v_prev_paid date;
   v_prev_start date;
-  v_access jsonb;
+  v_from timestamptz;
+  v_created timestamptz;
   v_trial_day date;
   v_start date;
   v_anchor date;
@@ -149,12 +154,14 @@ begin
     raise exception 'pagamento_de_outra_pessoa' using errcode = '22023';
   end if;
   insert into public.billing_events (event_id, provider) values (p_event_id, 'pix');
-  -- D-129: na primeira vez que o pagamento aparece pago, se a pessoa está no teste grátis (o mesmo acesso de my_access), o período dele
-  -- começa no dia (Brasília) do fim do teste, quando esse dia vem depois do dia pago.
+  -- D-129: na primeira vez que o pagamento aparece pago, se o dia pago é do teste grátis (do início da cobrança em diante e antes do fim do
+  -- teste, a mesma conta de my_access: o maior entre a criação da pessoa e o início da cobrança, mais 14 dias), o período dele começa no dia
+  -- (Brasília) do fim do teste. Pelo dia pago, e não pela situação na hora do aviso (o aviso atrasado e o segundo pagamento do teste também).
   if p_paid_on is not null and v_prev_paid is null and v_prev_start is null then
-    v_access := public.clarevo_access(p_person);
-    if v_access ->> 'status' = 'teste' and v_access ->> 'until' is not null then
-      v_trial_day := ((v_access ->> 'until')::timestamptz at time zone 'America/Sao_Paulo')::date;
+    select s.enforced_from into v_from from public.billing_settings s where s.id;
+    select p.created_at into v_created from public.persons p where p.id = p_person;
+    if v_from is not null and p_paid_on >= (v_from at time zone 'America/Sao_Paulo')::date then
+      v_trial_day := ((greatest(coalesce(v_created, now()), v_from) + interval '14 days') at time zone 'America/Sao_Paulo')::date;
       if v_trial_day > p_paid_on then
         v_start := v_trial_day;
       end if;

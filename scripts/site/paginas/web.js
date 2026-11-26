@@ -40,6 +40,16 @@ const PAGAR = [
   'Os preços são os mesmos na web, na App Store e no Google Play, e toda conta começa com 14 dias grátis, sem cartão.',
 ];
 
+/**
+ * A frase da chamada final (D-129): lançado, o convite de sempre; antes do lançamento, só o que a página oferece (ver o app por dentro e
+ * entrar, para quem já tem conta), sem convidar a criar conta: "Assine aqui" leva aos planos, que dizem que a assinatura abre em breve.
+ */
+function fimDaPagina(estado) {
+  return estado.lancado
+    ? 'Abra a Clarevo no computador, anote os gastos de hoje e veja o mês tomar forma.'
+    : 'Por enquanto, veja o app por dentro. Quando a assinatura abrir, é só abrir a Clarevo no computador, anotar os gastos de hoje e ver o mês tomar forma.';
+}
+
 function paginaWeb({ valores, img, estado }) {
   const u = (d) => rel(ARQUIVO, d);
   const { catalogo } = require('../catalogo');
@@ -92,7 +102,7 @@ ${PAGAR.map((i) => `<li>${esc(i.replace('14 dias', `${dias} dias`))}</li>`).join
     bloco(
       `<div class="chamada-final">
 <h2 id="comecar">Comece pelo navegador</h2>
-<p>${esc(`Abra a Clarevo no computador, anote os gastos de hoje e veja o mês tomar forma. ${noCelular(estado)}`)}</p>
+<p>${esc(`${fimDaPagina(estado)} ${noCelular(estado)}`)}</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 ${jaTemConta()}
 </div>`,
