@@ -11,14 +11,15 @@ import { Linking, Platform } from 'react-native';
 export const SITE_URL: string | null = normalizeSiteUrl(process.env.EXPO_PUBLIC_SITE_URL);
 
 /** O endereço completo de uma página do site, ou `null` quando não há endereço do site. */
-export const sitePageHref = (page: SitePage): string | null => sitePageUrl(SITE_URL, page);
+export const sitePageHref = (page: SitePage, site: string | null = SITE_URL): string | null => sitePageUrl(site, page);
 
 /**
  * Abre uma página do site no navegador (`Linking` do React Native: no aparelho abre o navegador; na web, uma janela nova, e o app
- * continua aberto). Devolve `false` quando não há endereço do site ou o sistema não conseguiu abrir.
+ * continua aberto). Devolve `false` quando não há endereço do site ou o sistema não conseguiu abrir. `site`: outro endereço do site, só
+ * para o roteiro de telas (`PURCHASE_PREVIEW_SITE`, `lib/capture.ts`).
  */
-export async function openSitePage(page: SitePage): Promise<boolean> {
-  const url = sitePageHref(page);
+export async function openSitePage(page: SitePage, site: string | null = SITE_URL): Promise<boolean> {
+  const url = sitePageHref(page, site);
   if (!url) return false;
   try {
     await Linking.openURL(url);

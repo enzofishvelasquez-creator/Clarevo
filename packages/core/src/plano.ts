@@ -212,10 +212,22 @@ export const PLAN_PERIOD_TEXT = {
       ? `Plano ${PLAN_NAME[plan]} anual, ${planPeriodPrice(plan, 'anual')}, equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês. No mensal, ${planPeriodPrice(plan, 'mensal')}. ${who}`
       : `Plano ${PLAN_NAME[plan]} mensal, ${planPeriodPrice(plan, 'mensal')}. No anual, ${planPeriodPrice(plan, 'anual')}. ${who}`,
   /**
-   * Sem falar do teste grátis: o anual no cartão é cobrado no dia, os produtos das lojas não têm oferta de teste e a tela aparece também
-   * para quem já passou do teste (o teste da conta já está em `ACCESS_TEXT.plansNote`).
+   * A nota do anual, por canal (análise geral de 26/11/2026, D-129: "O anual é uma cobrança só, que vale por 12 meses." podia ser lida como
+   * se o anual não renovasse). Sem falar do teste grátis (o teste da conta já está em `ACCESS_TEXT.plansNote`). Na web, o cartão renova e o
+   * Pix não; no app das lojas, nada de Pix nem de pagamento na web (as lojas não aceitam app que aponte para pagamento fora delas), e o
+   * cancelamento é nos ajustes da loja; na demonstração (o app das lojas abre a demonstração da web) e no guia de uso (que aparece também no
+   * app das lojas), a nota neutra, sem canal (com "automaticamente": o guia não usa adjetivo com gênero, nem para a assinatura).
    */
-  note: 'O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.',
+  note: {
+    web: 'No anual, os 12 meses são pagos de uma vez. No cartão, a assinatura renova sozinha a cada período até você cancelar; com Pix, não renova: você paga o próximo período se quiser continuar. Os dois períodos têm os mesmos recursos.',
+    store: 'No anual, os 12 meses são cobrados de uma vez, e a assinatura renova sozinha a cada período até você cancelar nos ajustes da loja. Os dois períodos têm os mesmos recursos.',
+    neutral: 'No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago.',
+  },
+  /**
+   * A mesma nota no site (os planos e a página de cada plano), sem nome de loja: o cartão e as lojas renovam, o Pix não.
+   */
+  noteSite:
+    'No anual, os 12 meses são pagos de uma vez. No cartão e pelas lojas de aplicativos, a assinatura renova sozinha ao fim de cada período, pelo mesmo preço, até você cancelar; com Pix, não há renovação: você paga o próximo período se quiser continuar.',
 } as const;
 
 /** Os textos fixos da assinatura (Conta, tela Assinatura e avisos). */
@@ -233,7 +245,12 @@ export const ACCESS_TEXT = {
   /** Na web. No app das lojas vale `howToPayStore`: a Apple e o Google não aceitam app que aponte para pagamento fora da loja. */
   howToPay: 'No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.',
   howToPayStore: 'No celular, a assinatura é feita pela loja de aplicativos do aparelho.',
-  notOpenYet: 'A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.',
+  /**
+   * Com a compra fechada (SUBSCRIBE_OPEN), embaixo dos planos, quando os botões de assinar não aparecem (análise geral de 26/11/2026, D-129:
+   * sem falar de lançamento). Só para quem tem o acesso completo (antes do início da cobrança ou no teste); em só ver e exportar, a curta.
+   */
+  notOpenYet: 'Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.',
+  notOpenYetShort: 'Assinatura em breve.',
   /**
    * Na demonstração, no lugar de como pagar e dos botões (revisão de 26/11/2026, diretriz 3.1.1 da App Store: o app das lojas abre a
    * demonstração da web, que não pode levar a um pagamento fora da loja).
@@ -261,7 +278,7 @@ export const SUBSCRIPTION_SCREEN_TEXT = {
     cortesia: 'Nada a pagar',
     teste: 'Sem cartão e sem cobrança',
     leitura: 'Seus dados continuam aqui',
-    pre_lancamento: 'Antes do lançamento',
+    pre_lancamento: 'Sem cobrança por enquanto',
   } as Readonly<Record<AccessStatus, string>>,
   /** A assinatura no cartão cancelada, com o período pago ainda valendo (sem comemoração). */
   eyebrowCanceled: 'Assinatura cancelada',
@@ -286,6 +303,10 @@ export const SUBSCRIPTION_SCREEN_TEXT = {
   perMonth: ' por mês',
 } as const;
 
+/** Como cancelar a assinatura no cartão da web (D-129): na tela Assinatura, o botão vem logo abaixo; no card de Conta, por "Ver a assinatura". */
+const WEB_CANCEL_BELOW = 'Para cancelar, toque em Cancelar assinatura, logo abaixo.';
+const WEB_CANCEL_FROM_ACCOUNT = `Para cancelar, toque em ${ACCESS_TEXT.cardOpen} e depois em Cancelar assinatura.`;
+
 export interface AccessView {
   /** "Teste grátis", "Só ver e exportar", "Plano Individual"... */
   situation: string;
@@ -297,22 +318,40 @@ export interface AccessView {
 
 /**
  * O que a tela Assinatura e o card de Conta mostram para a situação. `now` e o fuso da pessoa dão as datas. `web`: a tela está na web
- * (só lá se fala em pagar com Pix; no app das lojas, nada aponta para pagamento fora da loja).
+ * (só lá se fala em pagar com Pix; no app das lojas, nada aponta para pagamento fora da loja). `webSubscription`: a assinatura no cartão
+ * da web, lida no Asaas (a de quem assina e, desde a D-129, a de quem assinou no teste grátis, com a primeira cobrança no fim do teste).
+ * `cancelBelow`: o botão "Cancelar assinatura" vem logo abaixo (a tela Assinatura); no card de Conta, o caminho passa por "Ver a assinatura".
  */
-export function accessView(access: Access, now: Date, timeZone: string, opts: { web?: boolean; webSubscription?: WebSubscriptionStatus | null } = {}): AccessView {
+export function accessView(
+  access: Access,
+  now: Date,
+  timeZone: string,
+  opts: { web?: boolean; webSubscription?: WebSubscriptionStatus | null; cancelBelow?: boolean } = {},
+): AccessView {
   const end = untilDay(access, timeZone);
   const date = end ? formatDateBR(end) : null;
   switch (access.status) {
     case 'pre_lancamento':
+      // Antes do início da cobrança (billing_settings.enforced_from, no banco): o teste de quem já usa conta a partir dessa data (my_access,
+      // migração 0047: o maior entre a criação da conta e o início da cobrança, mais TRIAL_DAYS). Sem falar de lançamento (D-129).
       return {
         situation: 'Acesso completo',
         body: date
-          ? `A partir de ${date}, a Clarevo passa a ser paga. Quem já usa ganha ${TRIAL_DAYS} dias grátis a contar dessa data. Até lá, o acesso é completo e sem cobrança.`
-          : `Até o lançamento, o acesso é completo e sem cobrança. Depois, a Clarevo passa a ser paga, com ${TRIAL_DAYS} dias grátis para começar.`,
+          ? `A partir de ${date}, a Clarevo passa a ser paga. Quem já usa ganha ${TRIAL_DAYS} dias grátis a contar dessa data. Até essa data, o acesso é completo e sem cobrança.`
+          : `Por enquanto, o acesso é completo e sem cobrança. Quando a Clarevo passar a ser paga, você terá ${TRIAL_DAYS} dias grátis antes de precisar assinar.`,
         showPlans: true,
       };
     case 'teste': {
       const days = trialDaysLeft(access, now, timeZone) ?? 0;
+      // Assinou no cartão, na web, durante o teste (D-129): a assinatura existe no Asaas, com a primeira cobrança no fim do teste, e o
+      // acesso continua no teste até lá. Sem os planos (como quem já assina): o cancelamento fica logo abaixo, na tela Assinatura.
+      if (opts.web && opts.webSubscription?.active && opts.webSubscription.nextDueDate) {
+        return {
+          situation: 'Teste grátis',
+          body: `O seu teste grátis ${trialEnds(days, end ?? todayIn(timeZone, now))}. A assinatura no cartão já está feita: a primeira cobrança é em ${formatDateBR(opts.webSubscription.nextDueDate)}, quando o teste grátis acaba. Até lá, nada é cobrado.`,
+          showPlans: false,
+        };
+      }
       return {
         situation: 'Teste grátis',
         body: `O seu teste grátis ${trialEnds(days, end ?? todayIn(timeZone, now))}. Depois, sem assinatura, a conta fica só para ver e exportar. Nada é cobrado sem você assinar.`,
@@ -348,8 +387,9 @@ export function accessView(access: Access, now: Date, timeZone: string, opts: { 
         const ws = opts.webSubscription;
         return {
           situation: subscribedSituation(access),
+          // D-129: o caminho do cancelamento dito com o nome do botão (na tela Assinatura, ele vem logo abaixo).
           body: ws.active
-            ? `${activeSubscription(access)}, renova em ${ws.nextDueDate ? formatDateBR(ws.nextDueDate) : (date ?? 'breve')}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`
+            ? `${activeSubscription(access)}, renova em ${ws.nextDueDate ? formatDateBR(ws.nextDueDate) : (date ?? 'breve')}. ${opts.cancelBelow ? WEB_CANCEL_BELOW : WEB_CANCEL_FROM_ACCOUNT}`
             : `Assinatura cancelada: o acesso completo continua${date ? ` até ${date}` : ' até o fim do período já pago'}, sem nova cobrança.`,
           showPlans: false,
         };

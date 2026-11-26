@@ -39,7 +39,7 @@ function paginaSobre({ valores, estado = { prazoDeResposta: '' } }) {
 <div class="grade">
 <article class="cartao">
 <h3>Clareza</h3>
-<p>Cada número do app vem com a explicação de onde sai. O que você recebeu, o que já pagou e o que ainda vai vencer ficam separados, e a diferença do mês nunca é apresentada como saldo.</p>
+<p>Cada número do app vem com a explicação de onde sai. O que você recebeu, o que já pagou e o que ainda vence ficam separados, e a diferença do mês nunca é apresentada como saldo.</p>
 </article>
 <article class="cartao">
 <h3>Sem anúncios</h3>

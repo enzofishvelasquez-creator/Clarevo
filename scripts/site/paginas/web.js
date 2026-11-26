@@ -12,12 +12,14 @@
  *     da web e das lojas (decisão do Enzo, 26/11/2026: o mesmo preço em todo lugar, sem desconto na web). Preço com número só nos cartões
  *     dos planos (o teste do site confere): aqui, o link para os planos.
  * A chamada principal segue o estado do produto (`estado.js`): "Assine aqui", para os planos antes do lançamento (que mostram "Em breve") e
- * para criar conta depois; a segunda é "Conheça o app". A demonstração fica só como link de texto discreto, logo abaixo das chamadas.
+ * para criar conta depois; a segunda é "Conheça o app". A demonstração fica só como link de texto discreto, logo abaixo das chamadas. Desde a
+ * análise geral de 26/11/2026 (D-129), embaixo das chamadas da capa e da chamada final, nos dois estados, "Já tem conta? Entrar no
+ * navegador" (a tela de entrar do app web).
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, icone, telaLarga } = require('../modelo');
-const { chamadas, linhaDaCapa, linkDaDemonstracao, noCelular, selosDasLojas } = require('../estado');
+const { chamadas, jaTemConta, linhaDaCapa, linkDaDemonstracao, noCelular, selosDasLojas } = require('../estado');
 
 const ARQUIVO = 'web.html';
 
@@ -47,8 +49,9 @@ function paginaWeb({ valores, img, estado }) {
 <p class="lead">No computador ou no celular, sem instalar nada. A mesma conta e os mesmos dados do app para celular, com a tela larga e o menu ao lado no computador.</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
+${jaTemConta()}
 ${linkDaDemonstracao()}
-${selosDasLojas(estado)}`;
+${selosDasLojas(estado, { pequenos: true })}`;
 
   const cartoes = vantagens()
     .map(
@@ -91,6 +94,7 @@ ${PAGAR.map((i) => `<li>${esc(i.replace('14 dias', `${dias} dias`))}</li>`).join
 <h2 id="comecar">Comece pelo navegador</h2>
 <p>${esc(`Abra a Clarevo no computador, anote os gastos de hoje e veja o mês tomar forma. ${noCelular(estado)}`)}</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
+${jaTemConta()}
 </div>`,
       { rotulo: 'comecar' },
     ),

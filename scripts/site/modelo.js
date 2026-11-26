@@ -1,7 +1,7 @@
 'use strict';
 /**
  * O modelo de página, num só lugar: cabeçalho com o logotipo oficial e o menu (no celular, um `<details>`, que funciona sem
- * JavaScript), "Pular para o conteúdo", rodapé com todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]", título,
+ * JavaScript), "Pular para o conteúdo", rodapé com todas as seções, as páginas legais e "Clarevo é a marca de [RAZÃO SOCIAL], CNPJ [CNPJ].", título,
  * descrição, Open Graph e dados estruturados. Com domínio em `site/dados-da-empresa.json`, a página ganha `canonical`, `og:url` e
  * `og:image` com endereço completo; sem domínio, não há nada disso (e nada de sitemap).
  */
@@ -34,13 +34,16 @@ function menuHtml(arquivo) {
   };
   const lista = MENU.map(item).join('');
   // A chamada do cabeçalho segue o estado do produto (D-125 e D-128): "Entrar", para a tela de entrar do app web, antes do lançamento;
-  // "Assine aqui", para a tela de criar conta, depois.
-  const { estadoEmVigor, chamadaDoMenu } = require('./estado');
-  const cta = chamadaDoMenu(estadoEmVigor());
+  // "Assine aqui", para a tela de criar conta, depois, com "Entrar" ao lado, como link de texto (D-129).
+  const { estadoEmVigor, chamadaDoMenu, entrarNoMenu } = require('./estado');
+  const estado = estadoEmVigor();
+  const cta = chamadaDoMenu(estado);
+  const entrar = entrarNoMenu(estado);
+  const link = (l, classe = '') => `<a${classe ? ` class="${classe}"` : ''} href="${esc(l.href)}" rel="noopener noreferrer">${esc(l.texto)}</a>`;
   return `<nav class="menu" aria-label="Principal">
 <ul class="menu-lista">${lista}</ul>
-<a class="menu-cta" href="${esc(cta.href)}" rel="noopener noreferrer">${esc(cta.texto)}</a>
-<details class="menu-movel"><summary>Menu</summary><ul>${lista}<li><a href="${esc(cta.href)}" rel="noopener noreferrer">${esc(cta.texto)}</a></li></ul></details>
+${entrar ? `${link(entrar, 'menu-entrar')}\n` : ''}${link(cta, 'menu-cta')}
+<details class="menu-movel"><summary>Menu</summary><ul>${lista}${entrar ? `<li>${link(entrar)}</li>` : ''}<li>${link(cta)}</li></ul></details>
 </nav>`;
 }
 
@@ -122,7 +125,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
       `<meta property="og:image" content="${esc(`https://${dominio}/og/clarevo.png`)}">`,
       '<meta property="og:image:width" content="1200">',
       '<meta property="og:image:height" content="630">',
-      '<meta property="og:image:alt" content="Clarevo: cuidar da vida financeira faz parte de cuidar de você, mais clareza para decidir, com a tela Resumo do app">',
+      '<meta property="og:image:alt" content="Clarevo: cuidar da vida financeira faz parte de cuidar de você. Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Com a tela Resumo do app, em dados fictícios">',
       '<meta name="twitter:card" content="summary_large_image">',
     );
   }

@@ -24,8 +24,17 @@ const { ESTADO_DO_PRODUTO, URL_APP, URL_CRIAR_CONTA, URL_DEMO, URL_ENTRAR } = re
 const { esc } = require('./texto');
 const { rel } = require('./util');
 
-/** Os endereços aceitos para cada loja: a página do app, nada de link encurtado nem de rastreamento. */
-const PREFIXO_DA_LOJA = { appStore: 'https://apps.apple.com/', googlePlay: 'https://play.google.com/' };
+/**
+ * Os endereços aceitos para cada loja: a página do app, nada de link encurtado nem de rastreamento. Na App Store, um endereço de
+ * `https://apps.apple.com/` sem parâmetro nem âncora; no Google Play, exatamente a página oficial do app, que sempre leva o identificador
+ * do pacote no parâmetro `id` (`https://play.google.com/store/apps/details?id=app.clarevo`, análise geral de 26/11/2026, D-129), e nenhum
+ * outro parâmetro nem âncora.
+ */
+const PREFIXO_DA_LOJA = { appStore: 'https://apps.apple.com/', googlePlay: 'https://play.google.com/store/apps/details?id=' };
+const ENDERECO_DA_LOJA = {
+  appStore: /^https:\/\/apps\.apple\.com\/[^?#\s]*$/,
+  googlePlay: /^https:\/\/play\.google\.com\/store\/apps\/details\?id=[A-Za-z0-9._]+$/,
+};
 
 /** A assinatura pelo app está aberta no núcleo (`SUBSCRIBE_OPEN` de `packages/core/src/plano.ts`, lido por `catalogo().PLANOS.aberta`)? */
 function assinaturaAbertaNoNucleo() {
@@ -50,8 +59,15 @@ function estadoDoProduto(sobrescrever = {}) {
   if (typeof estado.lancado !== 'boolean') throw new Error('estado do produto: "lancado" precisa ser true ou false (scripts/site/config.js)');
   for (const [loja, url] of Object.entries(lojas)) {
     if (!(loja in PREFIXO_DA_LOJA)) throw new Error(`estado do produto: a loja "${loja}" não existe (use appStore e googlePlay)`);
+    if (typeof url !== 'string') throw new Error(`estado do produto: o endereço de ${loja} é um texto (vazio até a publicação)`);
     if (url && !url.startsWith(PREFIXO_DA_LOJA[loja])) throw new Error(`estado do produto: o endereço de ${loja} precisa começar com ${PREFIXO_DA_LOJA[loja]}`);
-    if (/[?#]/.test(url)) throw new Error(`estado do produto: o endereço de ${loja} vai sem parâmetro nem âncora (nada de rastreamento)`);
+    if (url && !ENDERECO_DA_LOJA[loja].test(url)) {
+      throw new Error(
+        loja === 'googlePlay'
+          ? 'estado do produto: o endereço de googlePlay é a página do app, https://play.google.com/store/apps/details?id=<pacote>, sem outro parâmetro nem âncora (nada de rastreamento)'
+          : `estado do produto: o endereço de ${loja} vai sem parâmetro nem âncora (nada de rastreamento)`,
+      );
+    }
   }
   if (typeof estado.prazoDeResposta !== 'string') throw new Error('estado do produto: "prazoDeResposta" é um texto (vazio, nenhuma página promete prazo)');
   if (simularAssinaturaAberta !== undefined && typeof simularAssinaturaAberta !== 'boolean') throw new Error('estado do produto: "simularAssinaturaAberta" precisa ser true ou false');
@@ -181,6 +197,32 @@ function chamadas(arquivo, estado, { secundaria = null } = {}) {
 }
 
 /**
+ * A linha dos planos antes do lançamento (análise geral de 26/11/2026, D-129): "Assine aqui" leva aos planos (a seção Planos do início ou
+ * `planos.html`), e os planos dizem, à vista, por que ainda não há botão de assinar. Depois do lançamento, nada.
+ */
+function assinaturaEmBreve(estado) {
+  return estado.lancado ? '' : 'A assinatura abre em breve, na web e nas lojas.';
+}
+
+/**
+ * As chamadas da capa dos planos (`planos.html` e a página de cada plano, D-129): lançado, as de sempre ("Assine aqui", para criar conta, e
+ * "Conheça o app"), com a linha do teste; antes do lançamento, a linha de que a assinatura abre em breve e um caminho a seguir, "Conheça o
+ * app" (os planos são onde "Assine aqui" chega: não podem ser um beco sem saída).
+ */
+function chamadasDosPlanos(arquivo, estado) {
+  if (estado.lancado) return `${chamadas(arquivo, estado, { secundaria: 'app' })}\n<p class="estado-produto">${esc(linhaDaCapa(estado))}</p>`;
+  return `<p class="estado-produto">${esc(assinaturaEmBreve(estado))}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${rel(arquivo, SECUNDARIAS.app.pagina)}">${esc(SECUNDARIAS.app.texto)}</a>\n</div>`;
+}
+
+/**
+ * "Já tem conta? Entrar no navegador" (D-129), embaixo das chamadas de Use no navegador, nos dois estados: a tela de entrar do app web, de
+ * quem já tem conta (antes do lançamento, também no menu; lançado, o menu tem "Entrar" ao lado de "Assine aqui").
+ */
+function jaTemConta() {
+  return `<p class="ja-tem-conta">Já tem conta? <a href="${esc(URL_ENTRAR)}" rel="noopener noreferrer">Entrar no navegador</a></p>`;
+}
+
+/**
  * A demonstração (dados fictícios), só como link de texto discreto (D-128), e só em O app e em Use no navegador. Igual nos dois estados: a
  * demonstração abre sem conta e não grava nada fora do aparelho.
  */
@@ -190,11 +232,16 @@ function linkDaDemonstracao() {
 
 /**
  * A chamada do cabeçalho: antes do lançamento, "Entrar", que leva à tela de entrar do app web (até 26/11/2026, "Entrar (quem testa)"; D-128);
- * depois, "Assine aqui", para a tela de criar conta, como a chamada principal das páginas. Nunca a tela inicial do app web antes do
- * lançamento: ela começa com "14 dias grátis, sem cartão" e "Criar conta" (D-064).
+ * depois, "Assine aqui", para a tela de criar conta, como a chamada principal das páginas, e, ao lado, "Entrar" como link de texto (análise
+ * geral de 26/11/2026, D-129: lançado, não havia como entrar pelo site). Nunca a tela inicial do app web antes do lançamento: ela começa com
+ * "14 dias grátis, sem cartão" e "Criar conta" (D-064).
  */
 function chamadaDoMenu(estado) {
   return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Assine aqui' } : { href: URL_ENTRAR, texto: 'Entrar' };
+}
+/** O link de texto "Entrar" ao lado de "Assine aqui", no cabeçalho do site lançado (D-129); antes do lançamento, nada (o botão já é "Entrar"). */
+function entrarNoMenu(estado) {
+  return estado.lancado ? { href: URL_ENTRAR, texto: 'Entrar' } : null;
 }
 
 /**
@@ -218,12 +265,15 @@ function appParaUsar(estado) {
 /**
  * Os selos das lojas (só depois do lançamento e só com o endereço de cada uma): links de texto em pílula, com o nome oficial em
  * português ("Baixar na App Store", "Disponível no Google Play"), sem imagem de terceiros (a política de segurança só aceita arquivos do
- * próprio site). Sem endereço nenhum, nada aparece.
+ * próprio site). Sem endereço nenhum, nada aparece. `pequenos` (as capas, D-129): numa linha pequena de texto, "No celular:" e os links, e
+ * não pílulas, para a capa ter no máximo dois botões ("Assine aqui" e a secundária).
  */
-function selosDasLojas(estado) {
+function selosDasLojas(estado, { pequenos = false } = {}) {
   const lojas = lojasPublicadas(estado);
   if (!lojas.length) return '';
-  return `<p class="selos-lojas">${lojas.map((l) => `<a class="selo-loja" href="${esc(l.url)}" rel="noopener noreferrer">${esc(l.texto)}</a>`).join('\n')}</p>`;
+  const links = lojas.map((l) => `<a class="selo-loja" href="${esc(l.url)}" rel="noopener noreferrer">${esc(l.texto)}</a>`);
+  if (pequenos) return `<p class="selos-lojas selos-pequenos">No celular: ${links.join('<span aria-hidden="true"> · </span>')}</p>`;
+  return `<p class="selos-lojas">${links.join('\n')}</p>`;
 }
 
 /** Os sistemas em que a Clarevo funciona hoje, para os dados estruturados (SoftwareApplication). */
@@ -245,8 +295,12 @@ module.exports = {
   emBreveNoTitulo,
   assineAqui,
   chamadas,
+  assinaturaEmBreve,
+  chamadasDosPlanos,
+  jaTemConta,
   linkDaDemonstracao,
   chamadaDoMenu,
+  entrarNoMenu,
   linkDaVersaoWeb,
   appParaUsar,
   selosDasLojas,

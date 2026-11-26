@@ -134,7 +134,7 @@ const RECURSOS = [
     imagem: 'negocio',
     itens: [
       'Categorias próprias do negócio, como "Vendas", "Serviços", "Material e mercadoria", "Taxas e maquininha" e "Impostos e DAS".',
-      'Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
+      'Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, e as maiores saídas.',
       'A Retirada para o Pessoal leva dinheiro do negócio para casa: sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
       'Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
     ],
@@ -218,7 +218,7 @@ ${figura}
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
 ${linkDaDemonstracao()}
-${estado.lancado ? selosDasLojas(estado) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
+${estado.lancado ? selosDasLojas(estado, { pequenos: true }) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
 ${faixaDeConfianca(ARQUIVO)}`;
   const lojas = lojasPublicadas(estado);
   const noCelular = estado.lancado && lojas.length
@@ -228,7 +228,7 @@ ${faixaDeConfianca(ARQUIVO)}`;
 ${selosDasLojas(estado)}
 </article>`
     : `<article class="cartao">
-<h3>No celular, em breve</h3>
+<h3>No celular</h3>
 <p><span class="etiqueta">Em breve</span> O app para iPhone e Android será publicado na App Store e no Google Play. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
 </article>`;
 
@@ -243,14 +243,14 @@ ${selosDasLojas(estado)}
 ${noCelular}
 <article class="cartao">
 <h3>Painel da empresa, só na web</h3>
-<p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
+<p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja como funciona para empresas</a>.</p>
 </article>
 </div>`,
       { rotulo: 'onde' },
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. As telas e os vídeos usam dados fictícios. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
 <div class="recursos">
 ${linhas}
 </div>`,

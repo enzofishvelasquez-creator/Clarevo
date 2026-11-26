@@ -115,10 +115,12 @@ main:focus{outline:none}
 .menu-movel[open] summary::after{transform:translateY(2px) rotate(-135deg)}
 .menu-movel ul{list-style:none;margin:.5rem 0 0;padding:.5rem;position:absolute;right:0;top:100%;width:min(18rem,calc(100vw - 32px));background:var(--topo);border:2px solid var(--sobre-topo);border-radius:16px;box-shadow:0 18px 40px rgba(6,16,64,.35)}
 .menu-movel li a{display:flex;width:100%}
-.menu .menu-cta{display:none}
+/* No site lançado (D-129), "Entrar" fica ao lado de "Assine aqui", como link de texto; no celular, os dois estão dentro do menu. */
+.menu .menu-cta,.menu .menu-entrar{display:none}
 @media (min-width:70rem){
   .menu-lista{display:flex}
   .menu-movel{display:none}
+  .menu .menu-entrar{display:inline-flex}
   .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none}
   .menu .menu-cta:hover{text-decoration:underline}
 }
@@ -728,6 +730,11 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .selos-lojas{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0 0}
 .selo-loja{display:inline-flex;align-items:center;min-height:44px;padding:0 1.1rem;border-radius:12px;background:var(--aparelho);color:#FFFFFF!important;border:1px solid #3A4A86;font-weight:800;text-decoration:none}
 .selo-loja:hover{text-decoration:underline;text-underline-offset:.2em}
+/* Nas capas (D-129), os selos numa linha pequena de texto, embaixo da linha do teste: a capa fica com no máximo dois botões. */
+.selos-pequenos{align-items:center;gap:0 .35rem;margin-top:.25rem;color:var(--sobre-topo-suave);font-size:.9375rem;font-weight:700}
+.selos-pequenos .selo-loja{min-height:44px;padding:0;border:0;border-radius:0;background:none;color:var(--sobre-topo)!important;font-weight:800;text-decoration:underline;text-underline-offset:.2em}
+/* A linha dos planos antes do lançamento (D-129), na seção Planos do início, à vista: por que ainda não há botão de assinar. */
+.aviso-assinatura{margin:-.75rem 0 1.5rem;font-weight:800;color:var(--texto)}
 .etiqueta-capa{vertical-align:middle;margin-left:.35rem}
 /* A fita "Em breve" dos cartões de plano (D-128), só antes do lançamento: uma faixa vermelha fina na diagonal do canto de cima, à direita,
    longe do nome e do preço, com o texto branco (5,6:1) nos dois temas. É só desenho (`aria-hidden`): o "em breve" também está no título do

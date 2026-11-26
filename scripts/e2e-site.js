@@ -1108,9 +1108,13 @@ function varrerPagina() {
             anualNaCapa: (document.querySelector('.capa .preco-capa-anual')?.textContent || '').replace(/\u00a0/g, ' '),
             titular: /titular/i.test(texto), convite: /Convite por link/.test(texto), umaPessoa: /Para uma pessoa: a assinatura é sua\./.test(texto),
             negocio: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(texto), compartilha: /compartilh/i.test(texto),
-            notOpen: /A assinatura pelo app abre no lançamento\. Até lá, nada é cobrado\./.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
+            notOpen: /abre no lançamento|Até lá, nada é cobrado|Assinatura em breve\. Por enquanto/.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
             links: [...document.querySelectorAll('#inclui ~ .grupos-recursos a')].map((a) => a.href),
-            fim: [...document.querySelectorAll('main .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+            fim: [...document.querySelectorAll('main > section.bloco .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+            // D-129: a capa nunca é beco sem saída: antes do lançamento, a linha da assinatura em breve e "Conheça o app".
+            capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+            avisoNaCapa: document.querySelector('.capa .estado-produto')?.textContent || null,
+            telegram: [...document.querySelectorAll('.recurso-cartao')].find((c) => c.querySelector('h4')?.textContent === 'Anotar pelo Telegram')?.querySelector('.recurso-onde')?.textContent || null,
           };
         });
         const quebrados = [];
@@ -1126,10 +1130,14 @@ function varrerPagina() {
           pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
+        ok(`planos (D-129): antes do lançamento, a capa do plano ${nome} diz à vista "A assinatura abre em breve, na web e nas lojas." e leva a "Conheça o app"; ${familiaPg ? 'o Telegram anota no Pessoal ou na Família em que a pessoa anota' : 'sem etiqueta de onde vale'}`,
+          pg.avisoNaCapa === 'A assinatura abre em breve, na web e nas lojas.' && JSON.stringify(pg.capa) === JSON.stringify([['Conheça o app', '../app/index.html']]) &&
+            pg.telegram === (familiaPg ? 'No seu Pessoal ou na Família em que você anota.' : null),
+          JSON.stringify({ capa: pg.capa, aviso: pg.avisoNaCapa, telegram: pg.telegram }));
         const outroHref = familiaPg ? 'individual.html' : 'familia.html';
         ok(`planos: no fim da página do plano ${nome}, "Ver o plano ${outro}" e "Comparar os planos"`, JSON.stringify(pg.fim) === JSON.stringify([[`Ver o plano ${outro}`, outroHref], ['Comparar os planos', '../planos.html']]), JSON.stringify(pg.fim));
       }
-      await p.click('main .acoes a:text-is("Comparar os planos")');
+      await p.click('main > section.bloco .acoes a:text-is("Comparar os planos")');
       await p.waitForURL(/\/planos(\.html)?$/);
       ok('planos: "Comparar os planos" volta ao resumo', (await p.textContent('h1')) === 'Planos da Clarevo');
       const largas = [];
@@ -1655,6 +1663,11 @@ function varrerPagina() {
               capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
               botoesPorBloco: [...document.querySelectorAll('.acoes')].map((b) => b.querySelectorAll('a.botao').length),
               menu: [document.querySelector('.menu-cta')?.textContent, document.querySelector('.menu-cta')?.getAttribute('href')],
+              // D-129: lançado, "Entrar" como link de texto ao lado de "Assine aqui"; "Segurança" fora do menu.
+              entrar: [document.querySelector('.menu-entrar')?.textContent ?? null, document.querySelector('.menu-entrar')?.getAttribute('href') ?? null],
+              seguranca: [...document.querySelectorAll('.menu-lista a')].some((a) => a.textContent === 'Segurança'),
+              jaTemConta: [...document.querySelectorAll('.ja-tem-conta a')].map((a) => [a.textContent, a.getAttribute('href')]),
+              avisoDaAssinatura: [...document.querySelectorAll('.capa .estado-produto, .aviso-assinatura')].map((e) => e.textContent).filter((t) => t === 'A assinatura abre em breve, na web e nas lojas.').length,
               // O plano anual existe desde a D-127 (o preço por ano nos planos); o Plus continua fora do site.
               plus: /Clarevo Plus/i.test(main),
               anual: /R\$ ?[\d.,]+ por ano/.test(main),
@@ -1704,6 +1717,22 @@ function varrerPagina() {
           await q.goto(`${base}/app/`);
           await Promise.all([q.waitForURL(noApp), q.click(`#onde ~ .grade a:text-is("${textoDoLink}")`)]);
           chegou['O app, onde usar'] = [q.url(), await q.title()];
+          // D-129: "Já tem conta? Entrar no navegador", embaixo das chamadas de Use no navegador, nos dois estados.
+          await q.goto(`${base}/web`);
+          await Promise.all([q.waitForURL(noApp), q.click('.capa .ja-tem-conta a')]);
+          chegou['Use no navegador, já tem conta'] = [q.url(), await q.title()];
+          if (assineNoApp) {
+            // Lançado (D-129): "Entrar" ao lado de "Assine aqui" no cabeçalho e no menu do celular.
+            await q.setViewportSize({ width: 1280, height: 900 });
+            await q.goto(`${base}/`);
+            await Promise.all([q.waitForURL(noApp), q.click('.menu-entrar')]);
+            chegou['Entrar do cabeçalho'] = [q.url(), await q.title()];
+            await q.setViewportSize({ width: 390, height: 900 });
+            await q.goto(`${base}/planos`);
+            await q.click('details.menu-movel > summary');
+            await Promise.all([q.waitForURL(noApp), q.click('details.menu-movel li:nth-last-child(2) a')]);
+            chegou['Entrar do menu do celular'] = [q.url(), await q.title()];
+          }
           if (assineNoApp) {
             for (const c of ['', 'app/', 'web', 'mei']) {
               await q.goto(`${base}/${c}`);
@@ -1723,7 +1752,13 @@ function varrerPagina() {
       const pre = await lerEstado(p, origem);
       const v = Object.values(pre);
       ok('estado do produto, antes do lançamento: nenhuma página fala de fase de testes, piloto, "quem testa", "Preços no lançamento" nem "abre no lançamento" (D-128); nenhuma convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; o menu diz "Entrar" e aponta para a tela de entrar; nada do Plus',
-        v.every((x) => semFaseDeTestes(x) && x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && x.menu[0] === 'Entrar' && x.menu[1] === `${URL_APP}/entrar` && x.botoesPorBloco.every((n) => n <= 2)), JSON.stringify(pre));
+        v.every((x) => semFaseDeTestes(x) && x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && x.menu[0] === 'Entrar' && x.menu[1] === `${URL_APP}/entrar` && x.entrar[0] === null && !x.seguranca && x.botoesPorBloco.every((n) => n <= 2)), JSON.stringify(pre));
+      ok('estado do produto, antes do lançamento (D-129): os planos nunca são beco sem saída: "A assinatura abre em breve, na web e nas lojas." à vista na seção Planos do início, em planos.html e na capa de cada plano, que leva a "Conheça o app"; Use no navegador diz "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
+        pre['início'].avisoDaAssinatura === 1 && ['planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].avisoDaAssinatura === 1) &&
+          JSON.stringify(pre.planos.capa) === JSON.stringify([['Conheça o app', 'app/index.html']]) &&
+          JSON.stringify(pre['planos/familia'].capa) === JSON.stringify([['Conheça o app', '../app/index.html']]) &&
+          JSON.stringify(pre.web.jaTemConta) === JSON.stringify([['Entrar no navegador', `${URL_APP}/entrar`], ['Entrar no navegador', `${URL_APP}/entrar`]]),
+        JSON.stringify(Object.fromEntries(['início', 'planos', 'planos/individual', 'planos/familia', 'web'].map((c) => [c, [pre[c].avisoDaAssinatura, pre[c].capa, pre[c].jaTemConta]]))));
       ok('estado do produto, antes do lançamento: "Assine aqui" é a chamada principal das capas (para os planos: a seção Planos no início, planos.html nas outras), com "Conheça o app" ou "Use no navegador" ao lado, e a demonstração só como link de texto em O app e em Use no navegador',
         JSON.stringify(pre['início'].capa) === JSON.stringify([['Assine aqui', '#planos'], ['Conheça o app', 'app/index.html']]) &&
         JSON.stringify(pre.comece.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
@@ -1750,14 +1785,16 @@ function varrerPagina() {
       // Antes do lançamento, os cliques do menu e de O app levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
       const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web');
       const destinosPre = Object.values(seguidosPre.chegou);
-      ok('estado do produto, antes do lançamento: o botão "Entrar" do menu (no computador e no celular) e o link "Entrar na versão web" de O app, clicados, chegam à tela de entrar do app web, e nada sai para a rede',
-        destinosPre.length === 4 && destinosPre.every(([url, titulo]) => url === `${URL_APP}/entrar` && titulo === 'App falso do teste') &&
-          seguidosPre.aoApp.length === 4 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar`) && seguidosPre.recusados.length === 0,
+      ok('estado do produto, antes do lançamento: o botão "Entrar" do menu (no computador e no celular), o link "Entrar na versão web" de O app e "Entrar no navegador" de Use no navegador (D-129), clicados, chegam à tela de entrar do app web, e nada sai para a rede',
+        destinosPre.length === 5 && destinosPre.every(([url, titulo]) => url === `${URL_APP}/entrar` && titulo === 'App falso do teste') &&
+          seguidosPre.aoApp.length === 5 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar`) && seguidosPre.recusados.length === 0,
         JSON.stringify(seguidosPre));
-      // O site lançado, gerado à parte com --estado (só a App Store com endereço, para conferir que o selo do Google não aparece sem o dele).
-      // Com a assinatura do núcleo ainda fechada (SUBSCRIBE_OPEN), o gerador recusa "lancado": true sozinho; o teste simula a assinatura aberta
-      // (simularAssinaturaAberta, que só o --estado aceita e que o --final recusa).
+      // O site lançado, gerado à parte com --estado, com as duas lojas: desde a D-129, o endereço do Google Play é o oficial, com o pacote em
+      // `?id=` (o teste do núcleo confere que, sem o endereço de uma loja, o selo dela não aparece). Com a assinatura do núcleo ainda fechada
+      // (SUBSCRIBE_OPEN), o gerador recusa "lancado": true sozinho; o teste simula a assinatura aberta (simularAssinaturaAberta, que só o
+      // --estado aceita e que o --final recusa).
       const APP_STORE = 'https://apps.apple.com/br/app/clarevo/id0000000000';
+      const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=app.clarevo';
       const gerarLancado = (nome, estado) => {
         const arquivo = path.join(dir, `${nome}.json`);
         fs.writeFileSync(arquivo, JSON.stringify(estado));
@@ -1770,8 +1807,11 @@ function varrerPagina() {
           recusado.stderr.slice(-400));
       }
       const saidaLancada = path.join(dir, 'site-lancado');
-      const g = gerarLancado('site-lancado', { lancado: true, lojas: { appStore: APP_STORE }, simularAssinaturaAberta: true });
-      ok('estado do produto: o gerador aceita --estado e grava o site lançado', g.status === 0, g.stderr.slice(-400));
+      const g = gerarLancado('site-lancado', { lancado: true, lojas: { appStore: APP_STORE, googlePlay: GOOGLE_PLAY }, simularAssinaturaAberta: true });
+      ok('estado do produto: o gerador aceita --estado e grava o site lançado, com o endereço oficial do Google Play (details?id=, D-129)', g.status === 0, g.stderr.slice(-400));
+      const comParametro = gerarLancado('site-lancado-parametro', { lancado: true, lojas: { googlePlay: `${GOOGLE_PLAY}&utm_source=site` }, simularAssinaturaAberta: true });
+      ok('estado do produto (D-129): o gerador recusa o Google Play com outro parâmetro (rastreamento) e não grava nada',
+        comParametro.status === 1 && /googlePlay é a página do app/.test(comParametro.stderr) && !fs.existsSync(path.join(dir, 'site-lancado-parametro')), comParametro.stderr.slice(-300));
       const lancado = await servir(saidaLancada, { hostDoSite: true });
       const outro = await navegador.newContext({ viewport: { width: 390, height: 900 }, locale: 'pt-BR' });
       try {
@@ -1781,24 +1821,60 @@ function varrerPagina() {
         q.on('pageerror', (e) => erros.push(e.message));
         const pos = await lerEstado(q, lancado.url);
         const w = Object.values(pos);
-        ok('estado do produto, lançado: nenhuma página fala de fase de testes, piloto, "quem testa", "em breve", "abre no lançamento" nem "Preços no lançamento" (inclusive o kit de imprensa), e a fita some; o menu diz "Assine aqui" e aponta para a tela de criar conta',
-          w.every((x) => semFaseDeTestes(x) && !x.breve && x.fita === 0 && x.menu[0] === 'Assine aqui' && x.menu[1] === CRIAR && x.botoesPorBloco.every((n) => n <= 2)) && demoCerta(pos) && erros.length === 0, JSON.stringify({ pos, erros }));
+        ok('estado do produto, lançado: nenhuma página fala de fase de testes, piloto, "quem testa", "em breve", "abre no lançamento" nem "Preços no lançamento" (inclusive o kit de imprensa), e a fita some; o menu diz "Assine aqui" e aponta para a tela de criar conta, com "Entrar" ao lado (D-129), sem "Segurança"',
+          w.every((x) => semFaseDeTestes(x) && !x.breve && x.fita === 0 && x.menu[0] === 'Assine aqui' && x.menu[1] === CRIAR && x.entrar[0] === 'Entrar' && x.entrar[1] === `${URL_APP}/entrar` && !x.seguranca && x.avisoDaAssinatura === 0 && x.botoesPorBloco.every((n) => n <= 2)) && demoCerta(pos) && erros.length === 0, JSON.stringify({ pos, erros }));
+        ok('estado do produto, lançado (D-129): planos.html e a capa de cada plano com "Assine aqui" (criar conta) e "Conheça o app"; Use no navegador com "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
+          JSON.stringify(pos.planos.capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
+            JSON.stringify(pos['planos/individual'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
+            JSON.stringify(pos['planos/familia'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
+            JSON.stringify(pos.web.jaTemConta) === JSON.stringify([['Entrar no navegador', `${URL_APP}/entrar`], ['Entrar no navegador', `${URL_APP}/entrar`]]),
+          JSON.stringify({ planos: pos.planos.capa, individual: pos['planos/individual'].capa, web: pos.web.jaTemConta }));
         // Lançado, os cliques do menu e de "Assine aqui" levam à tela de criar conta, e o link de O app, à tela inicial do app web.
         const seguidosPos = await seguirBotoes(lancado.url, 'Abrir a versão web', { assineNoApp: true });
         const destinosPos = Object.entries(seguidosPos.chegou);
-        ok('estado do produto, lançado: o botão do menu (no computador e no celular) e "Assine aqui" das capas do início, de O app, de Use no navegador e do MEI, clicados, chegam à tela de criar conta; "Abrir a versão web" de O app, à tela inicial do app web; nada sai para a rede',
-          destinosPos.length === 8 && destinosPos.every(([onde, [url, titulo]]) => titulo === 'App falso do teste' && url === (onde === 'O app, onde usar' ? `${URL_APP}/` : CRIAR)) &&
+        const paraEntrar = ['Use no navegador, já tem conta', 'Entrar do cabeçalho', 'Entrar do menu do celular'];
+        ok('estado do produto, lançado: o botão do menu (no computador e no celular) e "Assine aqui" das capas do início, de O app, de Use no navegador e do MEI, clicados, chegam à tela de criar conta; "Abrir a versão web" de O app, à tela inicial do app web; "Entrar" do cabeçalho e do menu do celular e "Entrar no navegador" (D-129), à tela de entrar; nada sai para a rede',
+          destinosPos.length === 11 && destinosPos.every(([onde, [url, titulo]]) => titulo === 'App falso do teste' && url === (onde === 'O app, onde usar' ? `${URL_APP}/` : paraEntrar.includes(onde) ? `${URL_APP}/entrar` : CRIAR)) &&
             seguidosPos.recusados.length === 0,
           JSON.stringify(seguidosPos));
-        ok('estado do produto, lançado: a capa do início e a do MEI com "Assine aqui" (criar conta) e "Conheça o app", e o selo só da App Store, que tem endereço',
+        // D-129: os selos das duas lojas (o Google Play com o endereço oficial, `?id=`) numa linha pequena de texto embaixo da capa, e nunca
+        // como um terceiro botão: a capa tem no máximo dois.
+        const selos = [['Baixar na App Store', APP_STORE], ['Disponível no Google Play', GOOGLE_PLAY]];
+        await q.setViewportSize({ width: 1280, height: 900 });
+        await q.goto(`${lancado.url}/`);
+        const capaLancada = await q.evaluate(() => {
+          const linha = document.querySelector('.capa .selos-pequenos');
+          const acoes = document.querySelector('.capa .acoes').getBoundingClientRect();
+          const botoes = [...document.querySelectorAll('.capa .acoes a.botao')].map((a) => a.getBoundingClientRect().height);
+          return { texto: linha?.textContent ?? null, embaixo: linha ? linha.getBoundingClientRect().top >= acoes.bottom : false, alturaDoSelo: Math.round(document.querySelector('.capa .selo-loja').getBoundingClientRect().height), botoes: botoes.length, alturaDoBotao: Math.round(botoes[0] ?? 0), fundo: getComputedStyle(document.querySelector('.capa .selo-loja')).backgroundColor };
+        });
+        await q.setViewportSize({ width: 390, height: 900 });
+        ok('estado do produto, lançado: a capa do início e a do MEI com "Assine aqui" (criar conta) e "Conheça o app" e os selos das duas lojas (D-129: o Google Play com details?id=) numa linha pequena de texto embaixo, sem terceiro botão',
           JSON.stringify(pos['início'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
           JSON.stringify(pos.mei.capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
           JSON.stringify(pos['app/'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Use no navegador', '../web.html']]) &&
-          JSON.stringify(pos['início'].selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]) && JSON.stringify(pos.comece.selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]),
-          JSON.stringify({ inicio: pos['início'], mei: pos.mei.capa, comece: pos.comece.selos }));
+          JSON.stringify(pos['início'].selos) === JSON.stringify(selos) && JSON.stringify(pos.comece.selos) === JSON.stringify(selos) &&
+          capaLancada.texto === 'No celular: Baixar na App Store · Disponível no Google Play' && capaLancada.embaixo && capaLancada.botoes === 2 && /rgba\(0, 0, 0, 0\)|transparent/.test(capaLancada.fundo),
+          JSON.stringify({ inicio: pos['início'].capa, selos: pos['início'].selos, mei: pos.mei.capa, comece: pos.comece.selos, capaLancada }));
         await q.goto(`${lancado.url}/`);
         const fim = await q.textContent('.chamada-final p');
-        ok('estado do produto, lançado: a chamada final do início diz que a Clarevo está aberta, na web e na App Store, com o teste grátis', fim.endsWith('A Clarevo está aberta para todas as pessoas na web e na App Store. Toda conta começa com 14 dias grátis, sem cartão.'), fim);
+        ok('estado do produto, lançado: a chamada final do início diz que a Clarevo está aberta, na web, na App Store e no Google Play, com o teste grátis', fim.endsWith('A Clarevo está aberta para todas as pessoas na web, na App Store e no Google Play. Toda conta começa com 14 dias grátis, sem cartão.'), fim);
+        // D-129: lançado, o cabeçalho ("Entrar" ao lado de "Assine aqui", sem "Segurança") continua numa linha a 1120 e 1440 px.
+        const cabecalhos = [];
+        for (const largura of [1120, 1440]) {
+          await q.setViewportSize({ width: largura, height: 900 });
+          await q.goto(`${lancado.url}/`);
+          cabecalhos.push(await q.evaluate((l) => {
+            const marca = document.querySelector('.marca').getBoundingClientRect();
+            const menu = document.querySelector('.menu-lista').getBoundingClientRect();
+            const entrar = document.querySelector('.menu-entrar').getBoundingClientRect();
+            const cta = document.querySelector('.menu-cta').getBoundingClientRect();
+            return { largura: l, topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), folga: Math.round(menu.left - marca.right), mesmaLinha: Math.abs(entrar.top + entrar.height / 2 - (cta.top + cta.height / 2)) < 4 && Math.abs(menu.top + menu.height / 2 - (cta.top + cta.height / 2)) < 6, entrarAntes: entrar.right <= cta.left, largo: document.documentElement.scrollWidth > window.innerWidth + 1 };
+          }, largura));
+        }
+        await q.setViewportSize({ width: 390, height: 900 });
+        ok('estado do produto, lançado (D-129): o cabeçalho com "Entrar" ao lado de "Assine aqui" continua numa linha a 1120 e 1440 px, com folga entre o logotipo e o menu, e nada passa da largura',
+          cabecalhos.every((c) => c.topo <= 80 && c.folga >= 16 && c.mesmaLinha && c.entrarAntes && !c.largo), JSON.stringify(cabecalhos));
         const largas = [];
         for (const largura of [320, 1280]) {
           await q.setViewportSize({ width: largura, height: 900 });
@@ -1838,7 +1914,7 @@ function varrerPagina() {
         inicio.h1 === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.primeiro === 'H1' && inicio.assinatura === 0 &&
         inicio.lead.startsWith('Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.') &&
         JSON.stringify(inicio.tipos) === JSON.stringify(['Organization', 'SoftwareApplication', 'FAQPage']) &&
-        JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Na web', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda', 'Segurança']) && inicio.rodapeMei === 'Por conta e MEI' && inicio.rodapeWeb === 'Use no navegador' &&
+        JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Na web', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda']) && inicio.rodapeMei === 'Por conta e MEI' && inicio.rodapeWeb === 'Use no navegador' &&
         inicio.perguntas.length === 6 && inicio.perguntas.every(([, aberta]) => !aberta), JSON.stringify(inicio));
       // As perguntas abrem pelo teclado (foco no resumo e Enter), uma por vez.
       await p.locator('#pergunta-banco > summary').focus();

@@ -83,7 +83,9 @@ const DOCUMENTOS_DO_PACOTE = ['resumo-para-advogado.md', 'pendencias-do-lancamen
 /**
  * O menu principal (cabeçalho). `pasta` marca a seção quando a página é uma das filhas dela. Desde 25/11/2026 (D-125): "Planos" e "Para MEI"
  * no menu (as três portas: pessoas e famílias, quem trabalha por conta e MEI, empresas); "Início" saiu (o logotipo leva ao início) e
- * "Novidades" ficou no rodapé, para o menu caber numa linha a partir de 70 rem.
+ * "Novidades" ficou no rodapé, para o menu caber numa linha a partir de 70 rem. Desde 26/11/2026 (D-129), "Segurança" também saiu do menu:
+ * o site lançado tem "Entrar" ao lado de "Assine aqui", e o cabeçalho continua numa linha a 1120 px. Segurança e privacidade continua na
+ * faixa de confiança das capas (início e O app) e no rodapé.
  */
 const MENU = [
   { arquivo: 'app/index.html', rotulo: 'O app', pasta: 'app' },
@@ -95,7 +97,6 @@ const MENU = [
   { arquivo: 'aprender/index.html', rotulo: 'Aprender', pasta: 'aprender' },
   { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras', pasta: 'calculadoras' },
   { arquivo: 'ajuda/index.html', rotulo: 'Ajuda', pasta: 'ajuda' },
-  { arquivo: 'seguranca.html', rotulo: 'Segurança', pasta: null },
 ];
 /** O rodapé: todas as seções, as páginas legais e o contato. */
 const RODAPE_COLUNAS = [
@@ -139,7 +140,8 @@ const RODAPE_COLUNAS = [
     ],
   },
 ];
-const RODAPE_LEGAL = '[RAZÃO SOCIAL] · CNPJ [CNPJ]';
+/** A linha legal do rodapé (D-129): a marca e a empresa dona dela, com o CNPJ (o endereço continua em Sobre e em Suporte). */
+const RODAPE_LEGAL = 'Clarevo é a marca de [RAZÃO SOCIAL], CNPJ [CNPJ].';
 
 /** Autoria dos posts. */
 const AUTORIA_PADRAO = 'Equipe Clarevo';

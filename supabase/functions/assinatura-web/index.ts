@@ -12,7 +12,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TransientError = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.TransientError = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
     exports.paymentsLookbackMonths = paymentsLookbackMonths;
     exports.periodOfCycle = periodOfCycle;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
@@ -24,6 +24,8 @@ const __mods = [
     exports.pixPaidOn = pixPaidOn;
     exports.periodEnd = periodEnd;
     exports.endOfDayBrasilia = endOfDayBrasilia;
+    exports.startOfDayBrasilia = startOfDayBrasilia;
+    exports.scheduledFirstCharge = scheduledFirstCharge;
     exports.webValidity = webValidity;
     exports.parseAsaasDate = parseAsaasDate;
     exports.asaasEventFrom = asaasEventFrom;
@@ -38,6 +40,7 @@ const __mods = [
     const servidor_comum_1 = __req(3);
     const sha256_1 = __req(4);
     const pix_1 = __req(5);
+    const primeira_cobranca_1 = __req(6);
     exports.ASAAS_PRODUCTION_URL = 'https://api.asaas.com/v3';
     exports.ASAAS_SANDBOX_URL = 'https://api-sandbox.asaas.com/v3';
     exports.ASAAS_KEY_PRODUCTION = '$aact_prod_';
@@ -158,6 +161,22 @@ const __mods = [
     function endOfDayBrasilia(day) {
         return new Date(`${day}T23:59:59.999${ASAAS_OFFSET}`);
     }
+    function startOfDayBrasilia(day) {
+        return new Date(`${day}T00:00:00.000${ASAAS_OFFSET}`);
+    }
+    exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = 31;
+    function scheduledFirstCharge(sub, payments, now) {
+        if (sub.status !== 'ACTIVE' || sub.deleted)
+            return null;
+        const live = payments.filter((p) => !p.deleted);
+        if (live.length === 0 || live.some((p) => p.status !== 'PENDING'))
+            return null;
+        const due = live.map((p) => p.dueDate).filter((d) => d !== null).sort()[0];
+        if (!due)
+            return null;
+        const today = (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now);
+        return due > today && due <= (0, dates_1.addDays)(today, exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS) ? due : null;
+    }
     function webValidity(sub, payments, now) {
         let paidThrough = null;
         for (const p of payments) {
@@ -167,10 +186,14 @@ const __mods = [
             if (!paidThrough || end > paidThrough)
                 paidThrough = end;
         }
-        if (!paidThrough)
-            return { paidThrough: null, validUntil: now };
+        if (!paidThrough) {
+            const first = scheduledFirstCharge(sub, payments, now);
+            if (first)
+                return { paidThrough: null, validFrom: startOfDayBrasilia(first), validUntil: endOfDayBrasilia((0, dates_1.addDays)(first, exports.WEB_GRACE_DAYS)) };
+            return { paidThrough: null, validFrom: null, validUntil: now };
+        }
         const grace = sub.status === 'ACTIVE' && !sub.deleted ? exports.WEB_GRACE_DAYS : 0;
-        return { paidThrough, validUntil: endOfDayBrasilia((0, dates_1.addDays)(paidThrough, grace)) };
+        return { paidThrough, validFrom: null, validUntil: endOfDayBrasilia((0, dates_1.addDays)(paidThrough, grace)) };
     }
     function parseAsaasDate(v) {
         if (typeof v !== 'string')
@@ -266,7 +289,7 @@ const __mods = [
             },
         };
     }
-    function checkoutRequest(personId, plan, appUrl, today, period = 'mensal') {
+    function checkoutRequest(personId, plan, appUrl, firstDue, period = 'mensal') {
         const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
         return {
             billingTypes: ['CREDIT_CARD'],
@@ -282,7 +305,7 @@ const __mods = [
                     value: plano_precos_1.PLAN_PERIOD_PRICE_CENTS[plan][period] / 100,
                 },
             ],
-            subscription: { cycle: exports.ASAAS_CYCLE[period], nextDueDate: today },
+            subscription: { cycle: exports.ASAAS_CYCLE[period], nextDueDate: firstDue },
         };
     }
     function checkoutPixRequest(personId, plan, appUrl, period = 'mensal') {
@@ -305,6 +328,9 @@ const __mods = [
     }
     function periodArg(period) {
         return period === 'anual' ? { p_period: 'anual' } : {};
+    }
+    function validFromArg(validFrom) {
+        return validFrom ? { p_valid_from: validFrom.toISOString() } : {};
     }
     function checkoutLink(response, sandbox) {
         const r = (0, servidor_comum_1.obj)(response);
@@ -460,7 +486,7 @@ const __mods = [
                 throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
             const data = (0, servidor_comum_1.obj)(list.json)?.data;
             const payments = (Array.isArray(data) ? data : []).map(asaasPaymentFrom).filter((p) => p !== null);
-            const { validUntil } = webValidity(sub, payments, now());
+            const { validFrom, validUntil } = webValidity(sub, payments, now());
             const applied = await db.rpcService('billing_apply', {
                 p_event_id: ev.id,
                 p_provider: 'web',
@@ -470,6 +496,7 @@ const __mods = [
                 p_valid_until: validUntil.toISOString(),
                 p_event_at: ev.at.toISOString(),
                 ...periodArg(periodOfCycle(sub.cycle)),
+                ...validFromArg(validFrom),
             });
             if (applied.status !== 200) {
                 log(`banco recusou o aviso ${ev.event} (${applied.status})`);
@@ -577,9 +604,10 @@ const __mods = [
                 if ((await activeSubscriptions(asaas, personId)).length > 0)
                     return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
                 const chosen = period ?? 'mensal';
+                const firstDue = (0, primeira_cobranca_1.paidStartDay)(status, current?.until, now()) ?? (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now());
                 const request = action === 'pix'
                     ? checkoutPixRequest(personId, plan, config.appUrl, chosen)
-                    : checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), chosen);
+                    : checkoutRequest(personId, plan, config.appUrl, firstDue, chosen);
                 const created = await asaas('POST', '/checkouts', request);
                 const checkoutId = text((0, servidor_comum_1.obj)(created.json)?.id);
                 const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
@@ -1023,6 +1051,24 @@ const __mods = [
     function pixCanPayNext(until, now, period = 'mensal') {
         const from = pixNextPaymentFrom(until, period);
         return from === null || now.getTime() >= from.getTime();
+    }
+  },
+  // packages/core/src/assinatura-web/primeira-cobranca.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BILLING_TIME_ZONE = void 0;
+    exports.paidStartDay = paidStartDay;
+    const dates_1 = __req(1);
+    exports.BILLING_TIME_ZONE = 'America/Sao_Paulo';
+    function paidStartDay(status, until, now) {
+        if (status !== 'teste' || typeof until !== 'string')
+            return null;
+        const end = Date.parse(until);
+        if (Number.isNaN(end) || end <= now.getTime())
+            return null;
+        const day = (0, dates_1.todayIn)(exports.BILLING_TIME_ZONE, new Date(end));
+        return day > (0, dates_1.todayIn)(exports.BILLING_TIME_ZONE, now) ? day : null;
     }
   },
 ];

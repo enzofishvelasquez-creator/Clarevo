@@ -26,10 +26,10 @@ function paginaComece({ valores, estado }) {
   const { PLANOS } = catalogo();
 
   const capa = `<h1>Comece aqui</h1>
-<p class="lead">A Clarevo é um app para organizar as contas, os cartões e os gastos do mês, com o pessoal, a família e o negócio separados. Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vai vencer. Não é banco, não movimenta dinheiro e não recomenda produtos financeiros.</p>
+<p class="lead">A Clarevo é um app para organizar as contas, os cartões e os gastos do mês, com o pessoal, a família e o negócio separados. Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vence. Não é banco, não movimenta dinheiro e não recomenda produtos financeiros.</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
-${selosDasLojas(estado)}`;
+${selosDasLojas(estado, { pequenos: true })}`;
 
   // Os três passos, verdadeiros nos dois estados: os planos (que, antes do lançamento, mostram "Em breve"), onde usar (o celular pelo estado
   // do produto) e o que fazer primeiro no app (o card Primeiros passos do Resumo, D-033, e os atalhos da conta nova, D-125).
@@ -46,7 +46,7 @@ ${selosDasLojas(estado)}`;
     },
     {
       titulo: 'Dê os primeiros passos',
-      texto: 'Anote os gastos de hoje ou importe o extrato, a fatura ou um print do banco. Numa conta nova, o card Primeiros passos do Resumo leva aos primeiros cadastros.',
+      texto: 'Anote os gastos de hoje ou importe o extrato, a fatura ou um print do banco. Numa conta nova, o Resumo mostra os primeiros passos, com um atalho para cada um.',
       link: { href: u('ajuda/comecar.html'), texto: 'Como começar, na Ajuda' },
     },
   ];

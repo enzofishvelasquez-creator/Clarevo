@@ -13,6 +13,7 @@ import {
   deviceTimeZone,
   formatDateBR,
   isStoreSubscription,
+  paidStartDay,
   periodSuffix,
   pixCanPayNext,
   pixNextPaymentFrom,
@@ -31,6 +32,7 @@ import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
+import { PURCHASE_PREVIEW, PURCHASE_PREVIEW_SITE } from '@/lib/capture';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases, type StoreChoice } from '@/lib/store-purchases';
 import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
@@ -91,11 +93,22 @@ export function AccessBanner() {
   );
 }
 
+/**
+ * Na web, se a situação do acesso depende da assinatura no cartão lida no Asaas (`situacao`): a de quem assina pelo cartão e, com a compra
+ * aberta, a de quem está no teste grátis (pode ter assinado no teste, com a primeira cobrança no fim dele, D-129). `webTest`: o teste da
+ * equipe no sandbox (`?assinar=teste`).
+ */
+export function readsWebSubscription(access: Access | undefined, webTest = false): boolean {
+  if (Platform.OS !== 'web' || !access) return false;
+  if (access.status === 'assinatura') return access.provider === 'web';
+  return access.status === 'teste' && (SUBSCRIBE_OPEN || webTest);
+}
+
 /** Card "Assinatura" em Conta: a situação, a explicação curta e o botão da tela Assinatura. */
 export function AccessCard() {
   const access = useAccess();
   const timeZone = useAccessTimeZone();
-  const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
+  const webCard = readsWebSubscription(access.data);
   const webStatus = useWebSubscriptionStatus(webCard);
   const now = useAccessNow();
   const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
@@ -122,11 +135,24 @@ export function AccessCard() {
 }
 
 /**
+ * Quem pode assinar na web (D-084): no teste, em só leitura ou coberta pelo Plano Família de outra pessoa; no teste do sandbox (antes do
+ * início da cobrança, todo mundo está em pre_lancamento), também nessa situação.
+ */
+function canSubscribeOnWeb(access: Access, webTest: boolean): boolean {
+  return access.status === 'teste' || access.status === 'leitura' || access.status === 'familia' || (webTest && access.status === 'pre_lancamento');
+}
+
+/**
  * Os botões de assinar na web (D-084): a função do servidor cria o Checkout do Asaas e a página de pagamento abre nesta mesma aba; o
  * Asaas devolve a pessoa a /conta/assinatura?pagamento=... No app das lojas nada disto aparece (lá a assinatura é pela loja). Só para
- * quem pode assinar: no teste, em só leitura ou coberta pelo Plano Família de outra pessoa.
+ * quem pode assinar (`canSubscribeOnWeb`). Antes dos botões do cartão, como na tela das lojas (análise geral de 26/11/2026, D-129): a
+ * cobrança do período escolhido, a renovação automática, como cancelar e quem guarda os dados do cartão; antes dos do Pix, que ele não
+ * renova nem cobra sozinho; no teste grátis, o dia em que a primeira cobrança no cartão e o período pago com Pix começam, o fim do teste
+ * (`paidStartDay`, com o `until` de `my_access`, do servidor; a função do servidor usa a mesma conta); e, antes de "Depois de pagar", os
+ * Termos de uso e a Política de privacidade.
  */
 function WebSubscribeButtons({ access, webTest, period }: { access: Access; webTest: boolean; period: BillingPeriod }) {
+  const now = useAccessNow();
   const repo = useRepo();
   const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | 'cancelar' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -152,8 +178,10 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
     }
     setBusy(null);
   };
-  // No teste do sandbox (antes do início da cobrança, todo mundo está em pre_lancamento), os botões aparecem também nessa situação.
-  if (access.status !== 'teste' && access.status !== 'leitura' && access.status !== 'familia' && !(webTest && access.status === 'pre_lancamento')) return null;
+  if (!canSubscribeOnWeb(access, webTest)) return null;
+  // No teste grátis, o dia do fim do teste (em Brasília, como o vencimento do Asaas e o banco): a primeira cobrança e o período pago com Pix.
+  const startDay = paidStartDay(access.status, access.until, now);
+  const startDate = startDay ? formatDateBR(startDay) : null;
   const subscribe = async (plan: PlanKind) => {
     if (busy) return;
     setMsg(null);
@@ -192,8 +220,13 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
   };
   return (
     <View style={{ gap: space[3] }}>
+      {startDate ? (
+        <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
+          {W.firstChargeOn(startDate)}
+        </Txt>
+      ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
-        {W.howItWorks}
+        {W.howItWorks(period)}
       </Txt>
       {T.plans.map((p) => (
         <Button
@@ -213,6 +246,11 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
       <Txt variant="caption" color={colors.textSecondary}>
         {period === 'anual' ? W.pixHowItWorksAnnual : W.pixHowItWorks}
       </Txt>
+      {startDate ? (
+        <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
+          {W.pixStartsOn(startDate)}
+        </Txt>
+      ) : null}
       {T.plans.map((p) => (
         <Button
           key={`pix-${p.plan}`}
@@ -225,6 +263,7 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
           onPress={() => void payPix(p.plan)}
         />
       ))}
+      <LegalLinks />
       <Txt variant="caption" color={colors.textSecondary}>
         {W.afterPayment}
       </Txt>
@@ -361,11 +400,15 @@ function StoreMessage({ msg }: { msg: StoreMsg }) {
   );
 }
 
-/** Os Termos de uso e a Política de privacidade junto da compra, como as lojas pedem (só com o endereço do site configurado). */
-function StoreLegalLinks() {
+/**
+ * Os Termos de uso e a Política de privacidade junto da compra, nas lojas (que pedem) e na web (D-129), só com o endereço do site
+ * configurado (no roteiro de telas, o do roteiro, `PURCHASE_PREVIEW_SITE`).
+ */
+function LegalLinks() {
   const [failed, setFailed] = useState(false);
-  if (!SITE_URL) return null;
-  const open = async (page: 'termos' | 'privacidade') => setFailed(!(await openSitePage(page)));
+  const site = SITE_URL ?? PURCHASE_PREVIEW_SITE;
+  if (!site) return null;
+  const open = async (page: 'termos' | 'privacidade') => setFailed(!(await openSitePage(page, site)));
   return (
     <View style={{ gap: space[1] }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4] }}>
@@ -439,7 +482,7 @@ function StoreSubscribeButtons({ access, period }: { access: Access; period: Bil
       <Txt variant="caption" color={colors.textSecondary}>
         {S.autoRenew}
       </Txt>
-      <StoreLegalLinks />
+      <LegalLinks />
       <Txt variant="caption" color={colors.textSecondary}>
         {S.restoreHint}
       </Txt>
@@ -572,8 +615,17 @@ function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (pe
  * a nota neutra `ACCESS_TEXT.demoNote`; a escolha do período continua, porque só muda o preço mostrado.
  */
 export function PlansCard({ access, webTest = false, subscribeHidden = false }: { access: Access; webTest?: boolean; subscribeHidden?: boolean }) {
-  const demo = useSession().auth.mode === 'demo';
+  const { auth, user } = useSession();
+  // O roteiro de telas (`PURCHASE_PREVIEW`, só com a marca dele na página) vê o que uma conta de verdade vê na web.
+  const demo = auth.mode === 'demo' && !PURCHASE_PREVIEW;
   const [period, setPeriod] = useState<BillingPeriod>('anual');
+  const web = Platform.OS === 'web';
+  const webButtons = !demo && (SUBSCRIBE_OPEN || webTest) && web && !subscribeHidden && canSubscribeOnWeb(access, webTest);
+  const storeButtons =
+    !demo && (SUBSCRIBE_OPEN || STORE_TEST) && !web && Boolean(DEVICE_STORE && STORE_PURCHASES_READY && SITE_URL && user && canSubscribeInStore(access.status));
+  // A frase da compra fechada só quando os botões não aparecem (D-129: com `?assinar=teste`, os botões e a frase apareciam juntos), e a de
+  // acesso completo só para quem o tem (em só ver e exportar, a curta).
+  const closedNote = SUBSCRIBE_OPEN || demo || webButtons || storeButtons ? null : access.canWrite ? T.notOpenYet : T.notOpenYetShort;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -624,19 +676,20 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
       <Txt variant="caption" color={colors.textSecondary}>
         {T.plansNote}
       </Txt>
+      {/* A nota do anual por canal (D-129): na web, o cartão renova e o Pix não; nas lojas, sem Pix nem web; na demonstração, a neutra. */}
       <Txt variant="caption" color={colors.textSecondary}>
-        {PLAN_PERIOD_TEXT.note}
+        {demo ? PLAN_PERIOD_TEXT.note.neutral : web ? PLAN_PERIOD_TEXT.note.web : PLAN_PERIOD_TEXT.note.store}
       </Txt>
       <Txt variant="caption" color={colors.textSecondary}>
-        {demo ? T.demoNote : Platform.OS === 'web' ? T.howToPay : T.howToPayStore}
+        {demo ? T.demoNote : web ? T.howToPay : T.howToPayStore}
       </Txt>
-      {!demo && (SUBSCRIBE_OPEN || webTest) && Platform.OS === 'web' && !subscribeHidden ? <WebSubscribeButtons access={access} webTest={webTest} period={period} /> : null}
-      {!demo && (SUBSCRIBE_OPEN || STORE_TEST) && Platform.OS !== 'web' ? <StoreSubscribeButtons access={access} period={period} /> : null}
-      {SUBSCRIBE_OPEN || demo ? null : (
+      {webButtons ? <WebSubscribeButtons access={access} webTest={webTest} period={period} /> : null}
+      {!demo && (SUBSCRIBE_OPEN || STORE_TEST) && !web ? <StoreSubscribeButtons access={access} period={period} /> : null}
+      {closedNote ? (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
-          {T.notOpenYet}
+          {closedNote}
         </Txt>
-      )}
+      ) : null}
       {access.status === 'teste' || access.status === 'leitura' ? (
         <Txt variant="caption" color={colors.textSecondary}>
           {T.readOnlyWhat}

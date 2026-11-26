@@ -190,9 +190,10 @@ const SEM_INDEXAR = ['404.html', 'noticias/materia.html'];
 const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...PAGINAS_DE_MERCADO, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /**
  * As páginas do menu principal (a página atual é marcada com aria-current). Desde 25/11/2026 (D-125), Planos e a página do MEI entraram;
- * "Início" saiu (o logotipo leva ao início) e Novidades ficou no rodapé. Desde 26/11/2026 (D-128), "Na web" (`web.html`).
+ * "Início" saiu (o logotipo leva ao início) e Novidades ficou no rodapé. Desde 26/11/2026 (D-128), "Na web" (`web.html`). Desde a D-129,
+ * "Segurança" saiu (continua no rodapé e na faixa de confiança das capas).
  */
-const NO_MENU = ['app/index.html', 'web.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html', 'seguranca.html'];
+const NO_MENU = ['app/index.html', 'web.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html'];
 
 const VAZIOS = Object.fromEntries(MARCADORES.map((m) => [m, '']));
 const PREENCHIDOS: Record<string, string> = {
@@ -390,12 +391,13 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     // Desde 25/11/2026 (D-125), Novidades saiu do menu e Planos entrou: as páginas de cada plano marcam Planos como seção atual.
     else if (/^(aprender|calculadoras|ajuda|planos)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
     else if (/^novidades\//.test(nome)) expect(cabecalho, `${nome}: Novidades fora do menu`).not.toMatch(/secao-atual|aria-current/);
-    // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
+    // Rodapé em todas: todas as seções, as páginas legais e "Clarevo é a marca de [RAZÃO SOCIAL], CNPJ [CNPJ]." (com os valores, quando
+    // houver; D-129: antes, só "[RAZÃO SOCIAL] · CNPJ [CNPJ]").
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
     for (const p of ['index.html', 'comece.html', 'app/index.html', 'web.html', 'planos.html', 'mei.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
-    expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
+    expect(rodape, `${nome}: rodapé`).toMatch(/<p>Clarevo é a marca de .+?, CNPJ .+?\.<\/p>/);
     expect(['RAZÃO SOCIAL', 'Empresa Exemplo', razaoSocialDoSite()].some((r) => rodape.includes(r)), `${nome}: rodapé com a razão social`).toBe(true);
     if (nome === '404.html') expect(html, 'a 404 usa caminhos a partir da raiz').toContain('href="/estilo.css"');
     expect(prefixoDe(nome)).toBe(nome === '404.html' ? '/' : nome.includes('/') ? '../'.repeat(nome.split('/').length - 1) : '');
@@ -754,7 +756,7 @@ describe('site público: as páginas geradas', () => {
         expect(h, nome).not.toContain('class="faixa"');
         expect(h, nome).not.toContain('class="pendente"');
         expect(g.pendencias.get(nome), nome).toEqual([]);
-        expect(h, nome).toContain('Empresa Exemplo Ltda · CNPJ 00.000.000/0001-00');
+        expect(h, nome).toContain('<p>Clarevo é a marca de Empresa Exemplo Ltda, CNPJ 00.000.000/0001-00.</p>');
         if (SEM_INDEXAR.includes(nome)) {
           expect(h, nome).toContain('noindex');
           continue;
@@ -831,7 +833,7 @@ describe('site público: as páginas geradas', () => {
     const titulo = '<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>';
     expect(h).toContain(titulo);
     // D-128: nenhuma frase pequena acima do título, e o benefício concreto abrindo o subtítulo, logo abaixo.
-    expect(h).toContain(`<div class="capa-grade">\n<div>\n${titulo}\n<p class="lead">Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Veja o que entrou, o que saiu e o que ainda vai vencer.</p>`);
+    expect(h).toContain(`<div class="capa-grade">\n<div>\n${titulo}\n<p class="lead">Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Veja o que entrou, o que saiu e o que ainda vence.</p>`);
     expect(h).not.toContain('class="assinatura-marca"');
     expect(h).not.toContain('Organize as contas');
     expect(h).not.toContain('class="frase-apoio"');
@@ -1128,7 +1130,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
     // D-128: uma linha só com o teste, o cancelamento e o "só ver e exportar"; nada de "Preços no lançamento" nem da frase da assinatura fechada.
     expect(h).toContain('<p class="nota nota-planos">14 dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, só ver e exportar. <a href="ajuda/conta.html#guia-assinatura">Como funciona a assinatura</a></p>');
-    expect(h).toContain(esc(PLAN_PERIOD_TEXT.note));
+    // D-129: a nota do anual do site diz que o cartão e as lojas renovam e que o Pix não (sem nome de loja); sem texto sobre a própria página.
+    expect(h).toContain(esc(PLAN_PERIOD_TEXT.noteSite));
+    expect(h).not.toContain('A página de cada plano mostra');
     expect(h).not.toContain(esc(ACCESS_TEXT.notOpenYet));
     expect(h).not.toMatch(/Preços no lançamento|\b(?:no|até o|antes do|para o) lançamento\b/);
     // O anual não promete teste grátis (o anual no cartão é cobrado no dia; o teste é da conta, na nota dos planos).
@@ -1157,7 +1161,7 @@ describe('site público: as páginas geradas', () => {
       expect(capa, arquivo).toContain(`<p class="preco-capa"><span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth} <span class="etiqueta etiqueta-capa">Em breve</span></p>`);
       // D-127: o anual logo abaixo, na capa (o único lugar da página com preço).
       expect(capa, arquivo).toContain(`<p class="preco-capa-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (equivale a`);
-      expect(p, arquivo).toContain(esc(PLAN_PERIOD_TEXT.note));
+      expect(p, arquivo).toContain(esc(PLAN_PERIOD_TEXT.noteSite));
       expect(p, arquivo).not.toContain('mesmo teste grátis');
       expect(p, arquivo).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       expect(capa, arquivo).toContain(`<p class="lead">${esc(ACCESS_TEXT.plans.find((x) => x.plan === plano)!.who)}</p>`);
@@ -1297,9 +1301,11 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/class="botao[^"]*" href="https:\/\/demo\./);
     expect(h).toContain('tocar num vídeo pausa ou toca de novo');
     expect(h).not.toContain('botão redondo');
-    // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
+    // "Cada texto vem do guia" não é verdade (os pontos são do site). Desde a D-129, nada de texto sobre como a página foi feita: só o que a
+    // pessoa vê (as cinco abas, os dados fictícios e os vídeos).
     expect(h).not.toContain('Cada texto vem do guia');
-    expect(h).toContain('A explicação de abertura de cada recurso é a do guia de uso do próprio app');
+    expect(h).not.toContain('guia de uso do próprio app');
+    expect(h).toContain('As telas e os vídeos usam dados fictícios.');
     // O que o app não faz: a faixa curta da capa, com link para o bloco completo de Segurança e privacidade (D-115).
     expect(h).not.toContain('id="nao-faz"');
     expect(h).toContain('<p class="confianca"><a href="../seguranca.html">');
@@ -1680,8 +1686,10 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     for (const p of ['index.html', 'comece.html', 'sobre.html']) expect(html(p), p).not.toContain('assinatura-marca');
     const menu = /<ul class="menu-lista">[\s\S]*?<\/ul>/.exec(h)![0];
     const rodape = /<footer class="rodape">[\s\S]*?<\/footer>/.exec(h)![0];
-    for (const alvo of ['aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html', 'seguranca.html']) expect(menu, alvo).toContain(`href="${alvo}"`);
-    for (const alvo of ['aprender/agenda.html', 'novidades/index.html', 'indicadores/index.html', 'mei.html', 'planos.html', 'web.html']) expect(rodape, alvo).toContain(`href="${alvo}"`);
+    for (const alvo of ['aprender/index.html', 'calculadoras/index.html', 'ajuda/index.html']) expect(menu, alvo).toContain(`href="${alvo}"`);
+    // D-129: Segurança saiu do menu (o site lançado tem "Entrar" ao lado de "Assine aqui"); continua no rodapé e na faixa de confiança.
+    expect(menu).not.toContain('href="seguranca.html"');
+    for (const alvo of ['aprender/agenda.html', 'novidades/index.html', 'indicadores/index.html', 'mei.html', 'planos.html', 'web.html', 'seguranca.html']) expect(rodape, alvo).toContain(`href="${alvo}"`);
     expect(menu).toContain('<li><a href="web.html">Na web</a></li>');
   });
 
@@ -1765,6 +1773,38 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(texto(gerador.gerarSite({ dados: PREENCHIDOS }).arquivos.get('sitemap.xml'))).toBe(sitemap);
     // Três gerações do site inteiro: com a máquina ocupada passam dos 5 segundos padrão.
   }, 60_000);
+
+  it('análise geral de 26/11/2026 (D-129): o Telegram na Família, a linguagem de quem visita, "No celular" sem "em breve" repetido e o rodapé com a marca', () => {
+    // O Telegram anota no Pessoal ou na Família em que a pessoa anota (o código de ligar escolhe o espaço; o banco recusa o negócio).
+    const familia = html('planos/familia.html');
+    expect(familia).toContain('<p class="recurso-onde">No seu Pessoal ou na Família em que você anota.</p>');
+    expect(familia).not.toContain('Só no seu Pessoal.</p>');
+    // Nada de jargão interno nem de texto sobre a própria página.
+    const proibidos: [string, string][] = [
+      ['index.html', 'Uma promessa para três jeitos'],
+      ['index.html', 'Ver Para empresas'],
+      ['mei.html', 'numa cor só'],
+      ['app/index.html', 'numa cor só'],
+      ['app/index.html', 'Veja Para empresas'],
+      ['comece.html', 'card Primeiros passos'],
+      ['app/index.html', 'A explicação de abertura'],
+      ['planos.html', 'A página de cada plano mostra'],
+      ['planos/individual.html', 'Veja Para empresas'],
+    ];
+    for (const [pagina, trecho] of proibidos) expect(html(pagina), `${pagina}: ${trecho}`).not.toContain(trecho);
+    expect(html('index.html')).toContain('<p class="lead-bloco">Para a vida pessoal e da família, para quem trabalha por conta e para empresas que oferecem a Clarevo à equipe.</p>');
+    expect(html('index.html')).toContain('<a href="empresas/index.html">Ver a Clarevo para empresas</a>');
+    expect(html('comece.html')).toContain('Numa conta nova, o Resumo mostra os primeiros passos, com um atalho para cada um.');
+    // O app, antes do lançamento: "No celular" (o "Em breve" fica na etiqueta e na linha das lojas da capa).
+    const app = html('app/index.html');
+    expect(app).toContain('<h3>No celular</h3>');
+    expect(app).not.toContain('No celular, em breve');
+    expect(app.match(/em breve/gi)?.length).toBe(2);
+    // O site e a primeira captura das lojas dizem o mesmo: "o que ainda vence".
+    for (const pagina of ['index.html', 'comece.html', 'planos/individual.html']) expect(html(pagina), pagina).not.toContain('ainda vai vencer');
+    // O rodapé: a marca e a empresa dona dela, com o CNPJ (o endereço continua em Sobre e em Suporte).
+    expect(html('index.html')).toMatch(/<div class="rodape-linha"><p>Clarevo é a marca de .+?, CNPJ .+?\.<\/p>/);
+  });
 });
 
 describe('site público: Aprender (o catálogo do app, uma fonte de verdade)', () => {
@@ -2291,18 +2331,21 @@ describe('site público: imagens, tamanho e Open Graph', () => {
     expect((gerado.arquivos.get('og/clarevo.png') as Buffer).equals(bytes)).toBe(true);
     const script = readFileSync(join(ROOT, 'scripts', 'gerar-og-site.js'), 'utf8');
     expect(script).toContain('clarevo-logotipo-reverso.svg');
-    // D-068: a imagem mostra a mensagem central e a frase de apoio, lidas da ficha das lojas.
+    // D-068 e D-129: a imagem mostra a mensagem central, lida da ficha das lojas, o benefício concreto do site e a nota "Dados fictícios", com
+    // o Resumo sem o selo "Demonstração" (a captura com a marca das capturas das lojas). Nada da linha de recursos de antes.
     expect(script).toContain('mensagem-central');
-    expect(script).toContain('frase-de-apoio');
-    expect(script).toContain('01_resumo.png');
-    // O texto que o desenho mostra (a mensagem central, a frase de apoio e a linha de recursos), sem preço, ranking, "melhor", "grátis" nem selos.
+    expect(script).toContain('BENEFICIO_DO_INICIO');
+    expect(script).toContain('resumo-sem-selo.png');
+    expect(script).toContain('<p class="nota">Dados fictícios</p>');
+    expect(script).not.toContain('Contas a pagar, cartões, metas e Família');
+    expect(existsSync(join(ROOT, 'docs', 'lojas', 'capturas', 'apple-iphone-6-3pol-1206x2622', 'resumo-sem-selo.png'))).toBe(true);
+    // O texto que o desenho mostra, sem preço, ranking, "melhor", "grátis" nem selos.
     const ficha = readFileSync(join(ROOT, 'docs', 'lojas', 'ficha.md'), 'utf8');
-    const textoDoDesenho = [...script.matchAll(/<p>([^<$]*)<\/p>/g)].map((m) => m[1]).join(' ');
-    expect(textoDoDesenho.length).toBeGreaterThan(20);
     const campo = (nome: string) => ficha.match(new RegExp(`${nome}[^\\n]*\\n\`\`\`\\n([^\\n]+)`))?.[1] ?? '';
     expect(campo('mensagem-central')).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
-    expect(campo('frase-de-apoio')).toBe('Mais clareza para decidir');
-    expect(`${textoDoDesenho} ${campo('mensagem-central')} ${campo('frase-de-apoio')}`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
+    const { BENEFICIO_DO_INICIO } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as { BENEFICIO_DO_INICIO: string };
+    expect(BENEFICIO_DO_INICIO).toBe('Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.');
+    expect(`${campo('mensagem-central')} ${BENEFICIO_DO_INICIO} Dados fictícios`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
   });
 });
 
@@ -3094,12 +3137,15 @@ describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', 
     expect(png.length).toBeGreaterThan(10_000);
   });
 
-  it('usa a mensagem central e a frase de apoio aprovadas da ficha, o logotipo reverso oficial e a captura da demonstração, sem texto de preço nem selos', () => {
+  it('usa a mensagem central aprovada da ficha, o benefício concreto do site, o logotipo reverso oficial e o Resumo da demonstração sem o selo (D-129), sem texto de preço nem selos', () => {
     const script = readFileSync(join(ROOT, 'scripts', 'gerar-grafico-loja.js'), 'utf8');
     expect(script).toContain('clarevo-logotipo-reverso.svg');
     expect(script).toContain('mensagem-central');
-    expect(script).toContain('frase-de-apoio');
-    expect(script).toContain('01_resumo.png');
+    expect(script).toContain('BENEFICIO_DO_INICIO');
+    expect(script).toContain('resumo-sem-selo.png');
+    expect(script).toContain('<p class="nota">Dados fictícios</p>');
+    expect(script).not.toContain('Contas a pagar, cartões, metas e Família');
+    expect(existsSync(join(ROOT, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', 'resumo-sem-selo.png'))).toBe(true);
     // Nada importante no centro nem na faixa de baixo ao meio (onde o Google pode sobrepor o botão de vídeo): o script mede e recusa o desenho.
     expect(script).toContain('ZONAS_LIVRES');
     expect(script).toContain('faixa inferior central');

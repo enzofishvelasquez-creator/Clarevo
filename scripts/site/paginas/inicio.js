@@ -24,7 +24,7 @@ const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 const { PAGINA_DO_PLANO, dadosDoApp, linhaDoAnual, linhaDosPlanos, pessoasNaFamilia } = require('./planos');
-const { chamadas, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, linhaDaCapa, noCelular, selosDasLojas, textoDoAcesso } = require('../estado');
+const { assinaturaEmBreve, chamadas, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, linhaDaCapa, noCelular, selosDasLojas, textoDoAcesso } = require('../estado');
 
 const ARQUIVO = 'index.html';
 /**
@@ -39,9 +39,9 @@ const MENSAGEM_CENTRAL = TITULO;
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
 /**
  * O subtítulo (D-128): o benefício concreto primeiro (o mesmo subtítulo das boas-vindas do app e a primeira linha das descrições das lojas) e
- * uma frase curta com o que o app mostra.
+ * uma frase curta com o que o app mostra, com as mesmas palavras da primeira captura das lojas ("o que ainda vence", D-129).
  */
-const SUBTEXTO = `${BENEFICIO} Veja o que entrou, o que saiu e o que ainda vai vencer.`;
+const SUBTEXTO = `${BENEFICIO} Veja o que entrou, o que saiu e o que ainda vence.`;
 /** A descrição completa, nos dados estruturados. */
 const DESCRICAO = `${SUBTEXTO} ${TITULO}`;
 /** A descrição da página para as buscas e o compartilhamento, em até 160 caracteres, com o termo que as pessoas buscam. */
@@ -53,10 +53,13 @@ const DESCRICAO_CURTA = 'Controle de gastos sem planilha: contas, cartões e gas
  * do plano. Desde 27/11/2026 (D-127), cada cartão mostra também o preço anual, com o equivalente por mês. Desde 26/11/2026 (D-128), antes
  * do lançamento cada cartão leva a fita "Em breve" no canto de cima (`fitaEmBreve`, só desenho, com o mesmo "em breve" no título para o
  * leitor de tela), no lugar da etiqueta "Preços no lançamento" e da frase "A assinatura pelo app abre no lançamento. Até lá, nada é
- * cobrado."; embaixo dos cartões, uma linha só (`linhaDosPlanos`). `u` monta o caminho relativo.
+ * cobrado."; embaixo dos cartões, uma linha só (`linhaDosPlanos`). Desde a D-129, antes do lançamento, logo abaixo do título (é aqui que
+ * "Assine aqui" da capa chega), à vista: "A assinatura abre em breve, na web e nas lojas." (`assinaturaEmBreve`). `u` monta o caminho
+ * relativo.
  */
 function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
   const fita = fitaEmBreve(estado);
+  const aviso = assinaturaEmBreve(estado);
   const cartoes = PLANOS.texto.plans
     .map(
       (p) => `<article class="cartao plano plano-link${fita ? ' com-fita' : ''}">
@@ -70,7 +73,7 @@ ${linhaDoAnual(p.plan)}
     .join('\n');
   return `<h2 id="planos">${esc(PLANOS.texto.plansTitle)}</h2>
 <p class="lead-bloco">${esc(PLANOS.texto.plansNote.split('. ')[0])}. O que muda é para quem é a assinatura.</p>
-<div class="grade">
+${aviso ? `<p class="aviso-assinatura">${esc(aviso)}</p>\n` : ''}<div class="grade">
 ${cartoes}
 </div>
 ${linhaDosPlanos(u)}
@@ -158,7 +161,7 @@ function paginaInicial({ valores, img, videos, estado }) {
 <p class="lead">${esc(SUBTEXTO)}</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
-${selosDasLojas(estado)}
+${selosDasLojas(estado, { pequenos: true })}
 ${faixaDeConfianca(ARQUIVO)}
 </div>
 ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
@@ -171,19 +174,19 @@ ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
   const portas = [
     { icone: 'pessoas', titulo: 'Pessoas e famílias', texto: `O seu Pessoal e, se quiser, uma Família de até ${pessoasNaFamilia()} pessoas, com as contas da casa em comum e o Pessoal de cada pessoa só dela.`, href: PAGINA_DO_PLANO.familiar, link: 'Ver o plano Família' },
     { icone: 'negocio', titulo: 'Quem trabalha por conta e MEI', texto: 'O dinheiro do negócio separado do da casa, com o fiado, a retirada para o Pessoal e o limite do MEI. Incluído na assinatura.', href: 'mei.html', link: 'Ver o Espaço Negócio' },
-    { icone: 'empresa', titulo: 'Empresas', texto: 'A Clarevo como benefício para a equipe. A empresa acompanha convites e licenças e nunca vê as finanças de ninguém.', href: 'empresas/index.html', link: 'Ver Para empresas' },
+    { icone: 'empresa', titulo: 'Empresas', texto: 'A Clarevo como benefício para a equipe. A empresa acompanha convites e licenças e nunca vê as finanças de ninguém.', href: 'empresas/index.html', link: 'Ver a Clarevo para empresas' },
   ];
 
   const passos = [
     { titulo: 'Anote do jeito mais fácil', texto: 'Uma mensagem no Telegram, a câmera na nota ou no boleto, o extrato e a fatura importados, ou poucos toques no app.' },
-    { titulo: 'Veja o mês', texto: 'O Resumo mostra o que entrou, o que saiu e o que ainda vai vencer, com contas a pagar, cartões e metas no mesmo lugar.' },
+    { titulo: 'Veja o mês', texto: 'O Resumo mostra o que entrou, o que saiu e o que ainda vence, com contas a pagar, cartões e metas no mesmo lugar.' },
     { titulo: 'Família e Negócio no mesmo app', texto: `No plano Família, até ${pessoasNaFamilia()} pessoas dividem as contas da casa. O Espaço Negócio vem nos dois planos. Cada espaço fica separado do outro.` },
   ];
 
   const brutas = [
     secao(
       `<h2 id="para-quem">Para quem é</h2>
-<p class="lead-bloco">Uma promessa para três jeitos de viver o dinheiro: o mês organizado, cada coisa no seu lugar.</p>
+<p class="lead-bloco">Para a vida pessoal e da família, para quem trabalha por conta e para empresas que oferecem a Clarevo à equipe.</p>
 <ul class="portas" role="list">
 ${portas.map((p) => porta(u, p)).join('\n')}
 </ul>`,

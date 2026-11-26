@@ -57,18 +57,33 @@ export const WEB_SUBSCRIPTION_TEXT = {
   /** "Assinar o plano Individual" e, com o período (D-127), "Assinar o plano Individual anual". */
   subscribe: (plan: PlanKind, period?: BillingPeriod) => `Assinar o plano ${PLAN_NAME[plan]}${period ? ` ${PERIOD_NAME[period]}` : ''}`,
   subscribeBusy: 'Abrindo a página de pagamento',
-  /** Antes dos botões de assinar. */
-  howItWorks:
-    'O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo, com cartão de crédito. Os dados do cartão ficam só com o Asaas: a Clarevo não vê nem guarda.',
+  /**
+   * Antes dos botões do cartão (análise geral de 26/11/2026, D-129, como a tela das lojas): a cobrança do período escolhido, a renovação
+   * automática e como cancelar (o botão "Cancelar assinatura" desta tela, com o acesso até o fim do período pago, sem nova cobrança), e quem
+   * guarda os dados do cartão. Os Termos e a Política vêm logo depois dos botões.
+   */
+  howItWorks: (period: BillingPeriod) =>
+    `${
+      period === 'anual'
+        ? 'No cartão, o plano anual é cobrado de uma vez e renova sozinho a cada 12 meses, pelo mesmo preço, até você cancelar.'
+        : 'No cartão, o plano mensal é cobrado todo mês e renova sozinho, pelo mesmo preço, até você cancelar.'
+    } Para cancelar, volte a esta tela e toque em Cancelar assinatura, quando quiser: o acesso completo continua até o fim do período já pago, sem nova cobrança. O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo; os dados do cartão ficam só com o Asaas, e a Clarevo não vê nem guarda.`,
+  /**
+   * Quem assina no teste grátis (D-129): a primeira cobrança no cartão é no fim do teste (o dia de `paidStartDay`, do servidor), e cancelar
+   * antes dela não cobra nada.
+   */
+  firstChargeOn: (date: string) => `A primeira cobrança é em ${date}, quando o teste grátis acaba. Se cancelar antes dessa data, nada é cobrado.`,
   afterPayment: 'Depois de pagar, você volta para esta tela e a assinatura aparece em alguns minutos.',
   /** Pix mês a mês (D-093, caminho B). */
   pixTitle: 'Ou pague um mês por vez, com Pix',
   pixHowItWorks:
-    'Com Pix, você paga um mês por vez, na página do Asaas. Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.',
+    'Com Pix, você paga um mês por vez, na página do Asaas. Não renova sozinho e nada é cobrado automaticamente: perto do fim do período pago, a Clarevo avisa aqui para você pagar o próximo, se quiser continuar.',
   /** Pix de um ano (D-127): um pagamento vale 12 meses. */
   pixTitleAnnual: 'Ou pague o ano de uma vez, com Pix',
   pixHowItWorksAnnual:
-    'Com Pix, você paga um ano de uma vez, na página do Asaas. Não renova sozinho: perto do fim do ano pago, a Clarevo avisa aqui para você pagar o próximo.',
+    'Com Pix, você paga um ano de uma vez, na página do Asaas. Não renova sozinho e nada é cobrado automaticamente: perto do fim do período pago, a Clarevo avisa aqui para você pagar o próximo, se quiser continuar.',
+  /** Quem paga com Pix no teste grátis (D-129): o período pago começa no fim do teste (billing_pix_apply, migração 0048). */
+  pixStartsOn: (date: string) => `O período pago começa em ${date}, quando o teste grátis acaba.`,
   /** "Pagar um mês do plano Individual com Pix" ou, no anual, "Pagar um ano do plano Individual com Pix". */
   payPix: (plan: PlanKind, period: BillingPeriod = 'mensal') => `Pagar um ${period === 'anual' ? 'ano' : 'mês'} do plano ${PLAN_NAME[plan]} com Pix`,
   /** Quem paga com Pix, na janela do próximo período: "Pagar mais um mês com Pix (R$ 29,90)" ou "Pagar mais um ano com Pix (R$ 269,90)". */
@@ -95,6 +110,10 @@ export const WEB_SUBSCRIPTION_TEXT = {
   cancelKeep: 'Manter a assinatura',
   cancelBusy: 'Cancelando',
   cancelDone: 'Assinatura cancelada. O acesso completo continua até o fim do período já pago.',
+  /** Quem assinou no teste grátis e cancela antes da primeira cobrança (D-129): nada é cobrado, e o teste continua até o fim. */
+  cancelConfirmBodyTrial: (date: string) =>
+    `Nada é cobrado. O teste grátis continua até ${date}; depois, sem assinatura, a conta fica só para ver e exportar, com os seus dados guardados.`,
+  cancelDoneTrial: (date: string) => `Assinatura cancelada antes da primeira cobrança: nada foi cobrado. O teste grátis continua até ${date}.`,
   changePlan: 'Para mudar de plano ou passar do mensal para o anual (ou do anual para o mensal), cancele a assinatura atual e, quando o período já pago terminar, assine de novo.',
   /** Excluir a conta: a assinatura da web precisa ser cancelada antes, e não deu. */
   cancelBeforeDeleteFailed: 'Não foi possível cancelar a assinatura feita na web. Tente de novo em instantes ou cancele em Conta, Assinatura, antes de excluir a conta.',

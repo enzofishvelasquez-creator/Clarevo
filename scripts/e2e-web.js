@@ -15003,7 +15003,9 @@ setInterval(async () => {
       t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
         t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
         t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
-        t.includes('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.') && !t.includes('mesmo teste grátis') &&
+        // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
+        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago.') &&
+        !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
         !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
     // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
     const alarme = await p.evaluate(() => {
@@ -15042,6 +15044,106 @@ setInterval(async () => {
       (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !/Assinar o plano|Pagar um (mês|ano)/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // A área de compra da web e a compra fechada (análise geral de 26/11/2026, D-129), num contexto à parte com a marca do roteiro
+  // (`__clarevoTesteCompra`, apps/app/src/lib/capture.ts): a tela Assinatura da demonstração mostra o que uma conta de verdade vê na web.
+  // Sem `?assinar=teste`, os planos com a frase da compra fechada ("Assinatura em breve. Por enquanto, o acesso é completo e nada é
+  // cobrado."), sem botão; com ele, a área de compra, sem a frase da compra fechada: no teste grátis, o dia da primeira cobrança e do começo
+  // do período pago com Pix (o fim do teste), a cobrança do período, a renovação, como cancelar, quem guarda o cartão, que o Pix não renova
+  // nem cobra sozinho e os links dos Termos e da Política antes de "Depois de pagar". Os links abrem o endereço do site (window.open, que o
+  // roteiro só anota), e nada vai à rede.
+  // ==================================================================================================================
+  {
+    const SITE = 'https://clarevo.app.br';
+    const cpCtx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await cpCtx.addInitScript((site) => {
+      window.__clarevoTesteCompra = site;
+      window.__abertas = [];
+      window.open = (u) => { window.__abertas.push(String(u)); return null; };
+    }, SITE);
+    const fora = [];
+    await cpCtx.route('**/*', (r) => {
+      const u = new URL(r.request().url());
+      if (u.hostname === 'localhost' || u.protocol === 'data:' || u.protocol === 'blob:') return r.continue();
+      fora.push(r.request().url());
+      return r.abort();
+    });
+    const cp = await cpCtx.newPage();
+    const cpErrors = [];
+    cp.on('pageerror', (e) => cpErrors.push(e.message));
+    const cpWrites = [];
+    cp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && cpWrites.push(`${r.method()} ${r.url()}`));
+    const cpWait = (t, timeout = 15000) => cp.getByText(t, { exact: false }).filter({ visible: true }).first().waitFor({ timeout });
+    const cpBody = async () => (await cp.locator('body').innerText()).replace(/\u00a0/g, ' ');
+    const cpCount = (role, name) => cp.getByRole(role, { name, exact: typeof name === 'string' }).filter({ visible: true }).count();
+    const cpShot = async (n) => { await cp.waitForTimeout(450); await cp.screenshot({ path: `${OUT}/${n}.png`, fullPage: true }); };
+    const cpOpen = async (endereco, espera) => {
+      await cp.goto(`http://localhost:${PORT}${endereco}`);
+      await cpWait('Cuidar da vida financeira');
+      await cp.getByRole('button', { name: 'Ver a demonstração', exact: true }).filter({ visible: true }).first().click();
+      await cpWait(espera);
+      await cp.waitForTimeout(700);
+    };
+    const NOTA_WEB = 'No anual, os 12 meses são pagos de uma vez. No cartão, a assinatura renova sozinha a cada período até você cancelar; com Pix, não renova: você paga o próximo período se quiser continuar. Os dois períodos têm os mesmos recursos.';
+    const FECHADA = 'Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.';
+    const COMUM = 'Para cancelar, volte a esta tela e toque em Cancelar assinatura, quando quiser: o acesso completo continua até o fim do período já pago, sem nova cobrança. O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo; os dados do cartão ficam só com o Asaas, e a Clarevo não vê nem guarda.';
+    const PIX_NAO_RENOVA = 'Não renova sozinho e nada é cobrado automaticamente: perto do fim do período pago, a Clarevo avisa aqui para você pagar o próximo, se quiser continuar.';
+    try {
+      // 1. A compra fechada (SUBSCRIBE_OPEN), sem "?assinar=teste": os planos, a nota do anual da web e a frase da compra fechada, sem botão.
+      await cpOpen('/conta/assinatura', FECHADA);
+      let t = await cpBody();
+      ok('Compra na web (D-129): com a compra fechada, a frase "Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.", sem falar de lançamento, a nota do anual da web (o cartão renova, o Pix não) e nenhum botão de assinar ou pagar',
+        new URL(cp.url()).pathname === '/conta/assinatura' && t.includes(FECHADA) && !/lançamento|Até lá/.test(t) && t.includes(NOTA_WEB) &&
+          (await cpCount('button', /^(Assinar|Pagar)/)) === 0 && !t.includes('A primeira cobrança é em'), t.slice(0, 1400));
+      await cpShot('617_assinatura_compra_fechada');
+      // 2. Com "?assinar=teste" (o teste da equipe no sandbox): a área de compra, sem a frase da compra fechada.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual anual');
+      t = await cpBody();
+      const fimDoTeste = /termina em \d+ dias, em (\d{2}\/\d{2}\/\d{4})/.exec(t)?.[1] ?? null;
+      const ordem = (a, b2) => t.indexOf(a) >= 0 && t.indexOf(b2) > t.indexOf(a);
+      ok('Compra na web (D-129): com "?assinar=teste", os botões do cartão e do Pix aparecem, e a frase da compra fechada não (antes, as duas juntas)',
+        (await cpCount('button', 'Assinar o plano Individual anual')) === 1 && (await cpCount('button', 'Assinar o plano Família anual')) === 1 &&
+          (await cpCount('button', 'Pagar um ano do plano Individual com Pix')) === 1 && !t.includes(FECHADA) && !t.includes('Assinatura em breve'), t.slice(0, 1400));
+      ok('Compra na web (D-129): no teste grátis, antes dos botões do cartão, "A primeira cobrança é em <fim do teste>, quando o teste grátis acaba. Se cancelar antes dessa data, nada é cobrado."; antes dos do Pix, "O período pago começa em <fim do teste>, quando o teste grátis acaba."',
+        fimDoTeste !== null && t.includes(`A primeira cobrança é em ${fimDoTeste}, quando o teste grátis acaba. Se cancelar antes dessa data, nada é cobrado.`) &&
+          t.includes(`O período pago começa em ${fimDoTeste}, quando o teste grátis acaba.`) && ordem(`A primeira cobrança é em ${fimDoTeste}`, 'Assinar o plano Individual anual') &&
+          ordem('Ou pague o ano de uma vez, com Pix', `O período pago começa em ${fimDoTeste}`), JSON.stringify({ fimDoTeste, trecho: t.slice(0, 1600) }));
+      ok('Compra na web (D-129): no anual, antes dos botões do cartão, a cobrança de uma vez, a renovação a cada 12 meses pelo mesmo preço até cancelar, como cancelar nesta tela (o acesso até o fim do período pago, sem nova cobrança) e quem guarda o cartão; o Pix não renova nem cobra sozinho',
+        t.includes(`No cartão, o plano anual é cobrado de uma vez e renova sozinho a cada 12 meses, pelo mesmo preço, até você cancelar. ${COMUM}`) &&
+          ordem('No cartão, o plano anual é cobrado de uma vez', 'Assinar o plano Individual anual') &&
+          t.includes(`Com Pix, você paga um ano de uma vez, na página do Asaas. ${PIX_NAO_RENOVA}`), t.slice(0, 1800));
+      const termos = cp.getByRole('button', { name: 'Termos de uso', exact: true }).filter({ visible: true });
+      const politica = cp.getByRole('button', { name: 'Política de privacidade', exact: true }).filter({ visible: true });
+      ok('Compra na web (D-129): os links "Termos de uso" e "Política de privacidade" junto da compra, como na tela das lojas, depois dos botões e antes de "Depois de pagar"',
+        (await termos.count()) === 1 && (await politica.count()) === 1 && ordem('Pagar um ano do plano Família com Pix', 'Termos de uso') && ordem('Política de privacidade', 'Depois de pagar, você volta para esta tela'), t.slice(0, 2000));
+      await termos.first().click(); await cp.waitForTimeout(300);
+      await politica.first().click(); await cp.waitForTimeout(300);
+      const abertas = await cp.evaluate(() => window.__abertas);
+      ok('Compra na web (D-129): os links abrem os Termos de uso e a Política de privacidade do site (o roteiro só anota o endereço, nada vai à rede)',
+        JSON.stringify(abertas) === JSON.stringify([`${SITE}/termos.html`, `${SITE}/privacidade.html`]), JSON.stringify(abertas));
+      await cpShot('618_assinatura_compra_web_anual');
+      // 3. No mensal: a cobrança todo mês, a mesma forma de cancelar e o Pix de um mês, que também não renova.
+      await cp.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await cp.waitForTimeout(400);
+      t = await cpBody();
+      ok('Compra na web (D-129): no mensal, a cobrança todo mês, que renova sozinha pelo mesmo preço até cancelar, o mesmo jeito de cancelar, e o Pix de um mês, que não renova nem cobra sozinho; a primeira cobrança no fim do teste',
+        t.includes(`No cartão, o plano mensal é cobrado todo mês e renova sozinho, pelo mesmo preço, até você cancelar. ${COMUM}`) &&
+          t.includes(`Com Pix, você paga um mês por vez, na página do Asaas. ${PIX_NAO_RENOVA}`) && (await cpCount('button', 'Assinar o plano Individual mensal')) === 1 &&
+          fimDoTeste !== null && t.includes(`A primeira cobrança é em ${fimDoTeste}`), t.slice(0, 1800));
+      await cpShot('619_assinatura_compra_web_mensal');
+      for (const w of [360, 1280]) {
+        await cp.setViewportSize({ width: w, height: w === 1280 ? 900 : 780 });
+        await cp.waitForTimeout(400);
+        const largo = await cp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+        ok(`Compra na web (D-129): nada passa da largura em ${w} px`, !largo);
+        if (w === 1280) await cpShot('620_assinatura_compra_web_computador');
+      }
+      ok('Compra na web (D-129): nada vai à rede (nenhum pedido para fora de localhost, nenhuma gravação) e nenhum erro na página',
+        fora.length === 0 && cpWrites.length === 0 && cpErrors.length === 0, JSON.stringify({ fora: fora.slice(0, 3), cpWrites: cpWrites.slice(0, 3), cpErrors: cpErrors.slice(0, 3) }));
+    } finally {
+      await cpCtx.close();
+    }
   }
 
   // ==================================================================================================================

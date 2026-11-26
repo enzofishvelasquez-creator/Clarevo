@@ -27,6 +27,11 @@
  * breve" ao lado do preço; saíram a etiqueta "Preços no lançamento" e a frase "A assinatura pelo app abre no lançamento. Até lá, nada é
  * cobrado.". Depois do lançamento, nada disso aparece.
  *
+ * Desde a análise geral de 26/11/2026 (D-129), a capa de `planos.html` e a de cada plano têm as chamadas pelo estado do produto
+ * (`chamadasDosPlanos`): lançado, "Assine aqui" (criar conta) e "Conheça o app", com a linha do teste; antes do lançamento, à vista, "A
+ * assinatura abre em breve, na web e nas lojas." e "Conheça o app" ("Assine aqui" de todas as páginas chega aqui, e a página não pode ser um
+ * beco sem saída). A nota do anual é a do site (`noteSite`): o cartão e as lojas renovam a cada período, o Pix não.
+ *
  * Os nomes, os preços, o "por mês" e as frases da assinatura vêm do núcleo (`catalogo().PLANOS`, de `packages/core/src/plano.ts`), para o
  * site e o app dizerem o mesmo; o resto foi conferido no guia de uso do app (`packages/core/src/guide`), nas decisões de `docs/00` (D-083
  * para o plano Família pago pela pessoa titular, D-093 para o Pix mês a mês, D-105 para o calendário, D-113 e `docs/52` para o Espaço
@@ -38,7 +43,7 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, icone, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { emBreveNoTitulo, estadoEmVigor, fitaEmBreve, sistemas } = require('../estado');
+const { chamadasDosPlanos, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, sistemas } = require('../estado');
 
 const ARQUIVO = 'planos.html';
 /** "R$ 29,90" → "29.90", para os dados estruturados. */
@@ -130,8 +135,9 @@ function pessoasNaFamilia() {
  * Os recursos do app, em grupos, os mesmos nos dois planos. Cada um: o nome (o texto do link e o título do cartão), o destino (Ajuda ou O
  * app), o ícone (`ICONES` de `modelo.js`), uma frase curta e, quando há, a ressalva que importa (`nota`), escritas conferindo o guia de uso e
  * as decisões citadas no começo do arquivo. No plano Família, quatro cartões dizem onde o recurso vale (`onde`): anotar no Pessoal ou na
- * Família (o seletor do guia, com o papel de quem anota); Investir, o Telegram e o negócio só no Pessoal de cada pessoa (como em Segurança,
- * no guia e em `business.ts`; o negócio compartilhado é do Plus, D-116). Desde 23/11/2026, os grupos têm 3, 3, 3 e 5 recursos, para a grade
+ * Família (o seletor do guia, com o papel de quem anota); o Telegram no Pessoal ou na Família em que a pessoa anota (o código de ligar
+ * escolhe o espaço, e o banco recusa o negócio, `clarevo_chat_create_code`, D-113a; corrigido na D-129, que dizia "Só no seu Pessoal");
+ * Investir e o negócio só no Pessoal de cada pessoa (como em Segurança, no guia e em `business.ts`; o negócio compartilhado é do Plus, D-116). Desde 23/11/2026, os grupos têm 3, 3, 3 e 5 recursos, para a grade
  * de cartões fechar as linhas; no último, os dois primeiros (os maiores) ficam lado a lado no computador.
  */
 function gruposDeRecursos(plano) {
@@ -142,7 +148,7 @@ function gruposDeRecursos(plano) {
       id: 'dia-a-dia',
       titulo: 'O dia a dia',
       itens: [
-        { nome: 'Anotar e Resumo', destino: 'app/index.html#resumo', icone: 'anotar', texto: 'Gastos e recebimentos em poucos toques. O Resumo mostra o recebido, o pago e o que ainda vai vencer no mês.', onde: soNaFamilia('No seu Pessoal e, com o papel de quem anota, na Família.') },
+        { nome: 'Anotar e Resumo', destino: 'app/index.html#resumo', icone: 'anotar', texto: 'Gastos e recebimentos em poucos toques. O Resumo mostra o recebido, o pago e o que ainda vence no mês.', onde: soNaFamilia('No seu Pessoal e, com o papel de quem anota, na Família.') },
         { nome: 'Contas a pagar', destino: ajudaDoGuia('contas-a-pagar'), icone: 'conta', texto: 'Os vencimentos, com lembrete no app para celular. Quando você paga, o valor passa a contar em Pago.' },
         { nome: 'Calendário do mês', destino: 'app/index.html#contas', icone: 'calendario', texto: 'Contas, faturas e gastos fixos por dia, com o previsto separado do que já foi pago.' },
       ],
@@ -170,7 +176,7 @@ function gruposDeRecursos(plano) {
       titulo: 'Do seu jeito',
       itens: [
         { nome: 'Espaço Negócio', destino: ajudaDoGuia('negocio'), icone: 'negocio', texto: 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio separadas do Pessoal, com quanto entrou, saiu e sobrou no mês.', nota: 'Incluído na assinatura: um negócio por pessoa, sem custo a mais.', onde: soNaFamilia('O negócio é só de quem o criou e não entra na Família.') },
-        { nome: 'Anotar pelo Telegram', destino: ajudaDoGuia('telegram'), icone: 'mensagem', texto: 'Anote um gasto ou um recebimento com uma mensagem escrita para a Clarevo.', onde: soNaFamilia('Só no seu Pessoal.') },
+        { nome: 'Anotar pelo Telegram', destino: ajudaDoGuia('telegram'), icone: 'mensagem', texto: 'Anote um gasto ou um recebimento com uma mensagem escrita para a Clarevo.', onde: soNaFamilia('No seu Pessoal ou na Família em que você anota.') },
         { nome: 'Tema claro ou escuro', destino: 'ajuda/conta.html#p-tema', icone: 'tema', texto: 'O app segue o tema do aparelho, e em Conta dá para escolher Claro ou Escuro.' },
         { nome: 'Ocultar valores', destino: ajudaDoGuia('ocultar-valores'), icone: 'ocultar', texto: 'Esconde os valores em reais da tela e, no celular, pode pedir biometria ao abrir o app.' },
         { nome: 'Exportar meus dados', destino: ajudaDoGuia('exportar'), icone: 'exportar', texto: 'Os seus gastos e recebimentos numa planilha (CSV) ou num resumo em PDF, montado no próprio aparelho.' },
@@ -246,12 +252,14 @@ function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const caminhos = `<p class="acoes"><a class="botao botao-principal" href="${u(PAGINA_DO_PLANO[outro])}">Ver o plano ${esc(PLANOS.nome[outro])}</a> <a class="botao botao-suave" href="${u(ARQUIVO)}">Comparar os planos</a></p>`;
 
   // O preço fica na capa, ao lado do nome: "R$" com número só aqui nesta página (o teste do site confere).
-  // Antes do lançamento (D-128), o preço leva a etiqueta "Em breve", como a fita dos cartões na página inicial e no resumo.
+  // Antes do lançamento (D-128), o preço leva a etiqueta "Em breve", como a fita dos cartões na página inicial e no resumo. Desde a D-129, as
+  // chamadas pelo estado do produto (`chamadasDosPlanos`).
   const capa = `<p class="migalha"><a href="${u(ARQUIVO)}">Planos</a></p>
 <h1>Plano ${esc(nome)}</h1>
 <p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${estado.lancado ? '' : ' <span class="etiqueta etiqueta-capa">Em breve</span>'}</p>
 ${linhaDoAnual(plano, 'preco-capa-anual')}
-<p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>`;
+<p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>
+${chamadasDosPlanos(arquivo, estado)}`;
 
   const assinatura = `<h2 id="assinatura">Como funciona a assinatura</h2>
 <ul class="como-funciona">
@@ -259,7 +267,7 @@ ${linhaDoAnual(plano, 'preco-capa-anual')}
 <li>Depois do teste, sem assinatura, a conta fica só para ver e exportar. ${esc(t.readOnlyWhat)}</li>
 <li>${esc(PLANOS.notaDoAnual)}</li>
 <li>${esc(t.howToPay)} Com Pix, você paga um mês por vez ou o ano de uma vez.</li>
-<li>${esc(t.benefitNote)} <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</li>
+<li>${esc(t.benefitNote)} <a href="${u('empresas/index.html')}">Veja como funciona o benefício pela empresa</a>.</li>
 </ul>
 <p class="nota">Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`;
 
@@ -354,8 +362,10 @@ ${linhaDoAnual(p.plan)}
     )
     .join('\n');
 
+  // D-129: as chamadas pelo estado do produto (lançado, "Assine aqui" e "Conheça o app"; antes, a assinatura em breve e "Conheça o app").
   const capa = `<h1>Planos da Clarevo</h1>
-<p class="lead">Dois planos, com os mesmos recursos do app. O que muda é para quem é a assinatura.</p>`;
+<p class="lead">Dois planos, com os mesmos recursos do app. O que muda é para quem é a assinatura.</p>
+${chamadasDosPlanos(ARQUIVO, estado)}`;
 
   const brutas = [
     bloco(
@@ -364,7 +374,7 @@ ${linhaDoAnual(p.plan)}
 ${cartoes}
 </div>
 ${linhaDosPlanos(u)}
-<p class="nota">${esc(PLANOS.notaDoAnual)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a>.</p>`,
+<p class="nota">${esc(PLANOS.notaDoAnual)} Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a>.</p>`,
       { rotulo: 'comparar' },
     ),
   ];

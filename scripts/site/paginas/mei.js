@@ -21,7 +21,7 @@ const ARQUIVO = 'mei.html';
 const RECURSOS = [
   { icone: 'negocio', titulo: 'O negócio no espaço dele', texto: 'Um espaço só do negócio, com as telas que você já usa no Pessoal: entradas e saídas, contas a pagar, gastos fixos, cartão e importação de extrato. Anotou no lugar errado? Dá para mover.' },
   { icone: 'conta', titulo: 'Categorias de quem vende e presta serviço', texto: 'Vendas, Serviços, Material e mercadoria, Combustível e transporte, Impostos e DAS, Taxas e maquininha e outras, prontas para usar.' },
-  { icone: 'investir', titulo: 'Quanto entrou, saiu e sobrou', texto: 'Em Seu negócio, o mês e os últimos 6 meses numa cor só, as maiores saídas e o Resumo do ano por categoria.' },
+  { icone: 'investir', titulo: 'Quanto entrou, saiu e sobrou', texto: 'Em Seu negócio, o mês e os últimos 6 meses, as maiores saídas e o Resumo do ano por categoria.' },
   { icone: 'dinheiro', titulo: 'Retirada para o Pessoal', texto: 'Levou dinheiro do negócio para casa? O valor sai de um espaço e entra no outro, sem virar custo do negócio. O caminho de volta é Trazer dinheiro do Pessoal.' },
   { icone: 'receber', titulo: 'A receber', texto: 'O fiado, a venda no cartão que ainda vai cair e outros valores, fora dos totais. Quando o dinheiro chega, toque em Recebi.' },
   { icone: 'ler', titulo: 'Nota e quem pagou', texto: 'Em cada entrada, marque se teve nota fiscal e quem pagou: pessoa física, empresa ou exterior. As marcas aparecem no Resumo do ano e na exportação.' },
@@ -29,7 +29,7 @@ const RECURSOS = [
 
 /** Só para quem marca o tipo do negócio como MEI (D-121 e D-122). */
 const PARA_MEI = [
-  'Marque o tipo do negócio como MEI e veja as vendas e os serviços anotados no ano ao lado do limite anual do MEI, numa cor só.',
+  'Marque o tipo do negócio como MEI e veja as vendas e os serviços anotados no ano ao lado do limite anual do MEI.',
   'No app para celular, lembretes opcionais do DAS do mês e da declaração anual, desligados até você ligar.',
   'O Resumo do ano junta o ano por categoria, e a exportação leva os lançamentos do negócio para uma planilha ou um PDF.',
 ];
@@ -54,7 +54,7 @@ function paginaMei({ valores, img, estado }) {
 <p class="lead">No Espaço Negócio, você anota o que entra e o que sai do trabalho, vê quanto sobrou no mês e leva para o Pessoal o que é seu, sem misturar as contas. Incluído na assinatura, sem custo a mais.</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
-${selosDasLojas(estado)}
+${selosDasLojas(estado, { pequenos: true })}
 </div>
 ${celular(img.negocio, ARQUIVO, { carregamento: 'eager' })}
 </div>`;

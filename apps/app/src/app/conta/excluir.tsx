@@ -3,6 +3,7 @@ import {
   DELETE_TEXT,
   FAMILY_TEXT,
   STORE_SUBSCRIPTION_TEXT,
+  SUBSCRIBE_OPEN,
   WEB_SUBSCRIPTION_TEXT,
   BUSINESS_TEXT,
   canSubmitDelete,
@@ -91,8 +92,9 @@ export default function ExcluirContaScreen() {
     setBusy(true);
     // Assinatura feita na web (D-084): cancela no Asaas antes (em qualquer plataforma; a chamada não tem tela), para não cobrar uma
     // conta que já não existe. Sem conseguir, não exclui ainda: a rede de segurança (o próximo aviso do Asaas encontra a conta excluída
-    // e a função do servidor cancela) chegaria depois de mais uma cobrança.
-    if (access.data?.provider === 'web') {
+    // e a função do servidor cancela) chegaria depois de mais uma cobrança. Com a compra aberta, também no teste grátis (D-129): quem
+    // assinou no cartão durante o teste continua no teste até a primeira cobrança, que seria a primeira cobrança depois da exclusão.
+    if (access.data?.provider === 'web' || (SUBSCRIBE_OPEN && access.data?.status === 'teste')) {
       const cancelled = await repo.cancelWebSubscription().catch(() => 'tente_de_novo' as const);
       if (cancelled !== 'cancelada' && cancelled !== 'sem_assinatura') {
         setBusy(false);

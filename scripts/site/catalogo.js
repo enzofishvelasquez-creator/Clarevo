@@ -99,11 +99,14 @@ function catalogo() {
       nome: plano.PLAN_NAME,
       preco: plano.planPriceAmount,
       porMes: plano.SUBSCRIPTION_SCREEN_TEXT.perMonth,
-      /** O plano anual (D-125 e D-127): o preço por ano, " por ano", o equivalente por mês e a nota do anual, os mesmos da tela Assinatura. */
+      /**
+       * O plano anual (D-125 e D-127): o preço por ano, " por ano", o equivalente por mês e a nota do anual. A nota é a do site (D-129): o
+       * cartão e as lojas renovam a cada período, o Pix não, sem nome de loja.
+       */
       precoAnual: (plan) => plano.planPeriodPriceAmount(plan, 'anual'),
       porAno: plano.periodSuffix('anual'),
       equivalente: plano.PLAN_PERIOD_TEXT.equivalent,
-      notaDoAnual: plano.PLAN_PERIOD_TEXT.note,
+      notaDoAnual: plano.PLAN_PERIOD_TEXT.noteSite,
       cobrancaAnual: plano.PLAN_PERIOD_TEXT.optionHint.anual,
       /** Os dias do teste grátis (TRIAL_DAYS), para a pergunta da página Planos. */
       diasDeTeste: plano.TRIAL_DAYS,

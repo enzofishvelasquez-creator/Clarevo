@@ -18,7 +18,11 @@ import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, TRIAL_DAYS, planPriceAmount } f
  *   - "Assine aqui" é a chamada principal de todas as capas e chamadas finais, com no máximo dois botões por bloco; os dados estruturados são
  *     JSON válido (com a FAQPage do início); `robots.txt` e `_headers` (a política de segurança) não mudam com o estado;
  *   - `lancado: true` é recusado enquanto a assinatura pelo app estiver fechada (`SUBSCRIBE_OPEN`). O site lançado deste teste usa
- *     `simularAssinaturaAberta`, que só o `--estado` aceita e que o `--final` recusa.
+ *     `simularAssinaturaAberta`, que só o `--estado` aceita e que o `--final` recusa;
+ *   - desde a análise geral de 26/11/2026 (D-129): os planos (`planos.html` e a página de cada plano) têm, lançado, "Assine aqui" e "Conheça
+ *     o app" na capa e, antes, a linha "A assinatura abre em breve, na web e nas lojas." (também na seção Planos do início) e "Conheça o app";
+ *     lançado, o menu tem "Entrar" ao lado de "Assine aqui", e Use no navegador diz "Já tem conta? Entrar no navegador" nos dois estados;
+ *     "Segurança" saiu do menu; e o endereço do Google Play é aceito só como a página oficial do app (`details?id=`).
  */
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const require = createRequire(import.meta.url);
@@ -38,12 +42,24 @@ interface Gerado {
 }
 const { gerarSite } = require(join(ROOT, 'scripts', 'gerar-site.js')) as { gerarSite: (opcoes?: Record<string, unknown>) => Gerado };
 const { estadoDoProduto } = require(join(ROOT, 'scripts', 'site', 'estado.js')) as { estadoDoProduto: (s?: Record<string, unknown>) => Estado };
-const config = require(join(ROOT, 'scripts', 'site', 'config.js')) as { URL_APP: string; URL_CRIAR_CONTA: string; URL_ENTRAR: string; URL_DEMO: string; ESTADO_DO_PRODUTO: Record<string, unknown> };
+const config = require(join(ROOT, 'scripts', 'site', 'config.js')) as {
+  URL_APP: string;
+  URL_CRIAR_CONTA: string;
+  URL_ENTRAR: string;
+  URL_DEMO: string;
+  ESTADO_DO_PRODUTO: Record<string, unknown>;
+  MENU: { arquivo: string; rotulo: string }[];
+};
+const { selosDasLojas } = require(join(ROOT, 'scripts', 'site', 'estado.js')) as { selosDasLojas: (e: Estado, o?: { pequenos?: boolean }) => string };
 const { URL_APP, URL_CRIAR_CONTA, URL_ENTRAR, URL_DEMO } = config;
 
 /** A data de referência dos posts (a do mais novo, a mesma do teste site.test.ts), para todas as matérias saírem nos dois estados. */
 const REFERENCIA = '2026-11-12';
 const APP_STORE = 'https://apps.apple.com/br/app/clarevo/id0000000000';
+/** A página oficial do app no Google Play: sempre com o identificador do pacote no parâmetro `id` (D-129). */
+const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=app.clarevo';
+/** A linha dos planos antes do lançamento (D-129). */
+const AVISO_DOS_PLANOS = 'A assinatura abre em breve, na web e nas lojas.';
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** O texto de um arquivo, com as entidades que o site usa trocadas pelo caractere e o espaço sem quebra virando espaço comum. */
@@ -115,12 +131,17 @@ const NUNCA: [string, RegExp][] = [
   ['Testar grátis', /Testar (?:\d+ dias )?grátis/],
   ['a demonstração como botão', /class="botao[^"]*" href="https:\/\/demo\./],
 ];
-/** Só antes do lançamento: a fita "Em breve" dos planos, "Assine aqui" levando aos planos e o "Entrar" do menu (a tela de entrar). */
+/**
+ * Só antes do lançamento: a fita "Em breve" dos planos, a linha de que a assinatura abre em breve, "Assine aqui" levando aos planos e o
+ * "Entrar" como botão do menu. A tela de entrar em si vale nos dois estados (D-129: lançado, "Entrar" fica ao lado de "Assine aqui" no
+ * menu, e Use no navegador diz "Já tem conta? Entrar no navegador").
+ */
 const SO_ANTES: [string, RegExp][] = [
   ['em breve', /\bem breve\b/i],
   ['a fita "Em breve"', /class="fita-em-breve"/],
+  ['a assinatura abre em breve', new RegExp(escRe(AVISO_DOS_PLANOS))],
   ['"Assine aqui" para os planos', /<a class="botao botao-principal" href="(?:#planos|(?:\.\.\/)*planos\.html)">Assine aqui<\/a>/],
-  ['link para a tela de entrar', new RegExp(escRe(URL_ENTRAR))],
+  ['"Entrar" como botão do menu', new RegExp(`<a class="menu-cta" href="${escRe(URL_ENTRAR)}"`)],
 ];
 /** O que só vale lançado: nunca antes do lançamento (D-064: nenhum convite a criar conta, nem a tela inicial do app web). */
 const SO_DEPOIS: [string, RegExp][] = [
@@ -223,20 +244,23 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     }
   });
 
-  it('o botão do menu leva aonde diz, em todas as páginas: "Entrar" à tela de entrar antes do lançamento e "Assine aqui" à de criar conta depois', () => {
+  it('o menu leva aonde diz, em todas as páginas: "Entrar" à tela de entrar antes do lançamento; lançado, "Assine aqui" à de criar conta e "Entrar" ao lado (D-129)', () => {
     const botoes = (g: Gerado) => {
       const vistos = new Set<string>();
       let paginas = 0;
       for (const nome of lidos(g).filter((n) => n.endsWith('.html'))) {
         const h = texto(g, nome);
         const cta = [...h.matchAll(/<a class="menu-cta" href="([^"]+)" rel="noopener noreferrer">([^<]+)<\/a>/g)];
+        const entrar = [...h.matchAll(/<a class="menu-entrar" href="([^"]+)" rel="noopener noreferrer">([^<]+)<\/a>/g)];
         if (!h.includes('class="menu-cta"')) continue;
         paginas++;
         expect(cta.length, nome).toBe(1);
-        // O menu do celular repete o mesmo botão, com o mesmo destino.
+        expect(entrar.length, nome).toBeLessThanOrEqual(1);
+        // O menu do celular repete os mesmos links, com os mesmos destinos, "Entrar" antes de "Assine aqui".
         const movel = /<details class="menu-movel">[\s\S]*?<\/details>/.exec(h)?.[0] ?? '';
-        expect(movel, nome).toContain(`<li><a href="${cta[0]![1]}" rel="noopener noreferrer">${cta[0]![2]}</a></li>`);
-        vistos.add(`${cta[0]![2]} -> ${cta[0]![1]}`);
+        const noMovel = (l: RegExpExecArray | RegExpMatchArray) => `<li><a href="${l[1]}" rel="noopener noreferrer">${l[2]}</a></li>`;
+        expect(movel, nome).toContain(entrar[0] ? `${noMovel(entrar[0])}${noMovel(cta[0]!)}` : noMovel(cta[0]!));
+        vistos.add([...entrar, ...cta].map((l) => `${l[2]} -> ${l[1]}`).join(' | '));
       }
       return { vistos: [...vistos], paginas };
     };
@@ -245,9 +269,72 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     expect(a.paginas).toBeGreaterThanOrEqual(100);
     expect(b.paginas).toBe(a.paginas);
     expect(a.vistos).toEqual([`Entrar -> ${URL_ENTRAR}`]);
-    expect(b.vistos).toEqual([`Assine aqui -> ${URL_CRIAR_CONTA}`]);
+    expect(b.vistos).toEqual([`Entrar -> ${URL_ENTRAR} | Assine aqui -> ${URL_CRIAR_CONTA}`]);
     expect(URL_ENTRAR).toBe(`${URL_APP}/entrar`);
     expect(URL_CRIAR_CONTA).toBe(`${URL_APP}/criar-conta`);
+    // "Segurança" saiu do menu (D-129): continua na faixa de confiança das capas e no rodapé.
+    expect(config.MENU.map((m) => m.rotulo)).not.toContain('Segurança');
+    for (const g of [pre, lancado]) {
+      const h = texto(g, 'index.html');
+      expect(/<ul class="menu-lista">[\s\S]*?<\/ul>/.exec(h)?.[0]).not.toContain('seguranca.html');
+      expect(h).toContain('<li><a href="seguranca.html">Segurança e privacidade</a></li>');
+      expect(h).toMatch(/<p class="confianca"><a href="seguranca\.html">/);
+    }
+  });
+
+  it('os planos nunca são um beco sem saída (D-129): lançado, "Assine aqui" e "Conheça o app" na capa; antes, à vista, a assinatura em breve e "Conheça o app"', () => {
+    const PLANOS = { 'planos.html': '', 'planos/individual.html': '../', 'planos/familia.html': '../' } as const;
+    for (const [nome, sobe] of Object.entries(PLANOS)) {
+      const capaDe = (g: Gerado) => /<section class="capa[^"]*">([\s\S]*?)<\/section>/.exec(texto(g, nome))?.[1] ?? '';
+      expect(capaDe(lancado), nome).toContain(
+        `<div class="acoes">\n<a class="botao botao-principal" href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">Assine aqui</a>\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>\n<p class="estado-produto">${TRIAL_DAYS} dias grátis, sem cartão. Cancele quando quiser.</p>`,
+      );
+      expect(capaDe(pre), nome).toContain(
+        `<p class="estado-produto">${AVISO_DOS_PLANOS}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>`,
+      );
+      expect(capaDe(pre), nome).not.toContain('botao-principal');
+      expect(capaDe(lancado), nome).not.toContain(AVISO_DOS_PLANOS);
+    }
+    // A seção Planos do início, aonde "Assine aqui" da capa leva antes do lançamento: a mesma linha, logo abaixo do título.
+    expect(texto(pre, 'index.html')).toMatch(new RegExp(`<h2 id="planos">Planos</h2>\n<p class="lead-bloco">[^<]+</p>\n<p class="aviso-assinatura">${escRe(AVISO_DOS_PLANOS)}</p>`));
+    expect(texto(lancado, 'index.html')).not.toContain('aviso-assinatura');
+  });
+
+  it('Use no navegador: "Já tem conta? Entrar no navegador" embaixo das chamadas da capa e da chamada final, nos dois estados (D-129)', () => {
+    const entrar = `<p class="ja-tem-conta">Já tem conta? <a href="${URL_ENTRAR}" rel="noopener noreferrer">Entrar no navegador</a></p>`;
+    for (const g of [pre, lancado]) {
+      const h = texto(g, 'web.html');
+      expect(h.split(entrar).length - 1).toBe(2);
+      expect(h).toMatch(new RegExp(`</div>\n${escRe(entrar)}\n</div>`));
+    }
+  });
+
+  it('o endereço das lojas (D-129): o Google Play só como a página oficial do app (details?id=), a App Store sem parâmetro; outros recusados', () => {
+    expect(estadoDoProduto({ lojas: { googlePlay: GOOGLE_PLAY } }).lojas.googlePlay).toBe(GOOGLE_PLAY);
+    expect(estadoDoProduto({ lojas: { appStore: APP_STORE } }).lojas.appStore).toBe(APP_STORE);
+    for (const url of [
+      'https://play.google.com/store/apps/details?id=app.clarevo&hl=pt_BR',
+      'https://play.google.com/store/apps/details?id=app.clarevo&utm_source=site',
+      'https://play.google.com/store/apps/details?id=app.clarevo#avaliacoes',
+      'https://play.google.com/store/apps/details?id=',
+      'https://play.google.com/store/apps/details?id=app clarevo',
+      'https://play.google.com/store/apps/dev?id=123',
+      'http://play.google.com/store/apps/details?id=app.clarevo',
+      'https://play.google.com.golpe.test/store/apps/details?id=app.clarevo',
+      'https://golpe.test/?https://play.google.com/store/apps/details?id=app.clarevo',
+    ]) {
+      expect(() => estadoDoProduto({ lojas: { googlePlay: url } }), url).toThrow(/googlePlay/);
+    }
+    for (const url of ['https://apps.apple.com/br/app/clarevo/id0000000000?mt=8', 'https://apps.apple.com/br/app/clarevo/id0000000000#x', 'https://golpe.test/apps.apple.com/']) {
+      expect(() => estadoDoProduto({ lojas: { appStore: url } }), url).toThrow(/appStore/);
+    }
+    // Lançado, com o endereço oficial do Google Play, o selo leva a ele (o "?" escapado só no HTML).
+    const comAsDuas = estadoDoProduto({ lancado: true, lojas: { appStore: APP_STORE, googlePlay: GOOGLE_PLAY }, simularAssinaturaAberta: true });
+    expect(selosDasLojas(comAsDuas)).toContain(`<a class="selo-loja" href="${GOOGLE_PLAY}" rel="noopener noreferrer">Disponível no Google Play</a>`);
+    // Nas capas, os selos numa linha pequena de texto, sem virar um terceiro botão.
+    expect(selosDasLojas(comAsDuas, { pequenos: true })).toMatch(/^<p class="selos-lojas selos-pequenos">No celular: <a class="selo-loja"/);
+    // Antes do lançamento, nenhum selo, mesmo com os endereços.
+    expect(selosDasLojas(estadoDoProduto({ lojas: { googlePlay: GOOGLE_PLAY } }))).toBe('');
   });
 
   it('O app, as calculadoras e o kit de imprensa seguem o estado: a versão web, o app que se pode abrir e "Onde usar"', () => {
