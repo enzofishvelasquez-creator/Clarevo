@@ -157,7 +157,7 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 
 ## Assinatura pelas lojas (D-090, `docs/42_ASSINATURA_LOJAS.md`)
 
-Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play), mensal de R$ 29,90 e Família de R$ 69,90, com o RevenueCat; 14 dias grátis pela Clarevo e só o mensal no lançamento.
+Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play), mensal de R$ 29,90 e Família de R$ 69,90, com o RevenueCat; 14 dias grátis pela Clarevo e só o mensal no lançamento (mudou com a D-125: o anual também entra no lançamento, R$ 269,90 e R$ 629,90 por ano, pronto no código e fechado até a compra abrir, D-127, `docs/42`).
 
 - [x] Produtos, compra no app (`react-native-purchases`, `apps/app/src/lib/store-purchases.ts`), botões, renovação e "Restaurar compras" na tela Assinatura, ajustes da loja e troca de plano, aviso ao excluir a conta
 - [x] Função do servidor `assinatura-lojas` (avisos do RevenueCat, "sincronizar" e "esquecer"), sem migração nova (`assinatura-lojas.test.ts`)

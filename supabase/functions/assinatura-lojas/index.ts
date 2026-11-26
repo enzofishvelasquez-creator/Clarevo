@@ -120,9 +120,11 @@ const __mods = [
             const s = (0, servidor_comum_1.obj)(value);
             if (!s)
                 continue;
+            const info = (0, produtos_1.storeProductInfo)(product);
             out.push({
                 product,
-                plan: (0, produtos_1.planOfStoreProduct)(product),
+                plan: info?.plan ?? null,
+                period: info?.period ?? null,
                 provider: storeProviderOf(s.store),
                 expiresAt: date(s.expires_date),
                 graceUntil: date(s.grace_period_expires_date),
@@ -149,7 +151,7 @@ const __mods = [
                 continue;
             const end = subscriptionEnd(s);
             if (end)
-                ends.push({ plan: s.plan, end });
+                ends.push({ plan: s.plan, period: s.period ?? 'mensal', end });
         }
         if (ends.length === 0)
             return null;
@@ -157,11 +159,11 @@ const __mods = [
         const active = ends.filter((e) => e.end.getTime() > now.getTime());
         if (active.length === 0) {
             const last = latest(ends);
-            return { plan: last.plan, validUntil: last.end };
+            return { plan: last.plan, period: last.period, validUntil: last.end };
         }
         const family = active.filter((e) => e.plan === 'familiar');
         const chosen = latest(family.length > 0 ? family : active);
-        return { plan: chosen.plan, validUntil: chosen.end };
+        return { plan: chosen.plan, period: chosen.period, validUntil: chosen.end };
     }
     function storeExternalRef(personId) {
         return (0, sha256_1.sha256Hex)(`revenuecat:${personId.toLowerCase()}`);
@@ -259,14 +261,14 @@ const __mods = [
                     const plan = row?.plan;
                     if (text(row?.person_id)?.toLowerCase() !== personId || (plan !== 'individual' && plan !== 'familiar'))
                         continue;
-                    validity = { plan, validUntil: now() };
+                    validity = { plan, period: row?.period === 'anual' ? 'anual' : 'mensal', validUntil: now() };
                     ended = true;
                 }
                 const tag = (0, sha256_1.sha256Hex)(`${personId}:${provider}`).slice(0, 16);
                 const minute = now().toISOString().slice(0, 16);
                 const id = eventId
                     ? `rc:${eventId}:${tag}`
-                    : `rc-app:${(0, sha256_1.sha256Hex)(`${personId}:${provider}:${validity.plan}:${ended ? 'fim' : validity.validUntil.toISOString()}:${minute}`).slice(0, 40)}`;
+                    : `rc-app:${(0, sha256_1.sha256Hex)(`${personId}:${provider}:${validity.plan}:${validity.period}:${ended ? 'fim' : validity.validUntil.toISOString()}:${minute}`).slice(0, 40)}`;
                 const applied = await c.rpcService('billing_apply', {
                     p_event_id: id,
                     p_provider: provider,
@@ -275,6 +277,7 @@ const __mods = [
                     p_plan: validity.plan,
                     p_valid_until: validity.validUntil.toISOString(),
                     p_event_at: at.toISOString(),
+                    ...(validity.period === 'anual' ? { p_period: 'anual' } : {}),
                 });
                 if (applied.status !== 200) {
                     log(`banco recusou a assinatura da loja ${provider} (${applied.status})`);
@@ -528,22 +531,35 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.GOOGLE_BASE_PLAN = exports.STORE_PRODUCT_IDS = void 0;
+    exports.STORE_PACKAGES = exports.STORE_OFFERINGS = exports.GOOGLE_BASE_PLAN = exports.GOOGLE_BASE_PLANS = exports.STORE_PRODUCT_IDS = exports.STORE_PRODUCTS = void 0;
+    exports.storeProductInfo = storeProductInfo;
     exports.planOfStoreProduct = planOfStoreProduct;
-    exports.STORE_PRODUCT_IDS = {
-        individual: 'clarevo_individual_mensal',
-        familiar: 'clarevo_familia_mensal',
+    exports.STORE_PRODUCTS = {
+        individual: { mensal: 'clarevo_individual_mensal', anual: 'clarevo_individual_anual' },
+        familiar: { mensal: 'clarevo_familia_mensal', anual: 'clarevo_familia_anual' },
     };
-    exports.GOOGLE_BASE_PLAN = 'mensal';
-    function planOfStoreProduct(id) {
+    exports.STORE_PRODUCT_IDS = {
+        individual: exports.STORE_PRODUCTS.individual.mensal,
+        familiar: exports.STORE_PRODUCTS.familiar.mensal,
+    };
+    exports.GOOGLE_BASE_PLANS = { mensal: 'mensal', anual: 'anual' };
+    exports.GOOGLE_BASE_PLAN = exports.GOOGLE_BASE_PLANS.mensal;
+    exports.STORE_OFFERINGS = { individual: 'individual', familiar: 'familia' };
+    exports.STORE_PACKAGES = { mensal: '$rc_monthly', anual: '$rc_annual' };
+    function storeProductInfo(id) {
         if (typeof id !== 'string')
             return null;
         const base = id.trim().split(':')[0] ?? '';
-        if (base === exports.STORE_PRODUCT_IDS.individual)
-            return 'individual';
-        if (base === exports.STORE_PRODUCT_IDS.familiar)
-            return 'familiar';
+        for (const plan of ['individual', 'familiar']) {
+            for (const period of ['mensal', 'anual']) {
+                if (base === exports.STORE_PRODUCTS[plan][period])
+                    return { plan, period };
+            }
+        }
         return null;
+    }
+    function planOfStoreProduct(id) {
+        return storeProductInfo(id)?.plan ?? null;
     }
   },
 ];

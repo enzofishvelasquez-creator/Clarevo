@@ -11,9 +11,13 @@
  * os botões de assinar não aparecem. `EXPO_PUBLIC_STORE_TEST=sim` (só em builds de teste) mostra os botões antes de a compra abrir.
  */
 import {
-  GOOGLE_BASE_PLAN,
-  STORE_PRODUCT_IDS,
-  planOfStoreProduct,
+  GOOGLE_BASE_PLANS,
+  STORE_OFFERINGS,
+  STORE_PACKAGES,
+  STORE_PRODUCTS,
+  storeChangeIsImmediate,
+  storeProductInfo,
+  type BillingPeriod,
   type PlanKind,
   type StoreName,
   type StorePurchaseResult,
@@ -21,7 +25,7 @@ import {
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking, Platform } from 'react-native';
-import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, STORE_REPLACEMENT_MODE } from 'react-native-purchases';
+import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, STORE_REPLACEMENT_MODE, type PurchasesPackage } from 'react-native-purchases';
 
 import { withExternalScreen } from '@/lib/external-screen';
 
@@ -122,31 +126,64 @@ function purchaseError(e: unknown): StorePurchaseResult {
   }
 }
 
+/** O que se compra na loja: o plano e o período (D-127). */
+export interface StoreChoice {
+  plan: PlanKind;
+  period: BillingPeriod;
+}
+
+/** Se o produto da loja é o do plano e do período escolhidos (o identificador sozinho ou com o plano básico do Google). */
+function isProductOf(identifier: string, choice: StoreChoice): boolean {
+  const info = storeProductInfo(identifier);
+  return info !== null && info.plan === choice.plan && info.period === choice.period;
+}
+
 /**
- * Compra o plano na loja. `current`: o plano que a pessoa já assina nesta loja, para a troca de plano. No iPhone, os dois produtos
- * estão no mesmo grupo de assinaturas, e a própria App Store faz a troca (o Família vale na hora; o Individual, na renovação). No
- * Android, a troca diz ao Google qual assinatura substituir: para o Família, na hora, com o tempo que sobrou descontado; para o
- * Individual, na próxima renovação.
+ * O pacote da oferta do RevenueCat (`$rc_monthly` ou `$rc_annual` na oferta do plano, docs/42), se existe e traz o produto certo. Sem a
+ * oferta no painel, sem rede para ela ou com outro produto no pacote: null, e a compra segue pelo identificador do produto.
  */
-export async function buyPlan(personId: string, plan: PlanKind, current: PlanKind | null = null): Promise<StorePurchaseResult> {
+async function offeringPackage(choice: StoreChoice): Promise<PurchasesPackage | null> {
+  try {
+    const offerings = await Purchases.getOfferings();
+    const pkg = offerings.all[STORE_OFFERINGS[choice.plan]]?.availablePackages.find((p) => p.identifier === STORE_PACKAGES[choice.period]) ?? null;
+    return pkg && isProductOf(pkg.product.identifier, choice) ? pkg : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compra o plano no período escolhido (mensal ou anual, D-127). `current`: o que a pessoa já assina nesta loja, para a troca de plano ou de
+ * período. No iPhone, os quatro produtos estão no mesmo grupo de assinaturas, e a própria App Store faz a troca (para o Família, na hora;
+ * para o Individual ou entre mensal e anual, na renovação). No Android, a troca diz ao Google qual assinatura substituir, com o mesmo
+ * efeito (`storeChangeIsImmediate`): na hora, com o tempo que sobrou descontado, ou na próxima renovação. A compra vai pelo pacote da
+ * oferta do RevenueCat quando ele existe e, sem ele, pelo produto da loja.
+ */
+export async function buyPlan(personId: string, choice: StoreChoice, current: StoreChoice | null = null): Promise<StorePurchaseResult> {
   if (!STORE_PURCHASES_READY) return 'indisponivel';
   try {
     await ready(personId);
-    const products = await Purchases.getProducts([STORE_PRODUCT_IDS[plan]], PRODUCT_CATEGORY.SUBSCRIPTION);
-    // No Google, o produto vem com o plano básico ("clarevo_individual_mensal:mensal"); fica o mensal.
-    const product =
-      products.find((p) => p.identifier === STORE_PRODUCT_IDS[plan]) ??
-      products.find((p) => p.identifier === `${STORE_PRODUCT_IDS[plan]}:${GOOGLE_BASE_PLAN}`) ??
-      products.find((p) => planOfStoreProduct(p.identifier) === plan);
-    if (!product) return 'indisponivel';
+    const id = STORE_PRODUCTS[choice.plan][choice.period];
     const change =
-      Platform.OS === 'android' && current && current !== plan
+      Platform.OS === 'android' && current && (current.plan !== choice.plan || current.period !== choice.period)
         ? {
-            oldProductIdentifier: STORE_PRODUCT_IDS[current],
-            replacementMode: plan === 'familiar' ? STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION : STORE_REPLACEMENT_MODE.DEFERRED,
+            oldProductIdentifier: STORE_PRODUCTS[current.plan][current.period],
+            replacementMode: storeChangeIsImmediate(current, choice) ? STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION : STORE_REPLACEMENT_MODE.DEFERRED,
           }
         : null;
-    // A tela de compra da loja é uma tela de fora: pagar pode levar mais de um minuto, e a volta dela não trava o app (lib/external-screen.ts).
+    const pkg = await offeringPackage(choice);
+    if (pkg) {
+      // A tela de compra da loja é uma tela de fora: pagar pode levar mais de um minuto, e a volta dela não trava o app (lib/external-screen.ts).
+      await withExternalScreen(() => Purchases.purchasePackage(pkg, null, change));
+      return 'comprado';
+    }
+    const products = await Purchases.getProducts([id], PRODUCT_CATEGORY.SUBSCRIPTION);
+    // No Google, o produto vem com o plano básico ("clarevo_individual_anual:anual").
+    const product =
+      products.find((p) => p.identifier === id) ??
+      products.find((p) => p.identifier === `${id}:${GOOGLE_BASE_PLANS[choice.period]}`) ??
+      products.find((p) => isProductOf(p.identifier, choice));
+    if (!product) return 'indisponivel';
     await withExternalScreen(() => Purchases.purchaseStoreProduct(product, change));
     return 'comprado';
   } catch (e) {
@@ -154,13 +191,16 @@ export async function buyPlan(personId: string, plan: PlanKind, current: PlanKin
   }
 }
 
-/** "Restaurar compras": liga à conta da Clarevo a assinatura que a conta da loja já tem (em outro aparelho ou antes de reinstalar). */
+/**
+ * "Restaurar compras": liga à conta da Clarevo a assinatura que a conta da loja já tem (em outro aparelho ou antes de reinstalar), mensal
+ * ou anual.
+ */
 export async function restorePurchases(personId: string): Promise<StoreRestoreResult> {
   if (!STORE_PURCHASES_READY) return 'indisponivel';
   try {
     await ready(personId);
     const info = await Purchases.restorePurchases();
-    return info.activeSubscriptions.some((id) => planOfStoreProduct(id) !== null) ? 'restaurado' : 'nada';
+    return info.activeSubscriptions.some((id) => storeProductInfo(id) !== null) ? 'restaurado' : 'nada';
   } catch (e) {
     const r = purchaseError(e);
     return r === 'rede' || r === 'indisponivel' ? r : 'tente_de_novo';

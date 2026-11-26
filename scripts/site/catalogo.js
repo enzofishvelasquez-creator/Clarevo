@@ -99,6 +99,12 @@ function catalogo() {
       nome: plano.PLAN_NAME,
       preco: plano.planPriceAmount,
       porMes: plano.SUBSCRIPTION_SCREEN_TEXT.perMonth,
+      /** O plano anual (D-125 e D-127): o preço por ano, " por ano", o equivalente por mês e a nota do anual, os mesmos da tela Assinatura. */
+      precoAnual: (plan) => plano.planPeriodPriceAmount(plan, 'anual'),
+      porAno: plano.periodSuffix('anual'),
+      equivalente: plano.PLAN_PERIOD_TEXT.equivalent,
+      notaDoAnual: plano.PLAN_PERIOD_TEXT.note,
+      cobrancaAnual: plano.PLAN_PERIOD_TEXT.optionHint.anual,
       /** Os dias do teste grátis (TRIAL_DAYS), para a pergunta da página Planos. */
       diasDeTeste: plano.TRIAL_DAYS,
       /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */

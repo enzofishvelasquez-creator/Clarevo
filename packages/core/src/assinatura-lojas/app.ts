@@ -4,10 +4,20 @@
  * assinatura aparecer sem esperar o aviso do RevenueCat. Na web nada daqui aparece (lá a assinatura é pelo Asaas, D-084). A função do
  * servidor fica em `servidor.ts` (não importa este arquivo: mudar um texto da tela não muda a função).
  */
-import { PLAN_NAME, type PlanKind } from '../plano-precos';
+import { PERIOD_NAME, PLAN_NAME, type BillingPeriod, type PlanKind } from '../plano-precos';
 import type { AccessProvider, AccessStatus } from '../plano';
 
-export { GOOGLE_BASE_PLAN, STORE_PRODUCT_IDS, planOfStoreProduct } from './produtos';
+export {
+  GOOGLE_BASE_PLAN,
+  GOOGLE_BASE_PLANS,
+  STORE_OFFERINGS,
+  STORE_PACKAGES,
+  STORE_PRODUCTS,
+  STORE_PRODUCT_IDS,
+  planOfStoreProduct,
+  storeProductInfo,
+  type StoreProductInfo,
+} from './produtos';
 
 /** O nome da função do servidor no Supabase (Edge Functions). */
 export const STORE_SUBSCRIPTION_FUNCTION = 'assinatura-lojas';
@@ -62,16 +72,27 @@ export function isStoreSubscription(status: AccessStatus, provider: AccessProvid
 const STORE_LABEL: Readonly<Record<StoreName, string>> = { apple: 'App Store', google: 'Google Play' };
 const STORE_ACCOUNT: Readonly<Record<StoreName, string>> = { apple: 'da sua conta Apple', google: 'da sua conta Google' };
 
+/**
+ * Para onde vai a troca na loja (D-090 e D-127), pela mesma regra nas duas lojas: para o Família (de um Individual, mensal ou anual), na
+ * hora, com o que sobrou do período pago descontado; para o Individual ou entre mensal e anual do mesmo plano, na próxima renovação. Na
+ * Apple, é o grupo de assinaturas que faz isso (o Família mensal e o anual no nível 1, o Individual mensal e o anual no nível 2); no
+ * Google, o app diz o modo da troca.
+ */
+export function storeChangeIsImmediate(from: { plan: PlanKind }, to: { plan: PlanKind }): boolean {
+  return from.plan === 'individual' && to.plan === 'familiar';
+}
+
 /** Os textos da assinatura pelas lojas (tela Assinatura e exclusão da conta). */
 export const STORE_SUBSCRIPTION_TEXT = {
-  subscribe: (plan: PlanKind) => `Assinar o plano ${PLAN_NAME[plan]}`,
+  /** "Assinar o plano Individual" e, com o período (D-127), "Assinar o plano Individual anual". */
+  subscribe: (plan: PlanKind, period?: BillingPeriod) => `Assinar o plano ${PLAN_NAME[plan]}${period ? ` ${PERIOD_NAME[period]}` : ''}`,
   subscribeBusy: 'Abrindo a loja',
   /** Antes dos botões de assinar. */
   howItWorks: (store: StoreName) =>
     `A assinatura é feita pela ${STORE_LABEL[store]}, com a forma de pagamento ${STORE_ACCOUNT[store]}. Os dados do pagamento ficam com a loja: a Clarevo não vê nem guarda.`,
   /** A renovação automática, como a Apple e o Google pedem antes da compra (preço, período, renovação e como cancelar). */
   autoRenew:
-    'Cada plano é uma assinatura mensal, com o preço acima. Ela renova sozinha a cada mês, pelo mesmo preço, até você cancelar. Para evitar a cobrança do mês seguinte, cancele nos ajustes de assinatura da loja até 24 horas antes da renovação. O acesso completo continua até o fim do mês já pago.',
+    'Cada plano é uma assinatura mensal ou anual, com o preço acima. Ela renova sozinha ao fim de cada período, a cada mês ou a cada ano, pelo mesmo preço, até você cancelar. Para evitar a cobrança do período seguinte, cancele nos ajustes de assinatura da loja até 24 horas antes da renovação. O acesso completo continua até o fim do período já pago.',
   terms: 'Termos de uso',
   privacy: 'Política de privacidade',
   legalOpenFailed: 'Não foi possível abrir a página. Tente de novo.',
@@ -85,11 +106,13 @@ export const STORE_SUBSCRIPTION_TEXT = {
   pending: 'O pagamento ficou pendente na loja. Quando a loja confirmar, a assinatura aparece aqui.',
   refresh: 'Atualizar',
   manage: (store: StoreName) => `Gerenciar na ${STORE_LABEL[store]}`,
-  manageHint: (store: StoreName) => `Para cancelar, use os ajustes de assinatura da ${STORE_LABEL[store]}. O acesso completo continua até o fim do mês já pago.`,
+  manageHint: (store: StoreName) => `Para cancelar, use os ajustes de assinatura da ${STORE_LABEL[store]}. O acesso completo continua até o fim do período já pago.`,
   changePlan: (plan: PlanKind) => `Mudar para o plano ${PLAN_NAME[plan]}`,
+  /** Mudar entre mensal e anual no mesmo plano (D-127). */
+  changePeriod: (period: BillingPeriod) => `Mudar para o ${PERIOD_NAME[period]}`,
   changeBusy: 'Abrindo a loja',
   changeNote:
-    'Ao mudar para o Família, a troca vale na hora, e a loja desconta o que sobrou do mês pago. Ao voltar para o Individual, a troca vale na próxima renovação.',
+    'Ao mudar para o Família, a troca vale na hora, e a loja desconta o que sobrou do período pago. Ao voltar para o Individual ou trocar entre mensal e anual, a troca vale na próxima renovação.',
   manageFailed: 'Não foi possível abrir os ajustes da loja. Abra a loja de aplicativos e procure Assinaturas.',
   /** Excluir a conta: a assinatura da loja não é cancelada pela Clarevo. */
   deleteNote: (store: StoreName) =>

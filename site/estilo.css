@@ -230,6 +230,9 @@ blockquote>:last-child{margin-bottom:0}
 .cartao h3{margin-top:0}
 .plano .preco{margin:.25rem 0 .5rem;color:var(--texto-2)}
 .plano .preco-valor{display:block;font-size:2rem;font-weight:800;line-height:1.2;color:var(--texto);font-variant-numeric:tabular-nums}
+/* O preço anual (D-127), logo abaixo do mensal, sem destaque de alerta: o valor em negrito e o equivalente por mês ao lado. */
+.plano .preco-anual{margin:-.25rem 0 .75rem;color:var(--texto-2)}
+.preco-valor-anual{font-weight:800;color:var(--texto);font-variant-numeric:tabular-nums}
 /* Os cartões dos planos na página inicial levam à página Planos (D-115): o link do fim cobre o cartão inteiro (um link só por cartão). */
 .plano-link{position:relative;transition:border-color .15s}
 .plano-link .ver-plano a{font-weight:800}
@@ -244,6 +247,8 @@ blockquote>:last-child{margin-bottom:0}
 .plano-link>.ver-plano{margin-top:auto}
 .preco-capa{margin:.35rem 0 .75rem;color:var(--sobre-topo-suave);font-size:1.0625rem}
 .preco-capa .preco-valor{display:block;font-size:clamp(2.1rem,6vw,2.6rem);font-weight:800;line-height:1.15;color:var(--sobre-topo);font-variant-numeric:tabular-nums}
+.preco-capa-anual{margin:-.25rem 0 .75rem;color:var(--sobre-topo-suave);font-size:1.0625rem}
+.preco-capa-anual .preco-valor-anual{color:var(--sobre-topo)}
 /* "O que o plano inclui" em cartões (23/11/2026, pedido do Enzo: a lista de links sublinhados com frases longas estava "feia, pouco
    intuitiva e não apresentável"). Cada grupo é uma seção com o título e uma linha fina ao lado; cada recurso, um cartão com o ícone num
    quadrado azul-claro, o nome (o link, que cobre o cartão inteiro, como nos cartões dos planos), uma frase curta, a ressalva, a etiqueta de
@@ -812,7 +817,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa .assinatura-marca,.capa .estado-produto,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa .assinatura-marca,.capa .estado-produto,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor,.preco-capa-anual,.preco-capa-anual .preco-valor-anual{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

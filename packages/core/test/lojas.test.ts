@@ -102,7 +102,7 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
       expect(t, nome).toContain('nunca vê seus gastos');
       expect(t, nome).toContain('Não é banco');
       expect(t, nome).toContain('não garantem resultado');
-      expect(t, nome).not.toMatch(/segurança nível bancário|100% seguro|economiz|Open Finance|Clarevo Plus|plano anual/i);
+      expect(t, nome).not.toMatch(/segurança nível bancário|100% seguro|economiz|Open Finance|Clarevo Plus/i);
     }
     expect(todos.find((c) => c.nome === 'apple-promocional')!.texto).toContain('Você decide o que entra');
     expect(todos.find((c) => c.nome === 'google-descricao-curta')!.texto).not.toMatch(/Sem ligar a contas bancárias/);
@@ -143,12 +143,18 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const c of todos) expect(c.texto, c.nome).not.toMatch(/\b(?:o|O|do|no|ao|pelo|um)\s+Clarevo\b|NO CLAREVO/);
   });
 
-  it('a tela de boas-vindas do app tem a mensagem central da ficha como título, o teste grátis e "Ver a demonstração" à vista (D-125)', () => {
+  it('a tela de boas-vindas do app tem o título do site (D-126), a mensagem central da ficha pequena acima dele, o teste grátis e "Ver a demonstração" à vista (D-125)', () => {
     const tela = ler('apps/app/src/app/boas-vindas.tsx');
     const central = todos.find((c) => c.nome === 'mensagem-central')!.texto;
-    // O título é WELCOME_TEXT.title, a mesma frase da ficha (a frase central fica para o fundador decidir; as duas mudam juntas).
+    // D-126: o título é WELCOME_TEXT.title, o mesmo título do site (e a promessa das descrições das lojas, sem o "no mesmo app"); a
+    // mensagem central fica como assinatura da marca, pequena, logo acima, como no site.
     expect(tela).toMatch(/accessibilityRole="header">\s*\{WELCOME_TEXT\.title\}\s*<\/Txt>/);
-    expect(ler('packages/core/src/welcome.ts')).toContain(`title: '${central}'`);
+    const TITULO_DO_INICIO = /const TITULO = '([^']+)';/.exec(ler('scripts/site/paginas/inicio.js'))![1]!;
+    expect(ler('packages/core/src/welcome.ts')).toContain(`title: '${TITULO_DO_INICIO}'`);
+    expect(ler('packages/core/src/welcome.ts')).toContain(`brand: '${central}'`);
+    expect(todos.find((c) => c.nome === 'apple-descricao')!.texto.split('\n')[0]).toBe(TITULO_DO_INICIO.replace(/\.$/, ', no mesmo app.'));
+    expect(tela.indexOf('{WELCOME_TEXT.brand}')).toBeGreaterThan(-1);
+    expect(tela.indexOf('{WELCOME_TEXT.brand}')).toBeLessThan(tela.indexOf('{WELCOME_TEXT.title}'));
     // Estudo de 25/11/2026 (sinal 19): o teste grátis escrito na tela e a demonstração como segunda opção.
     expect(tela).toContain('{WELCOME_TEXT.trial}');
     expect(tela).toContain('WELCOME_TEXT.demo');

@@ -47,9 +47,9 @@ reset role;
 -- 1. Privilégios: só a chave de serviço usa as funções do Checkout; ninguém lê a tabela direto; my_access continua do app.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  assert has_function_privilege('service_role', 'public.billing_checkout_record(text, uuid, text)', 'execute')
-     and not has_function_privilege('authenticated', 'public.billing_checkout_record(text, uuid, text)', 'execute')
-     and not has_function_privilege('anon', 'public.billing_checkout_record(text, uuid, text)', 'execute'),
+  assert has_function_privilege('service_role', 'public.billing_checkout_record(text, uuid, text, text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.billing_checkout_record(text, uuid, text, text)', 'execute')
+     and not has_function_privilege('anon', 'public.billing_checkout_record(text, uuid, text, text)', 'execute'),
     'billing_checkout_record só com a chave de serviço';
   assert has_function_privilege('service_role', 'public.billing_checkout_person(text)', 'execute')
      and not has_function_privilege('authenticated', 'public.billing_checkout_person(text)', 'execute')
@@ -90,7 +90,7 @@ begin
   assert r ->> 'result' = 'aplicado' and r #>> '{access,status}' = 'assinatura' and r #>> '{access,provider}' = 'web'
      and r #>> '{access,plan}' = 'familiar', 'assinatura da web: ' || r::text;
   -- A pessoa de uma assinatura já aplicada, pelo resumo (estorno depois de cancelar, quando o Asaas já não devolve a assinatura).
-  assert public.billing_person_by_external_ref('web', pg_temp.sha('sub_dora')) = jsonb_build_object('person_id', pg_temp.dora(), 'plan', 'familiar'),
+  assert public.billing_person_by_external_ref('web', pg_temp.sha('sub_dora')) = jsonb_build_object('person_id', pg_temp.dora(), 'plan', 'familiar', 'period', 'mensal'),
     'a pessoa pelo resumo da assinatura';
   assert public.billing_person_by_external_ref('apple', pg_temp.sha('sub_dora')) is null and public.billing_person_by_external_ref('web', pg_temp.sha('outra')) is null,
     'outro provedor ou outro resumo: nulo';
@@ -124,7 +124,7 @@ declare
 begin
   r := public.billing_checkout_record(pg_temp.sha('checkout-1'), pg_temp.dora(), 'individual');
   assert r = '{"result": "gravado"}', 'gravou: ' || r::text;
-  assert public.billing_checkout_person(pg_temp.sha('checkout-1')) = jsonb_build_object('person_id', pg_temp.dora(), 'plan', 'individual'), 'leu a pessoa e o plano';
+  assert public.billing_checkout_person(pg_temp.sha('checkout-1')) = jsonb_build_object('person_id', pg_temp.dora(), 'plan', 'individual', 'period', 'mensal'), 'leu a pessoa e o plano';
   -- Gravar de novo o mesmo Checkout atualiza o plano, sem duplicar.
   r := public.billing_checkout_record(pg_temp.sha('checkout-1'), pg_temp.dora(), 'familiar');
   assert r = '{"result": "gravado"}' and (public.billing_checkout_person(pg_temp.sha('checkout-1')) ->> 'plan') = 'familiar', 'atualizou o plano';

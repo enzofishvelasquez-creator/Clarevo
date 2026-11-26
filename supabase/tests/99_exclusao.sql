@@ -1149,7 +1149,7 @@ begin
     'my_account_marks trava a pessoa antes de guardar os marcos e a contagem (0041)';
   assert (select position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) > 0
               and position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) < position('insert into public.billing_pix_payments' in d)
-            from (select pg_get_functiondef('public.billing_pix_apply(text, uuid, text, text, date, timestamp with time zone)'::regprocedure) as d) x),
+            from (select pg_get_functiondef('public.billing_pix_apply(text, uuid, text, text, date, timestamp with time zone, text)'::regprocedure) as d) x),
     'billing_pix_apply trava a pessoa antes de gravar o pagamento';
   -- Toda função de escrita que o app executa termina gravando a operação (o gatilho acima é o ponto comum). As únicas sem operação:
   -- delete_my_account (a pessoa sai com o rastro), ensure_personal_space (cria a pessoa, sob a trava por pessoa e a guarda de auth.users)

@@ -19,6 +19,9 @@
  * o recurso vale, e "Ver como funciona" embaixo. Os grupos passaram a ter 3, 3, 3 e 5 recursos (os mesmos 14, com os mesmos destinos),
  * para a grade fechar as linhas: uma coluna no celular, duas no tablet e três no computador.
  *
+ * Desde 27/11/2026 (D-127), cada cartão e cada capa mostram também o preço anual, logo abaixo do mensal, com o equivalente por mês dito
+ * como equivalente ("ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)"), e a assinatura diz que o anual é uma cobrança só.
+ *
  * Os nomes, os preços, o "por mês" e as frases da assinatura vêm do núcleo (`catalogo().PLANOS`, de `packages/core/src/plano.ts`), para o
  * site e o app dizerem o mesmo; o resto foi conferido no guia de uso do app (`packages/core/src/guide`), nas decisões de `docs/00` (D-083
  * para o plano Família pago pela pessoa titular, D-093 para o Pix mês a mês, D-105 para o calendário, D-113 e `docs/52` para o Espaço
@@ -37,9 +40,19 @@ const ARQUIVO = 'planos.html';
 const precoDecimal = (texto) => texto.replace(/[^\d,]/g, '').replace(',', '.');
 
 /**
+ * O preço anual de um plano (D-127), logo abaixo do mensal: "ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)". `classe`: a do parágrafo
+ * (`preco-anual` nos cartões, `preco-capa-anual` na capa da página do plano). Do núcleo, como o resto dos preços.
+ */
+function linhaDoAnual(plano, classe = 'preco-anual') {
+  const { PLANOS } = catalogo();
+  const equivale = PLANOS.equivalente(plano).replace(/^E/, 'e');
+  return `<p class="${classe}">ou <span class="preco-valor-anual">${esc(PLANOS.precoAnual(plano))}</span>${esc(PLANOS.porAno)} (${esc(equivale)})</p>`;
+}
+
+/**
  * Os dados estruturados de app (SoftwareApplication, D-125), na página inicial e em Planos: o nome, a categoria, onde funciona hoje (pelo
- * estado do produto) e, depois do lançamento, os dois planos com o preço mensal, do núcleo. Sem nota nem avaliação (a Clarevo ainda não
- * tem). Só os planos mensais que existem hoje.
+ * estado do produto) e, depois do lançamento, os dois planos com o preço mensal e o anual (D-127), do núcleo. Sem nota nem avaliação (a
+ * Clarevo ainda não tem).
  * Antes do lançamento, sem `offers`: os preços são os do lançamento ("Preços no lançamento" na página) e ninguém consegue assinar ainda, e
  * uma oferta sem disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
  */
@@ -57,14 +70,23 @@ function dadosDoApp(valores, estado, descricao) {
     ...(dominio ? { url: `https://${dominio}/` } : {}),
     ...(estado.lancado
       ? {
-          offers: PLANOS.texto.plans.map((p) => ({
-            '@type': 'Offer',
-            name: `Plano ${PLANOS.nome[p.plan]}`,
-            price: precoDecimal(PLANOS.preco(p.plan)),
-            priceCurrency: 'BRL',
-            // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
-            description: `${p.who} ${PLANOS.texto.plansNote}`,
-          })),
+          offers: PLANOS.texto.plans.flatMap((p) => [
+            {
+              '@type': 'Offer',
+              name: `Plano ${PLANOS.nome[p.plan]}`,
+              price: precoDecimal(PLANOS.preco(p.plan)),
+              priceCurrency: 'BRL',
+              // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
+              description: `${p.who} ${PLANOS.texto.plansNote}`,
+            },
+            {
+              '@type': 'Offer',
+              name: `Plano ${PLANOS.nome[p.plan]} anual`,
+              price: precoDecimal(PLANOS.precoAnual(p.plan)),
+              priceCurrency: 'BRL',
+              description: `${p.who} ${PLANOS.cobrancaAnual}. ${PLANOS.texto.plansNote}`,
+            },
+          ]),
         }
       : {}),
   };
@@ -218,13 +240,15 @@ function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const capa = `<p class="migalha"><a href="${u(ARQUIVO)}">Planos</a></p>
 <h1>Plano ${esc(nome)}</h1>
 <p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${rotulo ? ` <span class="etiqueta etiqueta-capa">${esc(rotulo)}</span>` : ''}</p>
+${linhaDoAnual(plano, 'preco-capa-anual')}
 <p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>`;
 
   const assinatura = `<h2 id="assinatura">Como funciona a assinatura</h2>
 <ul class="como-funciona">
 <li>${esc(t.plansNote)}</li>
 <li>Depois do teste, sem assinatura, a conta fica só para ver e exportar. ${esc(t.readOnlyWhat)}</li>
-<li>${esc(t.howToPay)} Com Pix, você paga um mês por vez.</li>
+<li>${esc(PLANOS.notaDoAnual)}</li>
+<li>${esc(t.howToPay)} Com Pix, você paga um mês por vez ou o ano de uma vez.</li>
 <li>${esc(t.benefitNote)} <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</li>
 </ul>
 ${aindaNao}<p class="nota">Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`;
@@ -313,6 +337,7 @@ function paginaPlanos({ valores, estado = estadoEmVigor() }) {
       (p) => `<article class="cartao plano plano-link">
 <h3>${esc(PLANOS.nome[p.plan])}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
+${linhaDoAnual(p.plan)}
 <p>${esc(p.who)}</p>
 <p>${esc(oQueMuda(p.plan))}</p>
 <p class="ver-plano"><a href="${u(PAGINA_DO_PLANO[p.plan])}">Ver o plano ${esc(PLANOS.nome[p.plan])}</a></p>
@@ -329,7 +354,7 @@ function paginaPlanos({ valores, estado = estadoEmVigor() }) {
 ${rotulo ? `<p class="etiqueta-precos"><span class="etiqueta">${esc(rotulo)}</span></p>\n` : ''}<div class="grade">
 ${cartoes}
 </div>
-${aindaNao}<p class="nota">${esc(t.plansNote)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
+${aindaNao}<p class="nota">${esc(t.plansNote)} ${esc(PLANOS.notaDoAnual)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
       { rotulo: 'comparar' },
     ),
   ];
@@ -352,4 +377,4 @@ function paginasPlanos(ctx) {
   return [paginaPlanos(ctx), paginaDoPlano('individual', ctx), paginaDoPlano('familiar', ctx)];
 }
 
-module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };
+module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, linhaDoAnual, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };

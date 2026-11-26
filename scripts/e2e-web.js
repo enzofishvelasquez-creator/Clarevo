@@ -378,6 +378,25 @@ setInterval(async () => {
       bv.includes('14 dias grátis, sem cartão') && bv.includes('Depois, sem assinar, você continua vendo e exportando o que anotou.') && bvLayout.trial !== null && bvLayout.trial < bvLayout.criar, JSON.stringify(bvLayout));
     ok('Boas-vindas (D-125): dois botões grandes, "Criar conta" (o principal, azul) e "Ver a demonstração" (o segundo, suave, logo abaixo), com "Com dados fictícios, sem criar conta."',
       bvLayout.bigButtons === 2 && bvLayout.criar !== null && bvLayout.demo !== null && bvLayout.demo > bvLayout.criar && bvLayout.criarBg === 'rgb(36, 87, 245)' && bvLayout.demoBg !== bvLayout.criarBg && bv.includes('Com dados fictícios, sem criar conta.'), JSON.stringify(bvLayout));
+    // D-126: o título das boas-vindas é o mesmo do site, e a frase central da marca fica pequena logo acima dele, como a assinatura da marca
+    // no site.
+    const bvTitle = await p.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const headings = [...document.querySelectorAll('[role=heading]')].filter(shown);
+      const h = headings.find((e) => e.textContent === 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.');
+      const marca = [...document.querySelectorAll('div,span')].filter(shown).find((e) => e.textContent === 'Cuidar da vida financeira faz parte de cuidar de você.' && e.children.length === 0);
+      return {
+        titulo: h ? h.textContent : headings.map((e) => e.textContent).join(' | '),
+        tituloY: h ? Math.round(h.getBoundingClientRect().top) : null,
+        marcaY: marca ? Math.round(marca.getBoundingClientRect().bottom) : null,
+        tituloFonte: h ? parseFloat(getComputedStyle(h).fontSize) : null,
+        marcaFonte: marca ? parseFloat(getComputedStyle(marca).fontSize) : null,
+        marcaHeading: marca ? marca.closest('[role=heading]') !== null : null,
+      };
+    });
+    ok('Boas-vindas (D-126): o título é o do site ("Organize as contas, os cartões e os gastos do mês, ..."), e "Cuidar da vida financeira faz parte de cuidar de você." fica pequena acima dele, fora do título',
+      bvTitle.tituloY !== null && bvTitle.marcaY !== null && bvTitle.marcaY <= bvTitle.tituloY + 1 && bvTitle.marcaFonte < bvTitle.tituloFonte / 1.5 && bvTitle.marcaHeading === false &&
+        bv.includes('Veja o que entrou, o que saiu e o que ainda vai vencer no mês.'), JSON.stringify(bvTitle));
     ok('Boas-vindas (D-125): "Já tem conta? Entrar" e "Tenho um convite da empresa" continuam, como links menores, depois dos dois botões',
       bv.includes('Já tem conta?') && bvLayout.entrar !== null && bvLayout.entrar > bvLayout.demo && bvLayout.convite !== null && bvLayout.convite > bvLayout.entrar && bvLayout.entrarH < bvLayout.criarH, JSON.stringify(bvLayout));
     for (const w of [320, 360]) {
@@ -14961,10 +14980,42 @@ setInterval(async () => {
       t.includes('Toda conta começa com 14 dias grátis, sem cartão. Cancele quando quiser.') && t.includes('Na demonstração não há assinatura nem pagamento.') &&
       !/cartão ou Pix|App Store|Google Play|abre no lançamento/.test(t) && t.includes('você vê tudo, exporta e pode excluir a conta'), t.slice(0, 900));
     ok('Assinatura na demonstração: nenhum botão de assinar, pagar ou restaurar compra', (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0);
-    ok('Assinatura: os planos são lidos inteiros pelo leitor de tela',
-      (await p.locator('[aria-label="Plano Individual, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
+    ok('Assinatura: os planos são lidos inteiros pelo leitor de tela, com os dois períodos',
+      (await p.locator('[aria-label="Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
+    // Plano anual (D-127): a escolha "Anual" ou "Mensal", o anual primeiro e marcado, sem prazo, sem alarme e sem promessa de economia; o preço
+    // do período escolhido em destaque, o equivalente por mês dito como equivalente, a diferença exata para 12 mensalidades e o outro período
+    // sempre à vista. Na demonstração, a escolha só muda o preço mostrado: nenhum botão de compra.
+    const periodos = () => p.evaluate(() => {
+      const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura' && e.getBoundingClientRect().width > 0);
+      return g ? [...g.querySelectorAll('[role=radio]')].map((r) => [r.getAttribute('aria-label') || r.textContent, r.getAttribute('aria-checked')]) : null;
+    });
+    ok('Assinatura (D-127): a escolha do período, com o anual primeiro e já marcado, e o mensal ao lado',
+      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]), JSON.stringify(await periodos()));
+    ok('Assinatura (D-127): no anual, R$ 269,90 e R$ 629,90 por ano, "Equivale a R$ 22,49 por mês" e "R$ 88,90 a menos que 12 mensalidades" (Família: R$ 52,49 e R$ 208,90), com o mensal à vista e a nota do anual',
+      t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
+        t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
+        t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
+        t.includes('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos e começam com o mesmo teste grátis.') &&
+        !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
+    // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
+    const alarme = await p.evaluate(() => {
+      const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura');
+      const card = g?.parentElement;
+      if (!card) return ['sem o cartão dos planos'];
+      return [...card.querySelectorAll('*')].map((e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]).flat().filter((c) => /rgb\((2[0-9]{2}), ([0-9]{1,2}), ([0-9]{1,2})\)/.test(c) && Number(/rgb\((\d+)/.exec(c)[1]) > 180);
+    });
+    ok('Assinatura (D-127): nenhuma cor de alerta (vermelho) na escolha do período nem nos planos', alarme.length === 0, alarme.slice(0, 4).join(' | '));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
+    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Assinatura (D-127): escolher "Mensal" põe o mensal em destaque e deixa o anual à vista, com o equivalente por mês, sem botão de compra na demonstração',
+      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'false'], ['Mensal, uma cobrança por mês', 'true']]) &&
+        t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && t.includes('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês') &&
+        !t.includes('a menos que 12 mensalidades') && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
+        (await p.locator('[aria-label="Plano Família mensal, R$ 69,90 por mês. No anual, R$ 629,90 por ano. Para você e as pessoas da sua Família na Clarevo, até 6 pessoas."]').filter({ visible: true }).count()) === 1,
+      t.slice(0, 1200));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração, mensal ${w}px`); if (w === 390) await shot('615b_assinatura_demonstracao_mensal'); });
     // O teste da equipe no sandbox (`?assinar=teste`, docs/39) mostra os botões do cartão e do Pix numa conta de verdade. Na demonstração,
     // nem com ele (revisão de 26/11/2026, diretriz 3.1.1): nenhum botão de compra, só a nota neutra.
     await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
@@ -14973,6 +15024,14 @@ setInterval(async () => {
     ok('Assinatura na demonstração, mesmo com "?assinar=teste": nenhum botão de assinar ou de pagar com cartão ou Pix, sem o texto do Pix, e a nota neutra',
       new URL(p.url()).pathname === '/conta/assinatura' && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !t.includes('Ou pague um mês por vez, com Pix') &&
         !/cartão ou Pix/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
+    // D-127: com "?assinar=teste", a escolha do anual aparece (é só preço), e trocar de período continua sem botão de compra, nem do anual.
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): a escolha "Anual" ou "Mensal" com o anual marcado e os preços do ano, sem botão de compra',
+      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]) &&
+        t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && !/Assinar o plano|Pagar um (mês|ano)|Ou pague o ano de uma vez/.test(t), t.slice(0, 900));
+    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): no mensal, também nenhum botão de assinar, pagar ou restaurar',
+      (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !/Assinar o plano|Pagar um (mês|ano)/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }

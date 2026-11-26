@@ -36,7 +36,7 @@ import { LEARN_SECTIONS } from '../learn/sections';
 import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
 import { GOALS_NAV_TEXT, REMINDERS_SETTINGS_HREF, SUMMARY_NAV_TEXT } from '../navigation';
 import { NOTA_TEXT } from '../nota';
-import { ACCESS_TEXT, TRIAL_DAYS, TRIAL_WARNING_DAYS, planPrice } from '../plano';
+import { ACCESS_TEXT, PLAN_PERIOD_TEXT, TRIAL_DAYS, TRIAL_WARNING_DAYS, planPeriodPrice, planPrice } from '../plano';
 import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { ROUTINE_REMINDER_TEXT } from '../routine-reminders';
@@ -846,19 +846,19 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'assinatura',
     group: 'conta-e-privacidade',
     title: 'Assinatura e teste grátis',
-    purpose: `Mostra a situação do seu acesso (teste grátis, assinatura, benefício da empresa ou Plano Família) e os planos: Individual por ${planPrice('individual')} e Família por ${planPrice('familiar')}.`,
+    purpose: `Mostra a situação do seu acesso (teste grátis, assinatura, benefício da empresa ou Plano Família) e os planos: Individual por ${planPrice('individual')} ou ${planPeriodPrice('individual', 'anual')} e Família por ${planPrice('familiar')} ou ${planPeriodPrice('familiar', 'anual')}.`,
     where: [ACCOUNT_SCREEN, ACCESS_TEXT.cardTitle],
     steps: [
       `Em Conta, no card ${q(ACCESS_TEXT.cardTitle)}, toque em ${q(ACCESS_TEXT.cardOpen)}.`,
       `Em ${q(ACCESS_TEXT.situation)}, veja como está o seu acesso. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão, e a tela diz quando o teste termina.`,
       `Nos últimos ${TRIAL_WARNING_DAYS} dias do teste, o Resumo mostra um aviso com ${q(ACCESS_TEXT.bannerAction)}.`,
       'Sem assinatura depois do teste, a conta fica só para ver e exportar: os seus dados continuam guardados, você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
-      `Em ${q(ACCESS_TEXT.plansTitle)}, compare o Individual e o Família. No celular, a assinatura é feita pela loja de aplicativos do aparelho. Cancele quando quiser.`,
+      `Em ${q(ACCESS_TEXT.plansTitle)}, escolha ${q(PLAN_PERIOD_TEXT.option.anual)} ou ${q(PLAN_PERIOD_TEXT.option.mensal)} e compare o Individual e o Família. O anual é uma cobrança só, que vale por 12 meses. No celular, a assinatura é feita pela loja de aplicativos do aparelho. Cancele quando quiser.`,
       'Com o benefício da empresa ou no Plano Família de outra pessoa, nada a pagar: a situação mostra quem cobre o seu acesso.',
     ],
     screenName: ACCESS_TEXT.screenTitle,
     href: '/conta/assinatura',
-    keywords: ['assinatura', 'assinar', 'plano', 'preço', 'preco', 'quanto custa', 'mensalidade', 'pagar a clarevo', 'teste grátis', 'teste gratis', 'grátis', 'gratis', 'cancelar assinatura', 'só ver e exportar'],
+    keywords: ['assinatura', 'assinar', 'plano', 'preço', 'preco', 'quanto custa', 'mensalidade', 'anual', 'plano anual', 'pagar a clarevo', 'teste grátis', 'teste gratis', 'grátis', 'gratis', 'cancelar assinatura', 'só ver e exportar'],
     routes: ['/conta/assinatura'],
     screenshot: '615_assinatura_demonstracao.png',
   },

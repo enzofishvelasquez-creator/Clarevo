@@ -13,7 +13,7 @@ import { GOALS_TEXT, GOAL_DEADLINE_SHORTCUTS, GOAL_MILESTONES } from '../src/goa
 import { GUIDE_ENTRIES } from '../src/guide';
 import { INVESTMENT_TEXT } from '../src/investments';
 import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
-import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPriceAmount } from '../src/plano';
+import { ACCESS_TEXT, PLAN_NAME, PLAN_PERIOD_TEXT, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPeriodPriceAmount, planPriceAmount } from '../src/plano';
 import { SITE_CALCULATORS } from '../src/calculators';
 import { INDICADORES_TEXT, INDICADOR_IDS, exibirIndicador, type RetratoIndicadores } from '../src/indicadores';
 import { GLOSSARIO, INDICADORES_REVIEWED_ON, PAGINAS_INDICADORES, explicacoesDeMercado } from '../src/indicadores/conteudo';
@@ -878,7 +878,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(foraDosPlanos).not.toMatch(/R\$\s?\d/);
     expect(foraDosPlanos.replace(/<p class="estado-produto">[^<]*<\/p>/, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')).not.toMatch(/gr[áa]tis/i);
-    expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes|Clarevo Plus|plano anual/i);
+    expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes|Clarevo Plus/i);
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
     // Os dados estruturados: Organization (com a frase de marca) e SoftwareApplication (sem nota nem avaliação). Antes do lançamento, sem
     // oferta: os preços são os do lançamento e ninguém assina ainda (os dois planos mensais com preço, no site lançado, em site-estado.test.ts).
@@ -910,7 +910,13 @@ describe('site público: as páginas geradas', () => {
       expect(secao).toContain(`<h3>${PLAN_NAME[plano]}</h3>`);
       // O site junta "R$" e o número com espaço sem quebra (esc), para o preço não partir entre linhas.
       expect(secao).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace("R$ ", "R$\u00a0")}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+      // D-127: o preço anual logo abaixo do mensal, com o equivalente por mês dito como equivalente, do núcleo.
+      expect(secao).toContain(
+        `<p class="preco-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (${PLAN_PERIOD_TEXT.equivalent(plano).replace(/^E/, 'e').replace('R$ ', 'R$\u00a0')})</p>`,
+      );
     }
+    expect(secao).toContain('R$\u00a0269,90</span> por ano (equivale a R$\u00a022,49 por mês)');
+    expect(secao).toContain('R$\u00a0629,90</span> por ano (equivale a R$\u00a052,49 por mês)');
     for (const p of ACCESS_TEXT.plans) expect(secao).toContain(p.who);
     expect(secao).toContain(ACCESS_TEXT.plansNote);
     // Os Termos sem âncora: o texto jurídico muda com o advogado, e a página de exemplo dos testes não tem o item 12.
@@ -1052,12 +1058,13 @@ describe('site público: as páginas geradas', () => {
     for (const plano of ['individual', 'familiar'] as const) {
       const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(h)?.[0] ?? '';
       expect(cartao, plano).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+      expect(cartao, plano).toContain(`<span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano`);
       expect(cartao, plano).toContain(ACCESS_TEXT.plans.find((p) => p.plan === plano)!.who);
       expect(cartao, plano).toContain(`<p class="ver-plano"><a href="${PAGINAS_DOS_PLANOS[plano]}">Ver o plano ${PLAN_NAME[plano]}</a></p>`);
       expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
     }
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
-    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.notOpenYet]) expect(h, t).toContain(esc(t));
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.notOpenYet, PLAN_PERIOD_TEXT.note]) expect(h, t).toContain(esc(t));
     // Preço só nos dois cartões; fora deles, nenhum "R$" com número.
     const foraDosCartoes = h.replace(/<section[^>]*aria-labelledby="comparar"[\s\S]*?<\/section>/, '');
     expect(foraDosCartoes).not.toBe(h);
@@ -1080,6 +1087,10 @@ describe('site público: as páginas geradas', () => {
       expect(capa, arquivo).toContain(`<h1>Plano ${PLAN_NAME[plano]}</h1>`);
       // Antes do lançamento (D-125, o estado do produto em config.js), o preço leva a etiqueta "Preços no lançamento".
       expect(capa, arquivo).toContain(`<p class="preco-capa"><span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth} <span class="etiqueta etiqueta-capa">Preços no lançamento</span></p>`);
+      // D-127: o anual logo abaixo, na capa (o único lugar da página com preço).
+      expect(capa, arquivo).toContain(`<p class="preco-capa-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (equivale a`);
+      expect(p, arquivo).toContain(esc(PLAN_PERIOD_TEXT.note));
+      expect(p, arquivo).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       expect(capa, arquivo).toContain(`<p class="lead">${esc(ACCESS_TEXT.plans.find((x) => x.plan === plano)!.who)}</p>`);
       // Preço só na capa, e só o deste plano.
       expect(p.replace(capa, ''), arquivo).not.toMatch(/R\$\s?\d/);
@@ -1112,7 +1123,7 @@ describe('site público: as páginas geradas', () => {
       // Como funciona a assinatura, com os textos do núcleo.
       const assinatura = /<h2 id="assinatura">[\s\S]*?<\/section>/.exec(p)![0];
       for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet]) expect(assinatura, `${arquivo}: ${t}`).toContain(esc(t));
-      expect(assinatura).toContain('Com Pix, você paga um mês por vez.');
+      expect(assinatura).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       // No fim: o outro plano e o resumo.
       const fim = PAGINAS_DOS_PLANOS[outro].replace('planos/', '');
       expect(p, arquivo).toContain(`<p class="acoes"><a class="botao botao-principal" href="${fim}">Ver o plano ${PLAN_NAME[outro]}</a> <a class="botao botao-suave" href="../planos.html">Comparar os planos</a></p>`);

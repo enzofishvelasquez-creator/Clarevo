@@ -6,6 +6,10 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   GOOGLE_BASE_PLAN,
+  GOOGLE_BASE_PLANS,
+  STORE_OFFERINGS,
+  STORE_PACKAGES,
+  STORE_PRODUCTS,
   REVENUECAT_API_URL,
   STORE_MAX_CUSTOMERS_PER_EVENT,
   STORE_PRODUCT_IDS,
@@ -20,7 +24,9 @@ import {
   planOfStoreProduct,
   revenueCatEventFrom,
   sha256Hex,
+  storeChangeIsImmediate,
   storeExternalRef,
+  storeProductInfo,
   storeProviderOf,
   storeSubscriptionsFrom,
   storeValidity,
@@ -131,10 +137,37 @@ describe('Assinatura pelas lojas (D-090): produtos e configuração', () => {
     expect(GOOGLE_BASE_PLAN).toBe('mensal');
     expect(planOfStoreProduct('clarevo_individual_mensal')).toBe('individual');
     expect(planOfStoreProduct('clarevo_familia_mensal:mensal')).toBe('familiar');
-    expect(planOfStoreProduct('clarevo_individual_anual')).toBeNull();
     expect(planOfStoreProduct('outro_app_mensal')).toBeNull();
     expect(planOfStoreProduct(undefined)).toBeNull();
     expect(STORE_SUBSCRIPTION_FUNCTION).toBe('assinatura-lojas');
+  });
+
+  it('plano anual (D-127): dois produtos novos, os mesmos nas duas lojas (no Google, assinaturas novas com o plano básico "anual"); o produto diz o plano e o período', () => {
+    expect(STORE_PRODUCTS).toEqual({
+      individual: { mensal: 'clarevo_individual_mensal', anual: 'clarevo_individual_anual' },
+      familiar: { mensal: 'clarevo_familia_mensal', anual: 'clarevo_familia_anual' },
+    });
+    // Os mensais continuam os mesmos (o identificador da Apple não pode ser reaproveitado).
+    expect(STORE_PRODUCT_IDS).toEqual({ individual: STORE_PRODUCTS.individual.mensal, familiar: STORE_PRODUCTS.familiar.mensal });
+    expect(GOOGLE_BASE_PLANS).toEqual({ mensal: 'mensal', anual: 'anual' });
+    expect(STORE_OFFERINGS).toEqual({ individual: 'individual', familiar: 'familia' });
+    expect(STORE_PACKAGES).toEqual({ mensal: '$rc_monthly', anual: '$rc_annual' });
+    expect(storeProductInfo('clarevo_individual_anual')).toEqual({ plan: 'individual', period: 'anual' });
+    expect(storeProductInfo('clarevo_familia_anual:anual')).toEqual({ plan: 'familiar', period: 'anual' });
+    expect(storeProductInfo('clarevo_familia_mensal:mensal')).toEqual({ plan: 'familiar', period: 'mensal' });
+    expect(storeProductInfo(' clarevo_individual_mensal ')).toEqual({ plan: 'individual', period: 'mensal' });
+    expect(planOfStoreProduct('clarevo_individual_anual')).toBe('individual');
+    // Desconhecido continua nulo (o produto de outro app, um nome parecido, maiúsculas, vazio).
+    for (const id of ['clarevo_individual_semestral', 'clarevo_anual', 'CLAREVO_INDIVIDUAL_ANUAL', 'clarevo_individual_anual_x', '', null, 42]) {
+      expect(storeProductInfo(id), String(id)).toBeNull();
+      expect(planOfStoreProduct(id), String(id)).toBeNull();
+    }
+    // Os identificadores seguem o formato que as duas lojas aceitam (letras minúsculas, algarismos e "_"; até 100 caracteres na Apple).
+    for (const id of Object.values(STORE_PRODUCTS).flatMap((p) => Object.values(p))) expect(id).toMatch(/^[a-z][a-z0-9_]{2,99}$/);
+    // A troca: para o Família, na hora; para o Individual ou entre mensal e anual, na renovação.
+    expect(storeChangeIsImmediate({ plan: 'individual' }, { plan: 'familiar' })).toBe(true);
+    expect(storeChangeIsImmediate({ plan: 'familiar' }, { plan: 'individual' })).toBe(false);
+    expect(storeChangeIsImmediate({ plan: 'individual' }, { plan: 'individual' })).toBe(false);
   });
 
   it('só funciona com a chave secreta do RevenueCat, o token dos avisos (diferente da chave) e o banco', () => {
@@ -206,6 +239,7 @@ describe('Assinatura pelas lojas (D-090): o aviso e a validade', () => {
       purchasedAt: new Date('2026-11-10T15:00:00Z'),
       familyShared: false,
       sandbox: false,
+      period: 'mensal',
       ...extra,
     });
     expect(subscriptionEnd(s({}))).toEqual(new Date('2026-12-10T15:00:00Z'));
@@ -214,24 +248,35 @@ describe('Assinatura pelas lojas (D-090): o aviso e a validade', () => {
     expect(subscriptionEnd(s({ graceUntil: new Date('2026-12-26T15:00:00Z') }))).toEqual(new Date('2026-12-26T15:00:00Z'));
     expect(subscriptionEnd(s({ refundedAt: new Date('2026-11-12T10:00:00Z') }))).toEqual(new Date('2026-11-12T10:00:00Z'));
     expect(subscriptionEnd(s({ expiresAt: new Date('2026-11-01T00:00:00Z'), refundedAt: new Date('2026-11-12T10:00:00Z') }))).toEqual(new Date('2026-11-01T00:00:00Z'));
-    expect(storeValidity([s({})], 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-12-10T15:00:00Z') });
+    expect(storeValidity([s({})], 'apple', NOW)).toEqual({ plan: 'individual', period: 'mensal', validUntil: new Date('2026-12-10T15:00:00Z') });
     expect(storeValidity([s({})], 'google', NOW)).toBeNull();
     const familia = (extra: Partial<StoreSubscription>) => s({ product: STORE_PRODUCT_IDS.familiar, plan: 'familiar', ...extra });
     // Troca para o Família no Google, com o tempo que sobrou descontado: o Família novo termina antes do Individual antigo, e vale o Família.
     const upgrade = [s({ expiresAt: new Date('2026-12-10T15:00:00Z') }), familia({ expiresAt: new Date('2026-11-22T15:00:00Z') })];
-    expect(storeValidity(upgrade, 'apple', NOW)).toEqual({ plan: 'familiar', validUntil: new Date('2026-11-22T15:00:00Z') });
+    expect(storeValidity(upgrade, 'apple', NOW)).toEqual({ plan: 'familiar', period: 'mensal', validUntil: new Date('2026-11-22T15:00:00Z') });
     // Volta para o Individual na renovação: o Família vale até o fim dele.
     const downgrade = [familia({ expiresAt: new Date('2026-11-20T15:00:00Z') }), s({ expiresAt: new Date('2026-12-20T15:00:00Z') })];
-    expect(storeValidity(downgrade, 'apple', NOW)).toEqual({ plan: 'familiar', validUntil: new Date('2026-11-20T15:00:00Z') });
+    expect(storeValidity(downgrade, 'apple', NOW)).toEqual({ plan: 'familiar', period: 'mensal', validUntil: new Date('2026-11-20T15:00:00Z') });
     // Família já terminado e Individual valendo: Individual.
     const after = [familia({ expiresAt: new Date('2026-11-01T15:00:00Z') }), s({})];
-    expect(storeValidity(after, 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-12-10T15:00:00Z') });
+    expect(storeValidity(after, 'apple', NOW)).toEqual({ plan: 'individual', period: 'mensal', validUntil: new Date('2026-12-10T15:00:00Z') });
     // Compartilhamento Familiar da Apple não dá direito.
     expect(storeValidity([familia({ familyShared: true })], 'apple', NOW)).toBeNull();
     // Terminada: o direito acaba na data do fim (a última); produto de fora não conta.
     const ended = [s({ expiresAt: new Date('2026-10-10T15:00:00Z') }), familia({ expiresAt: new Date('2026-09-10T15:00:00Z') })];
-    expect(storeValidity(ended, 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-10-10T15:00:00Z') });
+    expect(storeValidity(ended, 'apple', NOW)).toEqual({ plan: 'individual', period: 'mensal', validUntil: new Date('2026-10-10T15:00:00Z') });
     expect(storeValidity([s({ plan: null, product: 'outro' })], 'apple', NOW)).toBeNull();
+    // Plano anual (D-127): vale até o fim do ano pago, com o período; na troca do Individual anual para o Família mensal, vale o Família.
+    const anual = (extra: Partial<StoreSubscription>) => s({ product: 'clarevo_individual_anual', period: 'anual', expiresAt: new Date('2027-11-10T15:00:00Z'), ...extra });
+    expect(storeValidity([anual({})], 'apple', NOW)).toEqual({ plan: 'individual', period: 'anual', validUntil: new Date('2027-11-10T15:00:00Z') });
+    expect(storeValidity([anual({}), familia({ expiresAt: new Date('2026-12-10T15:00:00Z') })], 'apple', NOW)).toEqual({
+      plan: 'familiar',
+      period: 'mensal',
+      validUntil: new Date('2026-12-10T15:00:00Z'),
+    });
+    // Do mensal para o anual do mesmo plano, na renovação: o mensal vale até o fim, e depois o anual, com o período dele.
+    const switching = [s({ expiresAt: new Date('2026-11-20T15:00:00Z') }), anual({ expiresAt: new Date('2027-11-20T15:00:00Z'), purchasedAt: new Date('2026-11-20T15:00:00Z') })];
+    expect(storeValidity(switching, 'apple', NOW)).toEqual({ plan: 'individual', period: 'anual', validUntil: new Date('2027-11-20T15:00:00Z') });
   });
 
   it('o identificador no banco é o resumo de "revenuecat:<pessoa>", o mesmo em maiúsculas e minúsculas', () => {
@@ -268,6 +313,34 @@ describe('Assinatura pelas lojas (D-090): a função, avisos do RevenueCat', () 
     // O identificador do aviso no banco não leva a pessoa.
     expect(String(base.applied[0]?.p_event_id)).not.toContain(ANA);
     expect(net.sent.every((x) => x.timeoutMs > 0)).toBe(true);
+  });
+
+  it('plano anual (D-127): o produto anual da loja vale um ano, e o período vai ao banco só quando é anual (sem ele, mensal)', async () => {
+    const base = db();
+    const net = fakeNet({
+      ...base.answers,
+      ...rcAnswer(ANA, {
+        clarevo_familia_anual: rcSub({ expires_date: '2027-11-10T15:00:00Z' }),
+        'clarevo_individual_anual:anual': rcSub({ store: 'play_store', expires_date: '2027-11-10T15:00:00Z', grace_period_expires_date: '2027-11-26T15:00:00Z' }),
+      }),
+    });
+    const h = createAssinaturaLojasHandler({ config, fetch: net.fetcher, now: () => NOW });
+    const res = await h(webhookReq(rcEvent({ product_id: 'clarevo_familia_anual' })));
+    expect(JSON.parse(res.body)).toEqual({ received: true, outcome: ['aplicado', 'aplicado'] });
+    expect(base.applied.map((a) => [a.p_provider, a.p_plan, a.p_period, a.p_valid_until])).toEqual([
+      ['apple', 'familiar', 'anual', '2027-11-10T15:00:00.000Z'],
+      ['google', 'individual', 'anual', '2027-11-26T15:00:00.000Z'],
+    ]);
+    // O mensal não manda o período (a função continua valendo com o banco de antes da migração 0047).
+    const monthly = db();
+    const h2 = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...monthly.answers, ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }) }).fetcher, now: () => NOW });
+    await h2(webhookReq(rcEvent()));
+    expect(monthly.applied[0]).not.toHaveProperty('p_period');
+    // Transferência de uma compra anual: o direito anterior encerrado leva o período que o banco guardou.
+    const ended = db({ previous: { [`apple:${storeExternalRef(ANA)}`]: { person_id: ANA, plan: 'familiar', period: 'anual' } as { person_id: string; plan: string } } });
+    const h3 = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...ended.answers, ...rcAnswer(ANA, {}) }).fetcher, now: () => NOW });
+    await h3(webhookReq(rcEvent({ type: 'TRANSFER' })));
+    expect(ended.applied.map((a) => [a.p_provider, a.p_plan, a.p_period, a.p_valid_until])).toEqual([['apple', 'familiar', 'anual', NOW.toISOString()]]);
   });
 
   it('o token vale com ou sem "Bearer"; token errado vira pedido do app sem sessão válida', async () => {

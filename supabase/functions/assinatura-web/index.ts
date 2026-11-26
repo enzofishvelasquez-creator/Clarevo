@@ -12,7 +12,9 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TransientError = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.TransientError = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.paymentsLookbackMonths = paymentsLookbackMonths;
+    exports.periodOfCycle = periodOfCycle;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
     exports.webReference = webReference;
     exports.parseWebReference = parseWebReference;
@@ -49,6 +51,14 @@ const __mods = [
     exports.REQUEST_BUDGET_MS = 8500;
     exports.CALL_TIMEOUT_MS = 3000;
     exports.PAYMENTS_LOOKBACK_MONTHS = 4;
+    exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = 14;
+    function paymentsLookbackMonths(cycle) {
+        return cycle === 'YEARLY' ? exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY : exports.PAYMENTS_LOOKBACK_MONTHS;
+    }
+    function periodOfCycle(cycle) {
+        return cycle === 'YEARLY' ? 'anual' : 'mensal';
+    }
+    exports.ASAAS_CYCLE = { mensal: 'MONTHLY', anual: 'YEARLY' };
     exports.ASAAS_TIME_ZONE = 'America/Sao_Paulo';
     const ASAAS_OFFSET = '-03:00';
     exports.PAID_STATUSES = new Set(['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED', 'AWAITING_CHARGEBACK_REVERSAL']);
@@ -256,7 +266,7 @@ const __mods = [
             },
         };
     }
-    function checkoutRequest(personId, plan, appUrl, today) {
+    function checkoutRequest(personId, plan, appUrl, today, period = 'mensal') {
         const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
         return {
             billingTypes: ['CREDIT_CARD'],
@@ -264,20 +274,37 @@ const __mods = [
             minutesToExpire: exports.CHECKOUT_MINUTES,
             externalReference: webReference(personId, plan),
             callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
-            items: [{ name: `Clarevo, plano ${plano_precos_1.PLAN_NAME[plan]}`, description: 'Assinatura mensal', quantity: 1, value: plano_precos_1.PLAN_PRICE_CENTS[plan] / 100 }],
-            subscription: { cycle: 'MONTHLY', nextDueDate: today },
+            items: [
+                {
+                    name: `Clarevo, plano ${plano_precos_1.PLAN_NAME[plan]}`,
+                    description: period === 'anual' ? 'Assinatura anual' : 'Assinatura mensal',
+                    quantity: 1,
+                    value: plano_precos_1.PLAN_PERIOD_PRICE_CENTS[plan][period] / 100,
+                },
+            ],
+            subscription: { cycle: exports.ASAAS_CYCLE[period], nextDueDate: today },
         };
     }
-    function checkoutPixRequest(personId, plan, appUrl) {
+    function checkoutPixRequest(personId, plan, appUrl, period = 'mensal') {
         const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
         return {
             billingTypes: ['PIX'],
             chargeTypes: ['DETACHED'],
             minutesToExpire: exports.CHECKOUT_MINUTES,
-            externalReference: (0, pix_1.pixReference)(personId, plan),
+            externalReference: (0, pix_1.pixReference)(personId, plan, period),
             callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
-            items: [{ name: `Clarevo, plano ${plano_precos_1.PLAN_NAME[plan]}`, description: 'Um mês de acesso, pago com Pix', quantity: 1, value: plano_precos_1.PLAN_PRICE_CENTS[plan] / 100 }],
+            items: [
+                {
+                    name: `Clarevo, plano ${plano_precos_1.PLAN_NAME[plan]}`,
+                    description: period === 'anual' ? 'Um ano de acesso, pago com Pix' : 'Um mês de acesso, pago com Pix',
+                    quantity: 1,
+                    value: plano_precos_1.PLAN_PERIOD_PRICE_CENTS[plan][period] / 100,
+                },
+            ],
         };
+    }
+    function periodArg(period) {
+        return period === 'anual' ? { p_period: 'anual' } : {};
     }
     function checkoutLink(response, sandbox) {
         const r = (0, servidor_comum_1.obj)(response);
@@ -309,7 +336,9 @@ const __mods = [
         const found = (0, servidor_comum_1.obj)(r.json);
         const personId = text(found?.person_id);
         const plan = found?.plan;
-        return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+        if (r.status !== 200 || !personId || !UUID.test(personId) || (plan !== 'individual' && plan !== 'familiar'))
+            return null;
+        return { personId: personId.toLowerCase(), plan, period: found?.period === 'anual' ? 'anual' : 'mensal' };
     }
     function createAssinaturaWebHandler(deps) {
         const log = deps.log ?? (() => { });
@@ -376,6 +405,7 @@ const __mods = [
                 p_payment_hash: (0, sha256_1.sha256Hex)(p.id),
                 p_paid_on: pixPaidOn(p, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now())),
                 p_event_at: ev.at.toISOString(),
+                ...periodArg(ref.period),
             });
             if (applied.status !== 200) {
                 log(`banco recusou o aviso ${ev.event} de Pix (${applied.status})`);
@@ -421,7 +451,7 @@ const __mods = [
                 log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
                 return 'sem_referencia';
             }
-            const since = (0, dates_1.addMonthsToDate)((0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), -exports.PAYMENTS_LOOKBACK_MONTHS);
+            const since = (0, dates_1.addMonthsToDate)((0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), -paymentsLookbackMonths(sub.cycle));
             const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
             if (list.status !== 200)
                 throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
@@ -436,6 +466,7 @@ const __mods = [
                 p_plan: ref.plan,
                 p_valid_until: validUntil.toISOString(),
                 p_event_at: ev.at.toISOString(),
+                ...periodArg(periodOfCycle(sub.cycle)),
             });
             if (applied.status !== 200) {
                 log(`banco recusou o aviso ${ev.event} (${applied.status})`);
@@ -501,8 +532,9 @@ const __mods = [
             }
             const action = payload?.action;
             const plan = payload?.plan;
+            const period = payload?.period === undefined ? 'mensal' : payload.period === 'mensal' || payload.period === 'anual' ? payload.period : null;
             if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
-                ((action === 'assinar' || action === 'pix') && plan !== 'individual' && plan !== 'familiar')) {
+                ((action === 'assinar' || action === 'pix') && ((plan !== 'individual' && plan !== 'familiar') || period === null))) {
                 return reply(400, { result: 'pedido_invalido' });
             }
             try {
@@ -536,13 +568,15 @@ const __mods = [
                     return reply(200, { result: 'ja_assinante' });
                 if (status === 'beneficio' || status === 'cortesia')
                     return reply(200, { result: 'sem_necessidade' });
-                if (status === 'assinatura' && !(0, pix_1.pixCanPayNext)(typeof current?.until === 'string' ? current.until : null, now()))
+                const currentPeriod = current?.period === 'anual' ? 'anual' : 'mensal';
+                if (status === 'assinatura' && !(0, pix_1.pixCanPayNext)(typeof current?.until === 'string' ? current.until : null, now(), currentPeriod))
                     return reply(200, { result: 'ja_pago' });
                 if ((await activeSubscriptions(asaas, personId)).length > 0)
                     return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
+                const chosen = period ?? 'mensal';
                 const request = action === 'pix'
-                    ? checkoutPixRequest(personId, plan, config.appUrl)
-                    : checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()));
+                    ? checkoutPixRequest(personId, plan, config.appUrl, chosen)
+                    : checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), chosen);
                 const created = await asaas('POST', '/checkouts', request);
                 const checkoutId = text((0, servidor_comum_1.obj)(created.json)?.id);
                 const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
@@ -553,7 +587,7 @@ const __mods = [
                 const cancelCheckout = () => asaas('POST', `/checkouts/${encodeURIComponent(checkoutId)}/cancel`).catch(() => undefined);
                 let recorded;
                 try {
-                    recorded = await db.rpcService('billing_checkout_record', { p_checkout_hash: (0, sha256_1.sha256Hex)(checkoutId), p_person: personId, p_plan: plan });
+                    recorded = await db.rpcService('billing_checkout_record', { p_checkout_hash: (0, sha256_1.sha256Hex)(checkoutId), p_person: personId, p_plan: plan, ...periodArg(chosen) });
                 }
                 catch (e) {
                     await cancelCheckout();
@@ -798,9 +832,20 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.PLAN_NAME = exports.PLAN_PRICE_CENTS = void 0;
+    exports.PERIOD_NAME = exports.PLAN_NAME = exports.PLAN_PERIOD_PRICE_CENTS = exports.PLAN_PRICE_CENTS = exports.PERIOD_MONTHS = exports.BILLING_PERIODS = void 0;
+    exports.parseBillingPeriod = parseBillingPeriod;
+    exports.BILLING_PERIODS = ['mensal', 'anual'];
+    exports.PERIOD_MONTHS = { mensal: 1, anual: 12 };
     exports.PLAN_PRICE_CENTS = { individual: 2990, familiar: 6990 };
+    exports.PLAN_PERIOD_PRICE_CENTS = {
+        individual: { mensal: 2990, anual: 26990 },
+        familiar: { mensal: 6990, anual: 62990 },
+    };
     exports.PLAN_NAME = { individual: 'Individual', familiar: 'Família' };
+    exports.PERIOD_NAME = { mensal: 'mensal', anual: 'anual' };
+    function parseBillingPeriod(v) {
+        return v === 'mensal' || v === 'anual' ? v : null;
+    }
   },
   // packages/core/src/servidor-comum.ts
   function (module, exports, __req) {
@@ -943,7 +988,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.PIX_WARNING_DAYS = exports.PIX_PAY_AHEAD_DAYS = exports.PIX_GRACE_DAYS = void 0;
+    exports.PIX_WARNING_DAYS_BY_PERIOD = exports.PIX_PAY_AHEAD_DAYS_BY_PERIOD = exports.PIX_WARNING_DAYS = exports.PIX_PAY_AHEAD_DAYS = exports.PIX_GRACE_DAYS = void 0;
     exports.pixReference = pixReference;
     exports.parsePixReference = parsePixReference;
     exports.pixNextPaymentFrom = pixNextPaymentFrom;
@@ -951,27 +996,29 @@ const __mods = [
     exports.PIX_GRACE_DAYS = 3;
     exports.PIX_PAY_AHEAD_DAYS = 10;
     exports.PIX_WARNING_DAYS = 7;
+    exports.PIX_PAY_AHEAD_DAYS_BY_PERIOD = { mensal: exports.PIX_PAY_AHEAD_DAYS, anual: 30 };
+    exports.PIX_WARNING_DAYS_BY_PERIOD = { mensal: exports.PIX_WARNING_DAYS, anual: 14 };
     const DAY_MS = 86_400_000;
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    function pixReference(personId, plan) {
-        return `clarevo-pix:${personId.toLowerCase()}:${plan}`;
+    function pixReference(personId, plan, period = 'mensal') {
+        return `clarevo-pix:${personId.toLowerCase()}:${plan}${period === 'anual' ? ':anual' : ''}`;
     }
     function parsePixReference(ref) {
         if (typeof ref !== 'string')
             return null;
-        const m = /^clarevo-pix:([0-9a-f-]{36}):(individual|familiar)$/i.exec(ref.trim());
+        const m = /^clarevo-pix:([0-9a-f-]{36}):(individual|familiar)(?::(mensal|anual))?$/i.exec(ref.trim());
         if (!m || !UUID.test(m[1] ?? ''))
             return null;
-        return { personId: (m[1] ?? '').toLowerCase(), plan: m[2] };
+        return { personId: (m[1] ?? '').toLowerCase(), plan: m[2].toLowerCase(), period: m[3]?.toLowerCase() === 'anual' ? 'anual' : 'mensal' };
     }
-    function pixNextPaymentFrom(until) {
+    function pixNextPaymentFrom(until, period = 'mensal') {
         if (!until)
             return null;
         const end = Date.parse(until);
-        return Number.isNaN(end) ? null : new Date(end - (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS + 1);
+        return Number.isNaN(end) ? null : new Date(end - (exports.PIX_PAY_AHEAD_DAYS_BY_PERIOD[period] + exports.PIX_GRACE_DAYS) * DAY_MS + 1);
     }
-    function pixCanPayNext(until, now) {
-        const from = pixNextPaymentFrom(until);
+    function pixCanPayNext(until, now, period = 'mensal') {
+        const from = pixNextPaymentFrom(until, period);
         return from === null || now.getTime() >= from.getTime();
     }
   },
