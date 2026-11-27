@@ -156,6 +156,16 @@ A arte final é montada no Canva como design nativo, com camadas editáveis e DM
 6. **Gerar design ou imagem por IA no Canva, só com decisão de Enzo** (seção 6). Nunca pessoas, rostos, depoimentos ou telas do app.
 7. A Elis baixa e publica. A sessão não publica nem agenda pelo Canva e não mexe nas configurações, no plano, na equipe nem no compartilhamento da conta do Canva.
 
+**Combinado de 27/11/2026 (Enzo, depois do retorno da Elis):**
+
+- **Quem edita é a Elis.** "Sou eu quem edito no Canva. O chat só dá a ideia." A sessão entrega a peça montada como design editável, nunca imagem fechada.
+- **Pasta "Clarevo | Instagram | para editar"** (https://www.canva.com/folder/FAHcHhH14jU). A sessão pode criar designs novos e cópias ali **sem perguntar a cada vez**, partindo do modelo da Elis ("Clarevo | Comece por aqui | Apresentação fixa", que nunca é alterado). Não toca em nada que não seja da Clarevo. Quando a peça fica pronta, deixa um **comentário no próprio design** avisando, com a legenda sugerida.
+- **Permissões:** as ações de ler, copiar, editar, mover para a pasta e comentar estão liberadas em `.claude/settings.json`. Gerar imagem por IA, exportar, publicar modelo e mexer na conta seguem de fora.
+- **Tom:** mais solto e humano, menos "robótico". Frases curtas, com humor leve e situações do dia a dia ("quem nunca?"), sem culpa. Toda frase precisa ser entendida por quem nunca ouviu falar do app (a página 6 da P01 antiga não foi entendida).
+- **Conteúdo mais dinâmico:** dia a dia, gente, bicho, meme, vídeo feito por Enzo e pela Elis, e peças que puxam comentário. As regras das seções 5 e 6 continuam valendo.
+- **Imagens:** da galeria do Canva, com escolha da Elis. As ferramentas do Canva desta sessão não buscam fotos na galeria, então cada design traz um **espaço marcado para foto ou meme**, com a ideia da cena e os termos de busca; a Elis escolhe e troca. Sem IA (seção 6).
+- **Peças já na pasta:** "Clarevo | 01 | Comece por aqui | cópia para editar" (P01 ajustada) e "Clarevo | 02 | Quem nunca? | para editar" (carrossel de identificação, com espaço de foto nas páginas 1 e 2).
+
 ## 9. Como trabalhar
 
 - **Responda em português do Brasil, curto.** A Elis e Enzo não são da área técnica: diga o que foi feito, o que ela precisa olhar e o próximo passo, sem jargão.
