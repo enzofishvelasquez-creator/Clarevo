@@ -76,7 +76,7 @@ Três publicações por semana, às terças, quintas e sábados, com Stories de 
 
 | Dia | Publicação | Peça | Formato | Situação |
 |---|---|---|---|---|
-| Sex 04/12 | O que é a Clarevo (fixada) | P01 | Carrossel, 6 páginas | Falta foto real |
+| Sex 04/12 | O que é a Clarevo (fixada) | P01 | Carrossel, 6 páginas | Desenhada, com a capa só com texto |
 | Sáb 05/12 | Clarevo na prática: o orçamento de Mercado e de Lazer (fixada) | P02 | Reels | Desenhada |
 | Dom 06/12 | Como conhecer a Clarevo (fixada) | P03 | Carrossel, 5 páginas | Desenhada |
 | Ter 08/12 | Saldo e compromissos do mês | P04 | Carrossel, 5 páginas | Desenhada |
@@ -117,7 +117,7 @@ Vídeos com pessoas da equipe (P06, P09 e P12) entram quando houver quem grave, 
 |---|---|---|
 | 1. Criar a conta com um e-mail da Clarevo, verificação em duas etapas, senha no cofre, conta profissional e o acesso da Elis. Nenhuma senha nem código passa pelo chat | Enzo | Até 30/11 |
 | 2. Subir a foto, o nome, a bio e o link, sem e-mail nem botão de contato; testar o link no celular, por dentro do Instagram | Elis, com o material da sessão | 01/12 |
-| 3. Preparar as três fixadas: textos atualizados, telas gravadas de novo, artes no Canva, fotos reais da P01, vídeo final do Reels | Sessão e Elis | Até 03/12 |
+| 3. Preparar as três fixadas: textos atualizados, telas gravadas de novo, artes no Canva, vídeo final do Reels | Sessão e Elis | Até 03/12 |
 | 4. Conferir cada publicação: frases sobre o app comparadas com a demonstração e com o site, uma revisão independente, prévia no celular com o som desligado | Sessão e Elis | Em toda publicação |
 | 5. Publicar e fixar as três, conferir a ordem na grade, criar os destaques Comece aqui e Na prática a partir dos Stories, colar o texto alternativo | Elis | 04 a 06/12 |
 | 6. Rotina: publicar às terças, quintas e sábados; ler comentários e mensagens em dia útil; na sexta, números do painel, relatório da semana e entrega das três publicações da semana seguinte | Elis e sessão | De 07/12 em diante |
@@ -148,7 +148,7 @@ Pedido do Enzo: depois do calendário do Instagram, publicar no Facebook e no Li
 2. Se "a partir de janeiro" pode aparecer nas publicações. Proposta: só depois de o dia estar firme.
 3. E-mail e horário de ajuda confirmados, para o destaque Ajuda e a P11.
 4. Conta de teste do Telegram, com nome fictício, criada pelo Enzo.
-5. Fotos próprias que podem ser usadas e quem da equipe aceita gravar, com autorização. Sem foto, a P01 e a F01 precisam de uma capa só com texto.
+5. Fotos próprias que podem ser usadas e quem da equipe aceita gravar, com autorização. A P01 já ficou com a capa só com texto (decisão de 27/11/2026); sem foto, a F01 e a F02 precisam do mesmo.
 6. A segunda linha da bio: manter "App para organizar seu mês." ou aproximar do subtítulo do site.
 7. Empresas: se o "pedir uma apresentação" do site é o contato comercial conferido.
 8. A ordem das outras redes e se a pasta de Novidades do site passa para a sessão de redes.

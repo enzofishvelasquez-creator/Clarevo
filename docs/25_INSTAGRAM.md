@@ -26,7 +26,7 @@ Saída em `--saida <pasta>` (nesta rodada, uma pasta fora do repositório). Quan
 
 Total da primeira geração: 160 arquivos (82 PNG, 8 MP4 e os textos), 26 MB.
 
-**Foto real.** Onde o Playbook pede foto (capa da P01, a página 5 da P01 e as capas de F01 e F02) o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva. O texto alternativo dessas páginas (P01 páginas 1 e 5, capas de F01 e F02) descreve só o quadro e a cena sugerida: a `ficha.md` de cada peça diz que a equipe o reescreve, antes de publicar, para descrever o que a foto escolhida realmente mostra.
+**Foto real.** Onde o Playbook pede foto e a peça a mantém (as capas de F01 e F02) o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva. A P01 saiu dessa lista em 27/11/2026: por decisão do Enzo, a capa e a página 5 são só com texto. O texto alternativo dessas páginas (capas de F01 e F02) descreve só o quadro e a cena sugerida: a `ficha.md` de cada peça diz que a equipe o reescreve, antes de publicar, para descrever o que a foto escolhida realmente mostra.
 
 **Telas do app.** Só de captura ou gravação real da demonstração (dados fictícios, etiqueta "Demonstração"), recortadas e ampliadas sem redesenhar: as capturas 4:5 e as gravações de `scripts/gravar-redes.js` (`docs/24`, seção 2). As páginas que mostram tela levam o aviso "Exemplo fictício" ou "Dados fictícios".
 
@@ -71,7 +71,7 @@ Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, aç
 
 | Dia | Peça | Formato | Ação principal | Arte gerada |
 |---|---|---|---|---|
-| D5 | P01 O que é a Clarevo | Carrossel fixado, 6 páginas | Ver o fixado Clarevo na prática | 6 páginas; capa e página 5 com quadro de foto real; página 4 com a tela de Orçamento por categoria |
+| D5 | P01 O que é a Clarevo | Carrossel fixado, 6 páginas | Ver o fixado Clarevo na prática | 6 páginas; capa e página 5 só com texto (decisão de 27/11/2026); página 4 com a tela de Orçamento por categoria |
 | D6 | P02 Clarevo na prática | Reel fixado | Conhecer a Clarevo pelo link da bio (fixado P03) | Capa, rascunho em MP4 (33 s) com Mercado e Lazer |
 | D7 | P03 Como conhecer a Clarevo | Carrossel fixado, 5 páginas | Conhecer a Clarevo pelo link da bio | 5 páginas, reescritas em 27/11/2026 (D-130) com as frases da página Comece aqui; página 4 com o Resumo; página 5 com "Assinatura em breve, com 14 dias grátis, sem cartão." |
 | D9 | P04 Saldo e compromissos do mês | Carrossel, 5 páginas | Salvar a sequência de conferência | 5 páginas em fundo claro, valores em reais, barras a partir de zero |
@@ -115,7 +115,7 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 ## 7. O que fica para a equipe no Canva
 
 - **Montar cada arte como design nativo do Canva**, com texto, avatar, imagens e números em camadas separadas e a fonte DM Sans (títulos em negrito, corpo sem negrito nem itálico). Os PNG daqui são o desenho de referência; o Playbook não converte nada automaticamente em Canva. Usar a assinatura "clarevo." pelo ativo original de `docs/marca` e o ícone C só no avatar.
-- **Fotos reais** (P01 capa e página 5, F01 e F02 quando forem usadas): escolher, ter a autorização e trocar o quadro. Reescrever o texto alternativo dessas páginas depois da escolha, para descrever o que a foto mostra (o `alt.txt` descreve só o quadro). Não associar a foto a depoimento nem a resultado de saúde.
+- **Fotos reais** (F01 e F02 quando forem usadas; a P01 ficou só com texto): escolher, ter a autorização e trocar o quadro. Reescrever o texto alternativo dessas páginas depois da escolha, para descrever o que a foto mostra (o `alt.txt` descreve só o quadro). Não associar a foto a depoimento nem a resultado de saúde.
 - **Vídeos com integrante** (P06, P09 e P12): gravar, revisar a fala com a pessoa, legendar no Edits e montar a capa no Canva no lugar do quadro "[Gravação com integrante real]".
 - **Reels** (P02, P05, P08 e P11): edição final no Edits a partir de `gravacao-limpa.mp4`, com pergunta na tela, legendas revisadas, "Exemplo fictício" enquanto os valores aparecerem e trilha só com direitos de uso. O `rascunho.mp4` serve de referência de posição e de texto.
 - **Trends** (T01 e T02): decidir na revisão semanal, preencher a ficha de referência externa e manter a alternativa perene pronta.

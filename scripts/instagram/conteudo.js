@@ -107,9 +107,9 @@ const PECAS = [
     fixado: 1,
     objetivo: 'Compreensão do produto: apresentar a Clarevo pelo bem-estar financeiro e explicar o apoio concreto do app.',
     acao: 'Ver o fixado Clarevo na prática (P02).',
-    familia: 'Fotográfica cotidiana, editorial e demonstração real',
+    familia: 'Editorial e demonstração real',
     paginas: [
-      { modelo: 'capaFoto', titulo: 'Cuidar da vida financeira faz parte de cuidar de você.', sub: 'Conheça a Clarevo.', cena: CENAS.p01Capa },
+      { modelo: 'capaAzul', titulo: 'Cuidar da vida financeira faz parte de *cuidar de você*.', sub: 'Conheça a Clarevo.' },
       { modelo: 'contasComprasPlanos', linhas: [['Contas', 'para lembrar,'], ['compras', 'para decidir,'], ['planos', 'para organizar.']], corpo: 'O dinheiro participa da rotina.' },
       { modelo: 'azulTexto', titulo: 'A Clarevo apoia seu *bem-estar financeiro* com um app para organizar a vida financeira pessoal e familiar.' },
       {
@@ -118,24 +118,24 @@ const PECAS = [
         captura: { arquivo: 'capturas/orcamento-2-mercado-e-lazer.png', recorte: { x: 40, y: 215, w: 1000, h: 830 } },
         chip: 'Exemplo fictício · demonstração',
       },
-      { modelo: 'fotoTexto', cena: CENAS.p01Final, texto: 'Aqui, você encontra situações reais, orientação prática e espaço para rever planos conforme a sua realidade.' },
+      { modelo: 'texto', titulo: 'Aqui, você encontra *situações reais*, orientação prática e espaço para rever planos conforme a sua realidade.' },
       { modelo: 'final', titulo: 'Conheça uma tarefa do aplicativo no fixado *Clarevo na prática*.' },
     ],
     legenda:
       'Cuidar da vida financeira faz parte do cuidado com a vida. A Clarevo oferece um aplicativo para organizar o mês e apoiar decisões pessoais e familiares. Aqui, falamos de rotina, escolhas e planos, com orientações práticas e sem julgamento. Conheça uma tarefa no fixado Clarevo na prática.',
     alt: [
-      'Capa do carrossel: cena cotidiana (foto real a escolher pela equipe) e o texto "Cuidar da vida financeira faz parte de cuidar de você. Conheça a Clarevo."',
+      'Capa do carrossel, fundo azul, com o texto "Cuidar da vida financeira faz parte de cuidar de você. Conheça a Clarevo."',
       'Fundo claro com o texto "Contas para lembrar, compras para decidir, planos para organizar. O dinheiro participa da rotina."',
       'Fundo azul com o texto "A Clarevo apoia seu bem-estar financeiro com um app para organizar a vida financeira pessoal e familiar."',
       'Tela da demonstração do app, com dados fictícios, em Orçamento por categoria: Mercado com R$ 1.400,00 usados de R$ 1.800,00, faltam R$ 400,00, e Lazer com R$ 400,00 usados de R$ 300,00, R$ 100,00 acima. Texto: "Um começo possível: comparar o que você orçou com o que usou no mês, categoria por categoria."',
-      'Cena cotidiana (foto real a escolher pela equipe) e o texto "Aqui, você encontra situações reais, orientação prática e espaço para rever planos conforme a sua realidade."',
+      'Fundo claro com o texto "Aqui, você encontra situações reais, orientação prática e espaço para rever planos conforme a sua realidade."',
       'Fundo azul com o texto "Conheça uma tarefa do aplicativo no fixado Clarevo na prática."',
     ],
     ajustes: [
       'Página 4: "o que você planejou com o que já registrou" virou "o que você orçou com o que usou no mês, categoria por categoria", que são os nomes da tela (Orçado e Usado) e a regra de competência do app.',
+      'Capa e página 5 só com texto, sem foto (decisão do Enzo de 27/11/2026): o Playbook pede foto real cotidiana na capa. Se a equipe quiser foto depois, ela entra no Canva, com autorização de imagem.',
     ],
     depende: [
-      'Foto real da capa e da página 5 (própria ou licenciada, com autorização de imagem; nada de rosto gerado nem foto de banco baixada aqui). Trocar o quadro no Canva.',
       'Conferência do produto na versão que for ao ar: Orçamento por categoria mostra Orçado, Usado e Faltam (responsável pelo produto, a designar).',
       'A P02 precisa estar pronta e fixada antes, porque a página 6 manda para ela.',
       'Montar no Canva com camadas editáveis e publicar (registrar URL, horário e janela de leitura).',
