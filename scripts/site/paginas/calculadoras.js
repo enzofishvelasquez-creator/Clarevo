@@ -258,13 +258,22 @@ const NOTA_DO_NUMERO = {
 
 const AVISO_EXTRA = 'Os resultados são estimativas feitas com os números que você digita e não garantem resultado.';
 
+/**
+ * O aviso de cada calculadora (o do app, `calcDisclaimer`, mais a frase de que os resultados são estimativas). Desde 27/11/2026 (análise
+ * geral de 26/11, lista "Depois"), ele vem logo DEPOIS do resultado, e não antes do formulário: a página abre pela conta (o formulário, e o
+ * resultado com a resposta numa frase no topo, `calc-destaque`), e o aviso fica à vista, sem recolher, logo embaixo dele. O `<noscript>` fica
+ * entre os dois, e sem JavaScript o aviso continua logo depois da lista do que a calculadora pede.
+ */
+const avisoDaConta = (c, slug) => `<div class="aviso-edu calc-aviso" role="note"><p>${esc(c.avisoDaCalculadora(slug))} ${esc(AVISO_EXTRA)}</p></div>`;
+
 function paginaDaCalculadora(info, { valores, estado = estadoEmVigor() }) {
   const c = catalogo();
   const arquivo = arquivoDaCalculadora(info.slug);
   const grupo = c.CALC_GRUPOS.find((g) => g.id === info.group);
   const u = (d) => rel(arquivo, d);
   // O app que qualquer pessoa pode abrir agora, pelo estado do produto: depois do lançamento, a versão web; antes, nenhum (D-128: a
-  // demonstração só aparece em O app e em Use no navegador, e a tela inicial do app web convida a criar conta, D-064).
+  // demonstração só aparece em O app e em Use no navegador, e o site nunca leva à tela inicial do app web antes do lançamento; o convite
+  // a criar a conta, desde 27/11/2026, fica na linha do fim da página, `ponteParaOProduto`).
   const outroApp = appParaUsar(estado);
   const linkDoOutroApp = outroApp ? `<a href="${esc(outroApp.href)}" rel="noopener noreferrer">${esc(outroApp.texto)}</a>` : '';
   const tambemFaz = TAMBEM_FAZ[info.slug] ? `${TAMBEM_FAZ[info.slug]} ` : '';
@@ -313,12 +322,11 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
   const corpo = [
     bloco(
       `<h2 id="calcular">Faça a conta</h2>
-<div class="aviso-edu calc-aviso"><p>${esc(c.avisoDaCalculadora(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
-${NOTA_DO_NUMERO[info.slug] ? `${NOTA_DO_NUMERO[info.slug](u)}\n` : ''}
-<div class="calc" data-calculadora="${esc(info.slug)}">
+${NOTA_DO_NUMERO[info.slug] ? `${NOTA_DO_NUMERO[info.slug](u)}\n` : ''}<div class="calc" data-calculadora="${esc(info.slug)}">
 <p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site.${linkDoOutroApp ? ` Você também pode usar a ${linkDoOutroApp} da Clarevo.` : ''}</p>
 </div>
-${sem}`,
+${sem}
+${avisoDaConta(c, info.slug)}`,
       { rotulo: 'calcular' },
     ),
     bloco(
@@ -341,6 +349,8 @@ ${
   const subtitulo = pergunta || !/^\p{Lu}\p{Ll}/u.test(info.subtitle) ? info.subtitle : info.subtitle.charAt(0).toLowerCase() + info.subtitle.slice(1);
   const descricao = `${info.title}${pergunta ? '' : ':'} ${subtitulo}. ${tambemFaz}A conta é feita no seu navegador, e nada do que você digita é enviado.`;
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     // "Calculadora: ..." no título da página, para ele não repetir o do tema de Aprender que explica o mesmo assunto.
     titulo: `Calculadora: ${info.title}`,
@@ -387,6 +397,8 @@ ${itens
 <a class="botao botao-suave" href="${u('aprender/index.html')}">Aprender</a>
 </div>`;
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: c.CALC_UI.screenTitle,
     descricao: `${c.CALCULADORAS.length} calculadoras para o dia a dia: parcelado ou à vista, dívidas, reserva, juros compostos e rendimento a um percentual do CDI. Feitas no navegador.`,

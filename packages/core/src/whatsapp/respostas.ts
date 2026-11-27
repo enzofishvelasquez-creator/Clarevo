@@ -8,9 +8,12 @@ import type { WhatsAppParseError } from './mensagem';
 /** Validade do código de ligar, em minutos (a mesma do banco). */
 export const WHATSAPP_CODE_MINUTES = 15;
 
-/** Espaço do registro, como o banco devolve: Pessoal ou o nome da Família. */
+/**
+ * Espaço do registro, como o banco devolve: Pessoal, o nome da Família ou, com a palavra "negócio" no começo da mensagem (27/11/2026), o
+ * nome do negócio da própria pessoa.
+ */
 export interface WhatsAppSpace {
-  kind: 'pessoal' | 'familia';
+  kind: 'pessoal' | 'familia' | 'negocio';
   name: string;
 }
 
@@ -52,7 +55,17 @@ export interface WhatsAppPurchaseInfo {
  * servidor. `today`: o dia da pessoa no instante da mensagem, no fuso dela (para "hoje" e "ontem" na resposta).
  */
 export type WhatsAppOutcome =
-  | { result: 'ligado'; space: WhatsAppSpace; /** Nome de quem ligou (o dono do código), para quem escreve conferir a conta. */ name?: string | null; today?: IsoDate }
+  | {
+      result: 'ligado';
+      space: WhatsAppSpace;
+      /** Nome de quem ligou (o dono do código), para quem escreve conferir a conta. */
+      name?: string | null;
+      /** A pessoa tem o próprio negócio (migração 0049): a resposta ensina a palavra "negócio". Sem a chave, não tem (ou banco de antes). */
+      negocio?: boolean;
+      today?: IsoDate;
+    }
+  /** Mensagem sem dados (ajuda, mídia, não entendi), respondida pelo servidor; na ajuda, `negocio` como no ligado. */
+  | { result: 'registrada'; negocio?: boolean; today?: IsoDate }
   | { result: 'anotado'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
   | { result: 'desfeito'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
   | { result: 'sem_permissao' | 'sem_conta'; space: WhatsAppSpace; today?: IsoDate }
@@ -64,6 +77,8 @@ export type WhatsAppOutcome =
         | 'nada_para_desfazer'
         /** DESFAZER: a última anotação daqui virou, no app, o pagamento de uma fatura (D-107), e só sai pelo app. */
         | 'pagamento_de_fatura'
+        /** "negócio ..." de quem não tem o próprio negócio (ou só anota no de outra pessoa): nada foi anotado. */
+        | 'sem_negocio'
         | 'desligado'
         | 'nao_ligado'
         | 'codigo_invalido'
@@ -77,12 +92,11 @@ export type WhatsAppOutcome =
         | 'descricao_invalida'
         | 'repetida'
         | 'silencio'
-        | 'registrada'
         | 'erro';
       today?: IsoDate;
     };
 
-/** "espaço Pessoal" ou "espaço Família Souza". */
+/** "espaço Pessoal", "espaço Família Souza" ou, no negócio, "espaço Sacolé da Maria" (o nome que a pessoa deu, sem artigo antes). */
 function spaceLabel(space: WhatsAppSpace): string {
   return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
 }
@@ -116,8 +130,9 @@ function listNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
 }
 
-function recordLines(r: WhatsAppRecordInfo, today: IsoDate): string {
-  const what = r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
+/** No negócio, as palavras do negócio no app (Saída e Entrada, BUSINESS_WORDS), como em "Seu negócio". */
+function recordLines(r: WhatsAppRecordInfo, today: IsoDate, business = false): string {
+  const what = business ? (r.kind === 'despesa' ? 'Saída' : 'Entrada') : r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
   const account = r.kind === 'despesa' ? 'Saiu de' : 'Entrou em';
   return [
     `${what}: ${r.description}, ${formatBRL(r.amount_cents)}`,
@@ -140,6 +155,15 @@ const EXAMPLES = [
   'farmácia 41 cartão',
   'Com mais de um cartão, o nome dele depois: "farmácia 41 cartão azul".',
 ].join('\n');
+
+/** Só para quem tem o próprio negócio (o banco diz, migração 0049): a palavra "negócio" no começo anota nele. */
+const BUSINESS_EXAMPLES = [
+  'Para anotar no seu negócio, comece com a palavra negócio:',
+  'negócio material 120',
+  'negócio recebi 300 conserto',
+].join('\n');
+
+const examplesFor = (business: boolean) => (business ? `${EXAMPLES}\n\n${BUSINESS_EXAMPLES}` : EXAMPLES);
 
 /** Canal da conversa (D-076 e D-080). As respostas e as regras são as mesmas; mudam o nome do canal e o de quem escreve. */
 export type ChatChannel = 'whatsapp' | 'telegram';
@@ -179,9 +203,13 @@ function chatReplies(channel: ChatChannel) {
   const where = whereTo(channel);
   const words = `DESFAZER apaga a última anotação feita por aqui, AJUDA mostra os exemplos e DESLIGAR desliga ${w.who} da Clarevo.`;
   const howToLink = where.link;
+  const help = (business: boolean) =>
+    `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${examplesFor(business)}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`;
   return {
     words,
-    ajuda: `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${EXAMPLES}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`,
+    ajuda: help(false),
+    /** A ajuda de quem tem o próprio negócio, com a palavra "negócio". */
+    ajuda_negocio: help(true),
     midia:
       'Por enquanto, a Clarevo entende só mensagens escritas. Dica: o microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
     nao_ligado: `${upperFirst(w.who)} ainda não está ligado a uma conta da Clarevo. ${howToLink}`,
@@ -195,14 +223,18 @@ function chatReplies(channel: ChatChannel) {
     pagamento_de_fatura:
       'A última anotação feita por aqui virou o pagamento de uma fatura no app e não sai por aqui. No app, abra o gasto e toque em Desligar da fatura; depois, se quiser, exclua o gasto.',
     desligado: `Pronto, ${w.whoLinked} foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.`,
+    sem_negocio:
+      'Nada foi anotado. Para anotar no negócio por aqui, crie antes o espaço Negócio no app: abra Conta e toque em Criar o espaço Negócio. Sem a palavra negócio no começo, a mensagem anota como sempre.',
     data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
     valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
     valor_acima_do_limite: `O valor passa do limite de ${formatBRL(MAX_RECORD_CENTS)} por registro.`,
     descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
     erro: `Não foi possível anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${SUPPORT_EMAIL}.`,
-    ligado: (space: WhatsAppSpace, name?: string | null) =>
-      `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
-    sem_permissao: (space: WhatsAppSpace) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
+    ligado: (space: WhatsAppSpace, name?: string | null, business = false) =>
+      `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${examplesFor(business)}\n\n${words}`,
+    // No negócio, o espaço não vem do vínculo: ligar de novo não muda nada.
+    sem_permissao: (space: WhatsAppSpace) =>
+      space.kind === 'negocio' ? `Você não anota mais no ${spaceLabel(space)}.` : `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
   };
 }
 
@@ -260,25 +292,33 @@ export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDa
     case 'registrada':
       return null;
     case 'ligado':
-      return r.ligado(outcome.space, outcome.name);
+      return r.ligado(outcome.space, outcome.name, outcome.negocio === true);
     case 'anotado':
-      return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
+      return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today, outcome.space.kind === 'negocio')}\n\nSe algo ficou errado, responda DESFAZER.`;
     case 'desfeito':
-      return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}`;
+      return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today, outcome.space.kind === 'negocio')}`;
     case 'sem_permissao':
       return r.sem_permissao(outcome.space);
     case 'sem_conta':
-      return `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
+      return outcome.space.kind === 'negocio'
+        ? `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, escolha o negócio no topo, abra Conta e escolha a opção principal em Bancos e carteira.`
+        : `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
     case 'compra_anotada':
       return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
     case 'compra_desfeita':
       return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
     case 'sem_cartao':
+      if (outcome.space.kind === 'negocio') {
+        return `O ${spaceLabel(outcome.space)} não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, com o negócio escolhido no topo, em Movimentos, Cartões. Para anotar como saída já paga, mande de novo sem a palavra cartão.`;
+      }
       return outcome.space.kind === 'pessoal'
         ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Movimentos, Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
         : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
-    case 'qual_cartao':
-      return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+    case 'qual_cartao': {
+      const name = withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase();
+      const example = outcome.space.kind === 'negocio' ? `negócio material 120 cartão ${name}` : `farmácia 41 cartão ${name}`;
+      return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "${example}".`;
+    }
     case 'fatura_paga':
       return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
     case 'limite_do_cartao':

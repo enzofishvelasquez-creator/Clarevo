@@ -215,6 +215,8 @@ ${guias.length ? `<h2 id="passo-a-passo">Como usar, passo a passo</h2>\n${guias.
     mainEntity: respostas.map((r) => ({ '@type': 'Question', name: r.pergunta, acceptedAnswer: { '@type': 'Answer', text: textoSimples(r.html) } })),
   };
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: `${t.titulo}: Ajuda`,
     descricao: t.descricao,
@@ -264,6 +266,8 @@ ${listaDeAtalhos(comuns.map(atalhoDe), { tres: true })}
   const capa = `<h1>Ajuda</h1>
 <p class="lead">Respostas por tema sobre como usar o app da Clarevo, com o passo a passo de cada função. A busca funciona no seu navegador e não envia o que você digita.</p>`;
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: 'Ajuda',
     descricao: 'Central de dúvidas da Clarevo: respostas por tema, passo a passo de cada função e busca no próprio navegador.',

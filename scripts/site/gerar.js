@@ -93,7 +93,10 @@ function workerDoSite(valores) {
     .replace('/*NOTICIAS*/ null', () => pacoteDoWorker('noticias/servidor.ts'));
 }
 
-/** robots.txt: com marcador pendente (versão preliminar) nada é indexado; pronto, tudo é, e o sitemap só existe com domínio. */
+/**
+ * robots.txt: com marcador pendente (versão preliminar) e `indexar` desligado, nada é indexado; com `indexar` ligado (D-131) ou sem
+ * marcador pendente, tudo é (as páginas com marcador pendente seguem com `noindex` e fora do sitemap), e o sitemap só existe com domínio.
+ */
 function robots(preliminar, dominio) {
   if (preliminar) return '# Versão preliminar, em revisão: nada deve ser indexado ainda.\nUser-agent: *\nDisallow: /\n';
   return `User-agent: *\nAllow: /\n${dominio ? `\nSitemap: https://${dominio}/sitemap.xml\n` : ''}`;
@@ -106,7 +109,7 @@ function robots(preliminar, dominio) {
  */
 function sitemap(paginas, dominio) {
   const urls = paginas
-    .filter((p) => !p.semIndexar)
+    .filter((p) => !p.semIndexar && !(p.pendencias && p.pendencias.length > 0))
     .map((p) => `<url><loc>https://${dominio}${caminhoLimpo(p.arquivo)}</loc>${p.atualizada && dataExiste(p.atualizada) ? `<lastmod>${p.atualizada}</lastmod>` : ''}</url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
@@ -255,7 +258,8 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
   const css = fs.readFileSync(path.join(SITE_SRC, 'estilo.css'), 'utf8');
   arquivos.set('estilo.css', css);
   arquivos.set('_headers', CABECALHOS);
-  arquivos.set('robots.txt', robots(preliminar, dominio));
+  // Indexar antes dos textos finais (D-131) só com domínio de verdade: sem domínio, o site ainda não é o publicado.
+  arquivos.set('robots.txt', robots(preliminar && !(estado.indexar && dominio), dominio));
   if (dominio) arquivos.set('sitemap.xml', sitemap(paginas, dominio));
   // O feed só existe com domínio: sem ele os endereços seriam relativos e o RSS, inválido.
   if (novidades.feed) arquivos.set('novidades/feed.xml', novidades.feed);
@@ -283,7 +287,16 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
   // (/api/noticias e /api/noticias/materia, desligadas sem NOTICIAS=ligado no painel); o resto vai para os arquivos estáticos.
   arquivos.set('_worker.js', workerDoSite(valores));
   arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
-  for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
+  // As fontes (27/11/2026): o site usa o WOFF2 (site-src/fontes, feito do TTF do app por `node scripts/gerar-fontes-site.js`); o TTF fica
+  // como segunda opção do @font-face (quem lê WOFF2, todo navegador atual, nunca o baixa) e para o kit de imprensa, que oferece os arquivos.
+  // TTF mudado sem refazer o WOFF2: aviso, e o --final recusa.
+  for (const peso of PESOS_FONTE) {
+    arquivos.set(`fontes/Manrope_${peso}.woff2`, ler(SITE_SRC, 'fontes', `Manrope_${peso}.woff2`));
+    arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
+  }
+  const dasFontes = require('../gerar-fontes-site').conferir();
+  avisos.push(...dasFontes.map((p) => `o --final recusaria: ${p}`));
+  problemasFinais.push(...dasFontes);
   arquivos.set('fontes/OFL.txt', ler(FONTES, 'OFL.txt'));
   arquivos.set('marca/clarevo-logotipo-reverso.svg', ler(MARCA, 'clarevo-logotipo-reverso.svg'));
   // Na impressão o cabeçalho fica sem fundo azul: entra o logotipo oficial de fundo claro, em vez de inverter as cores do reverso.

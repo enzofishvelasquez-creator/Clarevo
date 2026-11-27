@@ -179,4 +179,4 @@ ${duvida('excluir', 'Como excluir a conta', `<p>No app, abra Conta e, no último
   });
 }
 
-module.exports = { paginaSeguranca, AVISO_DE_SAUDE };
+module.exports = { paginaSeguranca, AVISO_DE_SAUDE, duvida };

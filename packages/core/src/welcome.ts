@@ -1,4 +1,4 @@
-import { TRIAL_DAYS } from './plano';
+import { ACCESS_TEXT, SUBSCRIBE_OPEN, TRIAL_DAYS } from './plano';
 
 /**
  * Primeiro uso (D-125, Onda 1, itens 8 e 9 do estudo de 25/11/2026): as boas-vindas dizem o teste grátis e têm um caminho principal
@@ -41,6 +41,27 @@ export const WELCOME_TEXT = {
   demoHint: 'Abre a demonstração no navegador, com dados fictícios.',
   haveAccount: 'Já tem conta?',
   signIn: 'Entrar',
+} as const;
+
+/**
+ * A linha do teste grátis em Criar conta (jornada de compra de 27/11/2026, item 2): com a assinatura aberta, o "Assine aqui" do site leva
+ * direto a esta tela, sem passar pelas boas-vindas, e a tela não falava de dinheiro. A primeira parte é a das boas-vindas
+ * (`WELCOME_TEXT.trial`), que vale nos dois estados: antes do início da cobrança, o acesso é completo e sem cobrança, e o teste de
+ * TRIAL_DAYS dias conta a partir dele (`accessView`, "pre_lancamento"); depois, toda conta nova começa com o teste. A segunda depende da
+ * compra: fechada (`SUBSCRIBE_OPEN` falso), a cobrança ainda não começou para ninguém, e vale a frase da tela Assinatura com a compra
+ * fechada (`ACCESS_TEXT.notOpenYet`, sem "Assinatura em breve"); aberta, a cobrança pode ou não ter começado, e só se diz o que é verdade
+ * nos dois casos: o plano se escolhe depois, no app. Nunca promete o que o banco decide (o dia do início da cobrança).
+ */
+export function signupTrialLine(subscribeOpen: boolean): string {
+  const second = subscribeOpen ? 'O plano você escolhe depois, no app.' : ACCESS_TEXT.notOpenYet.replace(/^Assinatura em breve\. /, '');
+  return `${WELCOME_TEXT.trial}. ${second}`;
+}
+
+export const SIGNUP_TEXT = {
+  title: 'Criar conta',
+  /** "14 dias grátis, sem cartão. Por enquanto, o acesso é completo e nada é cobrado." (compra fechada). */
+  trial: signupTrialLine(SUBSCRIBE_OPEN),
+  subtitle: 'Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.',
 } as const;
 
 /** "Sua primeira conta": os atalhos de começo ao lado de "Começar meu mês". */

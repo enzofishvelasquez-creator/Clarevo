@@ -94,6 +94,7 @@ describe('boas-vindas (sinal 19)', () => {
         '@/components/states': { WelcomeArt: () => null },
         '@/components/ui': { Button: ui.record('button'), LinkButton: ui.record('link'), TextField: ui.record('field'), Txt: () => null },
         '@/lib/demo-auth': { DemoAuth: FakeDemoAuth },
+        '@/lib/layout': { useShortLandscape: () => false },
         '@/state/session': { useSession: () => ({ auth }) },
         '@/theme/tokens': { colors: {}, fonts: {}, radius: {}, space: {} },
       },
@@ -283,8 +284,11 @@ describe('aba marcada nas telas fora das abas (sinal 21)', () => {
 });
 
 describe('letra grande (sinal 20): as abas continuam com o rótulo (revisão de 26/11/2026)', () => {
-  /** A barra das telas de consulta montada numa tela de 320 px com a letra a 2 vezes; devolve as props de cada aba. */
-  function mountBar(platform: 'ios' | 'android') {
+  /**
+   * A barra das telas de consulta montada numa tela de 320 px com a letra a 2 vezes (ou, com `short`, num celular deitado); devolve as props
+   * de cada aba.
+   */
+  function mountBar(platform: 'ios' | 'android', short = false) {
     const tabs: Record<string, any>[] = [];
     const FitTxt = () => null;
     const harness = createHooksHarness();
@@ -311,7 +315,7 @@ describe('letra grande (sinal 20): as abas continuam com o rótulo (revisão de 
         'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
         '@/components/ui': { FitTxt },
         '@/lib/bar-inset': { setBrowseBarInset: vi.fn() },
-        '@/lib/layout': { useWideLayout: () => false },
+        '@/lib/layout': { useShortLandscape: () => short, useWideLayout: () => false },
         '@/lib/nav-state': { contaBelow: core.contaBelow, useNavState: () => undefined },
         '@/theme/tokens': { colors: {}, fonts: {}, radius: {} },
       },
@@ -334,6 +338,20 @@ describe('letra grande (sinal 20): as abas continuam com o rótulo (revisão de 
       expect(t.accessibilityShowsLargeContentViewer).toBeUndefined();
     }
     app.unmount();
+  });
+
+  it('no celular deitado (revisão dos tamanhos de tela, 27/11/2026), o ícone fica ao lado do rótulo, com o alvo de 44 px; em pé, embaixo dele', () => {
+    const flat = (t: Record<string, any>) => Object.assign({}, ...(t.style({ pressed: false }) as unknown[]).filter((x) => x && typeof x === 'object'));
+    const lying = mountBar('android', true);
+    expect(lying.tabs).toHaveLength(5);
+    for (const t of lying.tabs) expect(flat(t)).toMatchObject({ flexDirection: 'row', minHeight: 44 });
+    lying.app.unmount();
+    const standing = mountBar('android');
+    for (const t of standing.tabs) {
+      expect(flat(t).flexDirection).toBeUndefined();
+      expect(flat(t).minHeight).toBe(56);
+    }
+    standing.app.unmount();
   });
 
   it('no iPhone, tocar e segurar a aba mostra o nome grande (visualizador de conteúdo grande do sistema)', () => {

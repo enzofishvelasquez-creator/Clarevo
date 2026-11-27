@@ -8,7 +8,7 @@
  */
 import { addDays, daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
-import { FAMILY_MAX_PEOPLE } from './family';
+import { FAMILY_MAX_PEOPLE, type FamilyOverview } from './family';
 import { formatBRL } from './money';
 import { PIX_GRACE_DAYS, PIX_WARNING_DAYS_BY_PERIOD } from './assinatura-web/pix';
 import type { WebSubscriptionStatus } from './assinatura-web/app';
@@ -189,15 +189,24 @@ export function annualSavingCents(plan: PlanKind): number {
 }
 
 /**
- * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O anual vem primeiro, sem pressa e sem alarme: só os números, com o
- * equivalente por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para 12 mensalidades.
+ * A ordem das opções e o período já marcado na escolha da tela Assinatura (na web, no app das lojas e na demonstração): o mensal primeiro e
+ * marcado (decisão do Enzo de 27/11/2026, no lugar do "anual primeiro" da D-127). Nenhum outro período vem marcado: o plano escolhido no
+ * site (`plano-escolhido.ts`) só troca o marcado quando o endereço traz `periodo`; sem ele, vale este.
+ */
+export const PLAN_PERIOD_ORDER: readonly BillingPeriod[] = ['mensal', 'anual'];
+export const PLAN_PERIOD_DEFAULT: BillingPeriod = 'mensal';
+
+/**
+ * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O mensal vem primeiro (27/11/2026, `PLAN_PERIOD_ORDER`), sem pressa e
+ * sem alarme: só os números, com o equivalente do anual por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para
+ * 12 mensalidades.
  */
 export const PLAN_PERIOD_TEXT = {
   /** O nome do grupo de opções, para o leitor de tela. */
   choiceLabel: 'Período da assinatura',
-  option: { anual: 'Anual', mensal: 'Mensal' } as Readonly<Record<BillingPeriod, string>>,
+  option: { mensal: 'Mensal', anual: 'Anual' } as Readonly<Record<BillingPeriod, string>>,
   /** Abaixo do nome de cada opção. */
-  optionHint: { anual: 'Uma cobrança por ano', mensal: 'Uma cobrança por mês' } as Readonly<Record<BillingPeriod, string>>,
+  optionHint: { mensal: 'Uma cobrança por mês', anual: 'Uma cobrança por ano' } as Readonly<Record<BillingPeriod, string>>,
   /** "Equivale a R$ 22,49 por mês". */
   equivalent: (plan: PlanKind) => `Equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês`,
   /** "R$ 88,90 a menos que 12 mensalidades". */
@@ -304,6 +313,39 @@ export const SUBSCRIPTION_SCREEN_TEXT = {
     { icon: 'familia', text: `Plano Família: até ${FAMILY_MAX_PEOPLE} pessoas na mesma assinatura` },
   ] as const,
   perMonth: ' por mês',
+} as const;
+
+/**
+ * O próximo passo de quem paga o plano Família (jornada de compra de 27/11/2026, item 4): depois de pagar, nada levava a criar a Família e
+ * convidar as pessoas, e sem isso o plano não entrega o que vendeu. Só com a assinatura Família da própria pessoa: em vigor ou, no teste
+ * grátis, assinada no cartão para a primeira cobrança no fim do teste (D-129: o banco segue dizendo "teste" até lá; `scheduledPlan`, o plano
+ * dessa assinatura marcada, `pendingFirstChargePlan`). Sem Família, "criar"; na Família em que é titular, sem mais ninguém e sem convite
+ * válido, "convidar"; nos outros casos (ou enquanto a Família não foi lida), nada. `family`: a leitura da Família (null: não tem;
+ * undefined: ainda não chegou ou falhou).
+ */
+export function familyPlanNextStep(
+  access: Access,
+  family: FamilyOverview | null | undefined,
+  now: Date,
+  scheduledPlan: PlanKind | null = null,
+): 'criar' | 'convidar' | null {
+  const paysFamily = (access.status === 'assinatura' && access.plan === 'familiar') || (access.status === 'teste' && scheduledPlan === 'familiar');
+  if (!paysFamily || family === undefined) return null;
+  if (family === null) return 'criar';
+  if (family.role !== 'titular') return null;
+  const others = family.members.filter((m) => m.status === 'ativo' && !m.isMe).length;
+  const openInvite = family.invites.some((i) => !i.usedAt && !i.cancelledAt && Date.parse(i.expiresAt) > now.getTime());
+  return others === 0 && !openInvite ? 'convidar' : null;
+}
+
+/** Os textos do próximo passo do plano Família, calmos e sem prazo. */
+export const FAMILY_PLAN_NEXT_TEXT = {
+  createTitle: `Crie a Família e convide até ${FAMILY_MAX_PEOPLE - 1} pessoas`,
+  createBody: `O plano Família vale para você e até ${FAMILY_MAX_PEOPLE - 1} pessoas na sua Família da Clarevo. O Pessoal de cada pessoa continua só dela.`,
+  createAction: 'Criar a Família',
+  inviteTitle: `Convide até ${FAMILY_MAX_PEOPLE - 1} pessoas para a Família`,
+  inviteBody: 'Cada pessoa que entrar pelo convite passa a ter o acesso completo pelo seu plano. O Pessoal de cada pessoa continua só dela.',
+  inviteAction: 'Convidar para a Família',
 } as const;
 
 /** Como cancelar a assinatura no cartão da web (D-129): na tela Assinatura, o botão vem logo abaixo; no card de Conta, por "Ver a assinatura". */

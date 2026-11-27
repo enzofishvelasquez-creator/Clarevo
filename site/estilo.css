@@ -1,7 +1,9 @@
 /* Estilo do site da Clarevo. Fonte em site-src/estilo.css; o gerador copia para site/estilo.css. Identidade: azul #2457F5, lima #D4F05B, texto #17223B. */
-@font-face{font-family:Manrope;font-weight:500;font-style:normal;font-display:swap;src:url(fontes/Manrope_500Medium.ttf) format("truetype")}
-@font-face{font-family:Manrope;font-weight:700;font-style:normal;font-display:swap;src:url(fontes/Manrope_700Bold.ttf) format("truetype")}
-@font-face{font-family:Manrope;font-weight:800;font-style:normal;font-display:swap;src:url(fontes/Manrope_800ExtraBold.ttf) format("truetype")}
+/* As fontes em WOFF2 desde 27/11/2026 (site-src/fontes, feitas do TTF do app por scripts/gerar-fontes-site.js): o navegador pega a primeira
+   que sabe ler, e todo navegador atual lê WOFF2; o TTF só seria baixado por um navegador antigo, sem custo para os outros. */
+@font-face{font-family:Manrope;font-weight:500;font-style:normal;font-display:swap;src:url(fontes/Manrope_500Medium.woff2) format("woff2"),url(fontes/Manrope_500Medium.ttf) format("truetype")}
+@font-face{font-family:Manrope;font-weight:700;font-style:normal;font-display:swap;src:url(fontes/Manrope_700Bold.woff2) format("woff2"),url(fontes/Manrope_700Bold.ttf) format("truetype")}
+@font-face{font-family:Manrope;font-weight:800;font-style:normal;font-display:swap;src:url(fontes/Manrope_800ExtraBold.woff2) format("woff2"),url(fontes/Manrope_800ExtraBold.ttf) format("truetype")}
 
 :root{
   --azul:#2457F5;
@@ -117,12 +119,18 @@ main:focus{outline:none}
 .menu-movel li a{display:flex;width:100%}
 /* No site lançado (D-129), "Entrar" fica ao lado de "Assine aqui", como link de texto; no celular, os dois estão dentro do menu. */
 .menu .menu-cta,.menu .menu-entrar{display:none}
+/* Desde 27/11/2026 (análise de 26/11, lista "Depois"): de 48 rem (768 px) em diante, a chamada do cabeçalho fica à vista. Entre 768 e
+   1119 px o cabeçalho tinha só o logotipo e "Menu", com 500 a 800 px vazios: agora "Entrar" (antes do lançamento) ou "Assine aqui" e, ao
+   lado, "Entrar" como link de texto (lançado) ficam antes de "Menu", que continua com as páginas (e repete as chamadas, como no celular). */
+@media (min-width:48rem){
+  .menu .menu-entrar{display:inline-flex}
+  .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none;white-space:nowrap}
+  .menu .menu-cta:hover{text-decoration:underline}
+  .menu .menu-cta+.menu-movel{margin-left:.5rem}
+}
 @media (min-width:70rem){
   .menu-lista{display:flex}
   .menu-movel{display:none}
-  .menu .menu-entrar{display:inline-flex}
-  .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none}
-  .menu .menu-cta:hover{text-decoration:underline}
 }
 
 /* Tema do site no rodapé (D-115). Desde 26/11/2026 (D-128, pedido do Enzo: estava em evidência demais), um controle discreto na linha de
@@ -163,12 +171,33 @@ main:focus{outline:none}
   .capa{padding:2.5rem 0 4.5rem}
   .capa-grade{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:3rem}
 }
+/* Celular deitado (varredura de tamanhos de 27/11/2026, 844 x 390): o celular da capa ficava embaixo do texto, e a capa passava de três
+   alturas de tela. Com a tela baixa e larga, o celular vai para o lado do texto, como no computador. */
+@media (min-width:40rem) and (max-width:55.99rem) and (max-height:32rem) and (orientation:landscape){
+  .capa-grade{grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:2rem}
+}
 .capa-simples{padding-bottom:2.5rem}
 .acoes{display:flex;flex-wrap:wrap;gap:.75rem;margin:1.25rem 0 .75rem}
 /* O texto logo embaixo dos botões (a linha do teste na capa, os links de texto da chamada final, o link da demonstração em O app): o mesmo
    respiro de cima dos botões, no celular e no computador, nunca colado neles (D-128, pedido do Enzo). */
 .acoes+:is(p,.selos-lojas){margin-top:1rem}
 @media (min-width:48rem){.acoes+:is(p,.selos-lojas){margin-top:1.25rem}}
+/* A capa com o celular ao lado (início e MEI), desde 27/11/2026 (retorno do Enzo sobre a capa do início: "dividir um pouco melhor esses
+   textos, estão próximos e longe do fim da área azul"): mais respiro entre o título, o subtítulo, os botões com a linha do teste e a faixa
+   de confiança, em quatro grupos; no computador, o bloco de texto fica no meio da altura do celular, e a área azul termina mais perto dos
+   dois (3 rem embaixo, eram 4,5). As capas simples (sem celular ao lado) não tinham esse vazio e ficam como estavam. */
+.capa:not(.capa-simples) .capa-grade h1{margin-bottom:1rem}
+.capa:not(.capa-simples) .capa-grade .lead{margin-bottom:1.5rem}
+.capa:not(.capa-simples) .capa-grade .acoes{margin-top:1.5rem}
+.capa:not(.capa-simples) .capa-grade .confianca{margin-top:1.5rem}
+@media (min-width:56rem){
+  .capa:not(.capa-simples){padding-bottom:3rem}
+  .capa:not(.capa-simples) .capa-grade .sobretitulo{margin-bottom:1rem}
+  .capa:not(.capa-simples) .capa-grade h1{margin-bottom:1.5rem}
+  .capa:not(.capa-simples) .capa-grade .lead{margin-bottom:2rem}
+  .capa:not(.capa-simples) .capa-grade .acoes{margin-top:2rem}
+  .capa:not(.capa-simples) .capa-grade .confianca{margin-top:2.25rem}
+}
 .botao{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 1.35rem;border-radius:999px;font-weight:800;text-decoration:none;border:2px solid transparent;text-align:center}
 .botao-principal{background:var(--botao);color:var(--sobre-botao)}
 .capa .botao-principal{background:var(--lima);color:var(--sobre-lima)}
@@ -216,6 +245,11 @@ blockquote>:last-child{margin-bottom:0}
 .texto{max-width:46rem}
 .texto-largo{max-width:52rem}
 .nota{color:var(--texto-2)}
+/* Varredura de tamanhos de 27/11/2026 (de 320 a 1920 px): numa tela larga, as notas e os parágrafos e listas soltos de uma seção (sem
+   classe, fora de grades e cartões), o aviso educativo, a lista de Segurança e o texto dos cartões que ocupam a linha toda chegavam a
+   140-150 caracteres por linha na largura toda do conteúdo (72 rem). Ficam com a medida do texto longo (52 rem, cerca de 100 caracteres na
+   letra das notas), como as perguntas recolhidas e as ressalvas. */
+.nota,.bloco .miolo>p:not([class]),.bloco .miolo>ul:not([class]),.bloco .miolo>ol:not([class]),.aviso-edu,.nao-e,.posts .cartao>p,.grade>.cartao>p{max-width:52rem}
 /* Um parágrafo de texto logo depois do lead de uma seção, na mesma largura (D-115: no lugar de um cartão sozinho). */
 .texto-bloco{max-width:42rem}
 /* Dois parágrafos lado a lado a partir de 56 rem (D-115, revisão: a primeira seção da página inicial ocupava só a metade da esquerda). */
@@ -414,6 +448,26 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .duvidas+p{max-width:52rem}
 /* As perguntas frequentes no fim de um bloco (início, D-128): sem somar a margem de baixo ao respiro do bloco. */
 .bloco .duvidas:last-child{margin-bottom:0}
+/* A linha calma do fim das páginas de conteúdo (27/11/2026, jornada de compra, item S2: Aprender, calculadoras, Ajuda e Novidades terminavam
+   sem caminho para o app): um parágrafo só, com uma linha fina em cima, sem caixa nem botão. */
+.bloco.bloco-ponte{padding:2rem 0 3rem}
+.ponte{max-width:46rem;margin:0;padding-top:1.25rem;border-top:1px solid var(--linha);color:var(--texto-2)}
+.ponte a{font-weight:700}
+/* Os passos de pôr a versão web na tela de início (Use no navegador, 27/11/2026): uma lista numerada curta dentro de cada cartão. */
+.passos-curtos{margin:0;padding-left:1.35rem}
+.passos-curtos li{margin:.35rem 0}
+.passos-curtos li::marker{font-weight:800;color:var(--link)}
+/* "Ver mais" (27/11/2026, O app e Para empresas mais curtas): um <details> fechado, sem JavaScript, com o resumo no desenho do botão
+   suave (pílula de 48 px, a seta que vira ao abrir) e o conteúdo de antes inteiro dentro. O leitor de tela ouve um botão "recolhido" ou
+   "expandido"; Enter e Espaço abrem e fecham. Nada de vídeo baixa enquanto está fechado (o vídeo fora da tela não toca, js/videos.js). */
+.ver-mais{margin:0}
+.ver-mais>summary{display:inline-flex;align-items:center;gap:.65rem;min-height:48px;padding:.5rem 1.35rem;border:2px solid var(--link);border-radius:999px;color:var(--link);font-weight:800;line-height:1.3;cursor:pointer;list-style:none}
+.ver-mais>summary::-webkit-details-marker{display:none}
+.ver-mais>summary::after{content:"";flex:none;width:.55rem;height:.55rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-2px) rotate(45deg)}
+.ver-mais[open]>summary::after{transform:translateY(2px) rotate(-135deg)}
+.ver-mais>summary:hover{text-decoration:underline;text-underline-offset:.2em}
+.ver-mais-corpo{margin-top:1.5rem}
+.ver-mais-corpo>.recursos>.recurso:first-child{padding-top:0}
 
 /* Tabelas dos textos jurídicos */
 .tabela table{width:100%;border-collapse:collapse;font-size:.9375rem}
@@ -474,7 +528,7 @@ details.conta ol{margin:.25rem 0 0;font-variant-numeric:tabular-nums}
 
 /* Calculadoras: o formulário vem do script da página (calculadoras/calculadora.js); sem JavaScript, o aviso fica no <noscript> */
 .calc{margin:1.25rem 0 0;display:grid;gap:1rem;max-width:46rem}
-.calc-aviso{margin-top:0;max-width:46rem}
+.calc-aviso{margin-top:1rem;max-width:46rem}
 .bloco .exemplo{max-width:46rem}
 .calc-carregando,.calc-sem-js{margin:0;padding:1rem 1.15rem;border:1px dashed var(--contorno);border-radius:16px;background:var(--superficie)}
 .calc-sem-js h3{margin-top:1rem}
@@ -551,7 +605,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .descricao h3{margin-top:0}
 .marca-cartao h3{margin:.75rem 0 .35rem}
 .marca-amostra{display:flex;align-items:center;justify-content:center;min-height:9rem;padding:1.25rem;border-radius:14px;border:1px solid var(--linha)}
-.marca-amostra img{display:block;max-width:100%;height:auto;max-height:5.5rem}
+.marca-amostra img{display:block;width:auto;max-width:100%;height:auto;max-height:5.5rem}
 .marca-claro{background:#FFFFFF}
 .marca-azul{background:#2457F5;border-color:#2457F5}
 .baixar{font-size:.9375rem;color:var(--texto-2)}
@@ -610,6 +664,10 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
 .celular video[tabindex]{cursor:pointer}
 .celular video:focus-visible{outline-offset:4px;border-radius:30px}
+/* Os vídeos do computador (27/11/2026) na moldura larga das capturas, com o mesmo comportamento. */
+.larga video{display:block;width:100%;height:auto;border-radius:12px;background:#F7F9FD;object-fit:cover}
+.larga video[tabindex]{cursor:pointer}
+.larga video:focus-visible{outline-offset:4px;border-radius:12px}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}
@@ -803,6 +861,14 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 
 /* D-128: o link de cada passo de Comece aqui, embaixo do texto. */
 .passos .passo-link{margin-top:.6rem;font-weight:700}
+/* O convite ao cadastro antes do lançamento (decisão do Enzo de 27/11/2026): na seção Planos do início, a linha honesta e "Criar conta
+   grátis" num quadro calmo, com as cores de sempre (nada de vermelho nem de alerta); no primeiro passo de Comece aqui, o botão embaixo do
+   texto. */
+.convite-conta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem 1.5rem;max-width:52rem;margin:0 0 1.75rem;padding:1rem 1.25rem;border:1px solid var(--linha);border-radius:20px;background:var(--superficie)}
+.bloco-alt .convite-conta{background:var(--fundo)}
+.convite-conta .aviso-assinatura{flex:1 1 18rem;margin:0;font-weight:700}
+.convite-conta .acoes{margin:0}
+.passos .acoes-passo{margin:.9rem 0 0}
 /* "Use no navegador ou no celular" na página inicial (D-128): o texto com a lista e, a partir de 56 rem, a tela do computador ao lado. No
    celular a captura larga ficaria pequena demais para ler: fica escondida (e, com loading="lazy", nem é baixada). */
 .na-web{display:grid;gap:1.5rem 3rem;align-items:center}
@@ -810,10 +876,20 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .so-tela-larga{display:none}
 @media (min-width:56rem){.na-web{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.so-tela-larga{display:block}}
 .na-web .acoes{margin-bottom:0}
-/* Use no navegador (web.html, D-128): as telas do computador, uma embaixo da outra no celular e lado a lado a partir de 64 rem. */
-.telas-web{display:grid;gap:1.5rem 2rem}
-@media (min-width:64rem){.telas-web{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.telas-web .larga{margin:0}
+/* Use no navegador (web.html): desde 27/11/2026, os vídeos do computador (pedido do Enzo, "focar em demonstração por vídeos do app"). O
+   principal na largura do conteúdo; os outros três, cada um ao lado do título e da frase do que mostra (a partir de 56 rem, o texto de um
+   lado e o vídeo do outro, alternando), e um embaixo do outro no celular. */
+.video-principal{margin:0 0 2.5rem}
+.videos-web{display:grid;gap:2.5rem}
+.video-web{display:grid;gap:1rem 2.5rem;align-items:center;margin:0}
+.video-web .larga{margin:0}
+.video-web-texto h3{margin:0 0 .5rem;font-size:1.25rem}
+.video-web-texto p{margin:0;color:var(--texto-2);max-width:30rem}
+@media (min-width:56rem){
+  .video-web{grid-template-columns:minmax(0,.75fr) minmax(0,1.6fr)}
+  .video-web:nth-child(even){grid-template-columns:minmax(0,1.6fr) minmax(0,.75fr)}
+  .video-web:nth-child(even) .video-web-texto{order:2}
+}
 .pagar-web{max-width:46rem}
 .pagar-web h2 .etiqueta{vertical-align:middle;margin-left:.5rem;font-size:.875rem}
 

@@ -13,6 +13,7 @@
  * Nas lojas nada disto vale: os produtos não têm oferta de teste, e a cobrança é no dia da compra (a tela das lojas diz isso).
  */
 import { addDays, todayIn, type IsoDate } from '../dates';
+import type { PlanKind } from '../plano-precos';
 
 /** O fuso do serviço de pagamento e do banco para os dias de cobrança: Brasília (o mesmo de ASAAS_TIME_ZONE e de billing_pix_apply). */
 export const BILLING_TIME_ZONE = 'America/Sao_Paulo';
@@ -54,10 +55,15 @@ export function trialEndPhrase(rel: TrialEndRelation): string {
   return rel === 'dia-seguinte' ? 'no dia seguinte ao fim do teste grátis' : rel === 'vespera' ? 'na véspera do fim do teste grátis' : 'quando o teste grátis acaba';
 }
 
-/** Um direito da própria pessoa pela web (`plan_entitlements`, provedor "web"): só o começo e o fim. */
+/** Um direito da própria pessoa pela web (`plan_entitlements`, provedor "web"): o começo, o fim e, lido pelo app, o plano. */
 export interface OwnWebEntitlement {
   validFrom: string;
   validUntil: string | null;
+  /**
+   * O plano do direito (`plan`), só quando o app o lê (`parseOwnWebEntitlementsWithPlan` e `pendingFirstChargePlan`, em `app.ts`, fora da
+   * função do servidor): para a tela Assinatura levar quem assinou o Família no teste a criar a Família.
+   */
+  plan?: PlanKind;
 }
 
 /** Lê as linhas de `plan_entitlements` (`valid_from`, `valid_until`); linha fora do formato fica de fora. */

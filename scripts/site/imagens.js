@@ -11,6 +11,13 @@
  * Desde 18/11/2026 (D-115, revisão), toda tela da demonstração no site, captura ou vídeo, tem a mesma legenda: "Tela da demonstração, com
  * dados fictícios" (`LEGENDA_DEMO`, igual a `LEGENDA_TELA` de `videos.js`; antes as capturas diziam "Dados fictícios de demonstração").
  *
+ * Desde 27/11/2026 (pedido do Enzo), nenhuma tela do site mostra o selo "Demonstração" do app: as telas de O app, do kit de imprensa, de
+ * Segurança e de Para empresas que tinham o selo (as telas cruas de `docs/lojas/capturas/` e as de `docs/telas/` do roteiro de telas) vêm de
+ * `site-src/imagens/telas/`, gravadas por `scripts/gravar-videos-site.js --capturas` com a marca das capturas (`__clarevoCaptura`), que
+ * esconde o selo; a legenda continua dizendo que é a demonstração, com dados fictícios. As telas de `docs/telas/` sem o selo (a Família,
+ * o benefício e as licenças da empresa, de contas simuladas fora da demonstração) continuam de lá. As telas do computador de `web.html` e
+ * do início deram lugar aos vídeos do computador (`telaLargaComVideo` de `videos.js`).
+ *
  * D-114 (17/11/2026): as telas das matérias de Novidades (`TELAS_DAS_NOVIDADES`, gravadas da demonstração por
  * `scripts/gravar-videos-site.js --capturas` em `site-src/imagens/telas/`) têm uma versão no tema claro e outra no escuro (`escura`): a
  * página mostra a do tema de quem visita (`<picture>` com `prefers-color-scheme`), e as duas têm a mesma largura e altura. A legenda delas,
@@ -36,7 +43,6 @@ const RESUMO_DO_CODIGO = crypto
 
 const { LEGENDA_TELA, VIDEOS } = require('./videos');
 const LEGENDA_DEMO = LEGENDA_TELA;
-const LOJA = 'docs/lojas/capturas/apple-iphone-6-3pol-1206x2622';
 const TELAS = 'docs/telas';
 const NOVIDADES = 'site-src/imagens/telas';
 /** Largura dos celulares (a página mostra a imagem com até 280 px de largura) e do painel largo. */
@@ -45,28 +51,27 @@ const LARGURA_LARGA = 960;
 
 /** `id` vira `imagens/<id>.png`. `alt` descreve a tela sem repetir a legenda. */
 const IMAGENS = [
-  { id: 'resumo', origem: `${LOJA}/01_resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo da Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vence e o botão Anotar gasto.' },
-  { id: 'anotar', origem: `${LOJA}/02_anotar_gasto.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto, com descrição, valor, forma de pagamento, categoria e data.' },
-  { id: 'contas', origem: `${LOJA}/03_contas_a_pagar.png`, largura: LARGURA_CELULAR, alt: 'Tela Contas a pagar, com as contas do mês, os vencimentos e o total que ainda falta pagar.' },
-  { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
-  { id: 'evolucao', origem: `${LOJA}/05_evolucao.png`, largura: LARGURA_CELULAR, alt: 'Tela Evolução, com o gráfico de Recebido e Pago mês a mês, a média e a mediana.' },
-  { id: 'metas', origem: `${LOJA}/07_metas.png`, largura: LARGURA_CELULAR, alt: 'Tela Metas, com a reserva para imprevistos e o quanto já foi guardado.' },
-  { id: 'aprender', origem: `${LOJA}/08_aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
+  // As telas de O app e do kit de imprensa, sem o selo (27/11/2026), no tamanho da captura da App Store de 6,3 pol. (1206 x 2622).
+  { id: 'resumo', origem: `${NOVIDADES}/app-resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo da Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vence e o botão Anotar gasto.' },
+  { id: 'anotar', origem: `${NOVIDADES}/app-anotar-gasto.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto, com descrição, valor, forma de pagamento, categoria e data.' },
+  { id: 'contas', origem: `${NOVIDADES}/app-contas-a-pagar.png`, largura: LARGURA_CELULAR, alt: 'Tela Contas a pagar, com as contas do mês, os vencimentos e o total que ainda falta pagar.' },
+  { id: 'cartoes', origem: `${NOVIDADES}/app-cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
+  { id: 'evolucao', origem: `${NOVIDADES}/app-evolucao.png`, largura: LARGURA_CELULAR, alt: 'Tela Evolução, com o gráfico de Recebido e Pago mês a mês, a média e a mediana.' },
+  { id: 'metas', origem: `${NOVIDADES}/app-metas.png`, largura: LARGURA_CELULAR, alt: 'Tela Metas, com a reserva para imprevistos e o quanto já foi guardado.' },
+  { id: 'aprender', origem: `${NOVIDADES}/app-aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
   { id: 'familia', origem: `${TELAS}/402_familia_titular.png`, largura: LARGURA_CELULAR, alt: 'Tela Família, com o nome da Família, as pessoas, o papel de cada uma e o botão Convidar.' },
   // Era a tela Anotar gasto com o botão de escanear, quase igual à captura "anotar": desde 12/11/2026 é o comprovante já lido.
-  { id: 'nota', origem: `${LOJA}/09_comprovante_lido.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto depois de ler um comprovante de Pix: o aviso do que foi lido e a descrição e o valor já preenchidos, para conferir antes de salvar.' },
+  { id: 'nota', origem: `${NOVIDADES}/app-comprovante-lido.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto depois de ler um comprovante de Pix: o aviso do que foi lido e a descrição e o valor já preenchidos, para conferir antes de salvar.' },
   { id: 'beneficio', origem: `${TELAS}/433_conta_beneficio_ativo.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta de quem recebeu o benefício, com a empresa, o plano, a data de início e a situação.' },
-  { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
-  { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
+  // Desde 27/11/2026, a captura das Novidades no tema claro (sem o selo), no lugar de `docs/telas/330_quem_ve.png`.
+  { id: 'quem-ve', origem: `${NOVIDADES}/quem-ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
+  // Desde 27/11/2026, a captura das Novidades no tema claro (sem o selo), no lugar de `docs/telas/421_empresa_painel_1280px.png`.
+  { id: 'empresa-painel', origem: `${NOVIDADES}/empresa-painel.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
   // O Espaço Negócio (D-113) em O app (D-115): a tela Seu negócio do cenário "negocio" da demonstração, gravada por
   // `scripts/gravar-videos-site.js --capturas --telas negocio`, só no tema claro, como as outras telas de O app (com uma versão escura
   // só nela, o tema escuro mostrava um celular escuro entre os claros).
   { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela do negócio Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
-  // A versão web no computador (D-128: o bloco "Use no navegador ou no celular" do início e a página `web.html`): as telas que o roteiro de
-  // telas grava a 1280 px (`scripts/e2e-web.js`, "Computador"), com o menu ao lado.
-  { id: 'computador-resumo', origem: `${TELAS}/630_computador_resumo.png`, largura: LARGURA_LARGA, alt: 'A Clarevo no navegador do computador: o menu ao lado, com Anotar gasto, Resumo, Movimentos, Metas, Investir e Aprender, e o Resumo de outubro com a diferença do mês, o recebido, o pago, as contas a pagar, as metas e o orçamento por categoria.' },
-  { id: 'computador-movimentos', origem: `${TELAS}/631_computador_movimentos.png`, largura: LARGURA_LARGA, alt: 'Movimentos no navegador do computador: o menu ao lado, os atalhos Buscar, Seu mês em 30 segundos, Evolução e Análises, o recebido e o pago de outubro e a tabela dos lançamentos com data, descrição, categoria, conta e valor.' },
 ];
 
 /**
@@ -83,8 +88,11 @@ const TELAS_DAS_NOVIDADES = [
   { id: 'post-empresa-painel', origem: `${NOVIDADES}/empresa-painel.png`, escura: `${NOVIDADES}/empresa-painel-escuro.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa, com o aviso de demonstração, o nome da empresa e o contrato: plano, vagas, vagas em uso, vagas livres, início, fim e situação. Nenhum dado financeiro.' },
 ];
 
-/** As capas dos vídeos de uso (D-114), do momento que melhor resume cada vídeo. Não têm texto alternativo: a capa é do vídeo, que tem nome e descrição. */
-const CAPAS_DOS_VIDEOS = VIDEOS.map((v) => ({ id: `video-${v.id}`, origem: `site-src/videos/${v.id}-capa.png`, largura: LARGURA_CELULAR, alt: '' }));
+/**
+ * As capas dos vídeos de uso (D-114), do momento que melhor resume cada vídeo. Não têm texto alternativo: a capa é do vídeo, que tem nome e
+ * descrição. As dos vídeos do computador (27/11/2026) na largura das telas largas.
+ */
+const CAPAS_DOS_VIDEOS = VIDEOS.map((v) => ({ id: `video-${v.id}`, origem: `site-src/videos/${v.id}-capa.png`, largura: v.aparelho === 'computador' ? LARGURA_LARGA : LARGURA_CELULAR, alt: '' }));
 
 /** Ilustrações da marca feitas no repositório (SVG), para a matéria sem tela. Largura e altura são as do desenho (`viewBox`). */
 const ILUSTRACOES = [

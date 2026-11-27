@@ -7,6 +7,7 @@ import { CATEGORIES, NO_CATEGORY_LABEL, recordMonth } from './records';
 import type { FamilyRole } from './family';
 import type { RepoErrorCode } from './repository';
 import { charCount, DESCRIPTION_MAX, ERROR_TEXT } from './validation';
+import { BUSINESS_CATEGORIES } from './business-categories';
 
 /**
  * Espaço Negócio (D-113, 17/11/2026; docs/52_ESPACO_NEGOCIO.md). Para quem tem CNPJ ou trabalha por conta (a loja de conserto de
@@ -18,7 +19,8 @@ import { charCount, DESCRIPTION_MAX, ERROR_TEXT } from './validation';
  * Regras repetidas no banco (migração 0042): create_business, rename_business e end_business; a retirada para o Pessoal
  * (create_business_withdrawal e delete_business_withdrawal: o gasto "Retirada para o Pessoal" no negócio e o recebimento "Retirada do
  * negócio" no Pessoal, ligados e gravados juntos); mover um lançamento entre o Pessoal e o negócio (move_record). Metas e investimentos
- * ficam fora do negócio; WhatsApp e Telegram anotam só no Pessoal.
+ * ficam fora do negócio. O Telegram (e o WhatsApp, ainda em piloto fechado) continua ligado ao Pessoal ou à Família, e a mensagem que
+ * começa com a palavra "negócio" anota no negócio da própria pessoa (27/11/2026, migração 0049; packages/core/src/whatsapp/mensagem.ts).
  *
  * Clarevo Plus (preparar agora, lançar depois): o modelo já aceita vários negócios por pessoa, sócios e ajudantes com papéis (os vínculos
  * da Família) e a exportação para o contador; nada disso aparece no app enquanto o Enzo não definir (docs/52, seção 6).
@@ -31,32 +33,8 @@ export const BUSINESS_MAX_PER_PERSON = 1;
 /** A conta com que o negócio nasce (bancos e carteira, D-043). */
 export const BUSINESS_DEFAULT_ACCOUNT = 'Conta do negócio';
 
-/**
- * Categorias do negócio. Entradas: vendas, serviços e outras. Saídas: o que um pequeno negócio costuma gastar, sem termos de
- * contabilidade. D-121 (24/11/2026, pesquisa de 18/11): "Divulgação", "Contabilidade e sistemas" e "Juros e multas" entram nas saídas da
- * operação (ainda fora do orçamento, que segue com as 9 de BUSINESS_BUDGET_CATEGORIES); "Empréstimo recebido", "Parcela de empréstimo" e "Equipamento" são categorias de
- * escolha que ficam fora da operação em "Seu negócio" (o dinheiro entrou ou saiu de verdade, mas não é venda nem gasto do dia a dia) e
- * fora do orçamento.
- */
-export const BUSINESS_CATEGORIES: Readonly<Record<RecordKind, readonly string[]>> = {
-  receita: ['Vendas', 'Serviços', 'Outras entradas', 'Empréstimo recebido'],
-  despesa: [
-    'Material e mercadoria',
-    'Peças e ferramentas',
-    'Combustível e transporte',
-    'Funcionários e ajudantes',
-    'Impostos e DAS',
-    'Aluguel do ponto',
-    'Contas do ponto',
-    'Taxas e maquininha',
-    'Divulgação',
-    'Contabilidade e sistemas',
-    'Juros e multas',
-    'Outras saídas',
-    'Parcela de empréstimo',
-    'Equipamento',
-  ],
-};
+/** As categorias do negócio (D-113 e D-121): em `business-categories.ts`, sem dependências, para a leitura das mensagens do Telegram. */
+export { BUSINESS_CATEGORIES };
 
 /**
  * As 9 categorias do orçamento do negócio, na ordem do banco (clarevo_budget_categories, migração 0042). D-121: "Divulgação",
@@ -857,7 +835,12 @@ export const BUSINESS_TEXT = {
   ended: 'Espaço Negócio encerrado.',
   /** Quem vê e conversas. */
   whoSees: 'Só você vê e anota no espaço Negócio. O Pessoal e a Família, se houver, continuam separados.',
-  /** O canal pode estar ligado ao Pessoal ou à Família (D-113a): a frase diz só que o negócio fica de fora. */
+  /**
+   * Quem administra (27/11/2026, migração 0049): o canal continua ligado ao Pessoal ou à Família, e a palavra "negócio" no começo da
+   * mensagem anota no negócio da própria pessoa. Também no guia (a entrada "Espaço Negócio").
+   */
+  chatNoteOwner: 'Pelo Telegram, comece a mensagem com a palavra negócio para anotar no espaço Negócio, como negócio material 120.',
+  /** No negócio de outra pessoa (Clarevo Plus, desligado): a palavra "negócio" anota só no negócio da própria pessoa, nunca neste. */
   chatNote: 'O WhatsApp e o Telegram não anotam no espaço Negócio.',
 } as const;
 

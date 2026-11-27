@@ -786,7 +786,7 @@ begin
   assert position('clarevo_chat_add_record' in pg_get_functiondef('public.whatsapp_add_record(text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)'::regprocedure)) > 0
      and position('clarevo_chat_undo' in pg_get_functiondef('public.whatsapp_undo(text, text, timestamptz)'::regprocedure)) > 0
      and position('clarevo_chat_unlink' in pg_get_functiondef('public.whatsapp_unlink(text, text)'::regprocedure)) > 0
-     and position('clarevo_chat_link_locked' in pg_get_functiondef('public.clarevo_chat_add_record(text, text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)'::regprocedure)) > 0
+     and position('clarevo_chat_link_locked' in pg_get_functiondef('public.clarevo_chat_add_record(text, text, text, timestamptz, public.record_kind, bigint, integer, date, text, text, boolean)'::regprocedure)) > 0
      and position('clarevo_chat_link_locked' in pg_get_functiondef('public.clarevo_chat_undo(text, text, text, timestamptz)'::regprocedure)) > 0
      and position('clarevo_chat_link_locked' in pg_get_functiondef('public.clarevo_chat_unlink(text, text, text)'::regprocedure)) > 0,
     'anotar, desfazer e desligar releem o vínculo com a trava da pessoa';

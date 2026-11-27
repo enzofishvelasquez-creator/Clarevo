@@ -178,7 +178,11 @@ const estado = (nome, texto, visivel = false) => `<p class="noticias-estado" dat
 /** O host de cada fonte de notícias (os links de texto que a página tem para elas). */
 const hostsDasFontesDeNoticias = () => [...new Set(doNucleo().FONTES_NOTICIAS.map((f) => new URL(f.site).host))].sort();
 
-function paginaIndice(edicoes, { valores }) {
+/**
+ * A lista de notícias. Com as notícias desligadas (`noticiasLigadas: false` em `ESTADO_DO_PRODUTO`, `scripts/site/config.js`; as rotas só
+ * ligam com NOTICIAS=ligado na Cloudflare), a página só mostra "Em breve" e os links das fontes: fica com `noindex` e fora do sitemap.
+ */
+function paginaIndice(edicoes, { valores, estado: estadoDoProduto }) {
   const arquivo = ARQUIVO_INDICE;
   const { NOTICIAS_TEXT: T, FONTES_NOTICIAS, licencaEfetiva } = doNucleo();
   const capa = `<h1>${esc(T.titulo)}</h1>
@@ -246,6 +250,7 @@ ${resumos}
     scripts: [SCRIPT_DAS_NOTICIAS],
     avisoDeMercado: true,
     atualizada: edicoes[0]?.data ?? null,
+    semIndexar: estadoDoProduto?.noticiasLigadas !== true,
   });
   return { arquivo, ...pg };
 }

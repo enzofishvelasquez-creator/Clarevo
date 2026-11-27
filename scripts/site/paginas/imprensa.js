@@ -29,7 +29,10 @@ const MARCAS = [
   { nome: 'clarevo-simbolo-uma-cor', tipo: 'símbolo', titulo: 'Símbolo de uma cor', uso: 'Impressão ou fundos em que a cor não é possível.', fundo: 'claro' },
 ];
 
-/** As capturas do kit: as telas da demonstração em tamanho original (as de `docs/lojas/capturas/`), com o nome do arquivo para baixar. */
+/**
+ * As capturas do kit: as telas da demonstração em tamanho original (1206 x 2622, as de O app, `site-src/imagens/telas/app-*.png`, sem o
+ * selo "Demonstração" desde 27/11/2026; antes, as telas cruas de `docs/lojas/capturas/`), com o nome do arquivo para baixar.
+ */
 const CAPTURAS = [
   { id: 'resumo', arquivo: '01-resumo.png' },
   { id: 'anotar', arquivo: '02-anotar-gasto.png' },
@@ -226,12 +229,12 @@ ${cores}
     ),
     bloco(
       `<h2 id="fonte">Fonte</h2>
-<p>O texto do app e do site usa a <strong>Manrope</strong>, nos pesos Medium (500), Bold (700) e ExtraBold (800), com a licença SIL Open Font License 1.1. O logotipo foi desenhado com a Manrope ExtraBold. A licença está em <a href="${u('fontes/OFL.txt')}">fontes/OFL.txt</a>, e os arquivos das três fontes, que são os do site, estão em <a href="${u('fontes/Manrope_500Medium.ttf')}">Medium</a>, <a href="${u('fontes/Manrope_700Bold.ttf')}">Bold</a> e <a href="${u('fontes/Manrope_800ExtraBold.ttf')}">ExtraBold</a>.</p>`,
+<p>O texto do app e do site usa a <strong>Manrope</strong>, nos pesos Medium (500), Bold (700) e ExtraBold (800), com a licença SIL Open Font License 1.1. O logotipo foi desenhado com a Manrope ExtraBold. A licença está em <a href="${u('fontes/OFL.txt')}">fontes/OFL.txt</a>, e os arquivos das três fontes, em TTF, estão em <a href="${u('fontes/Manrope_500Medium.ttf')}">Medium</a>, <a href="${u('fontes/Manrope_700Bold.ttf')}">Bold</a> e <a href="${u('fontes/Manrope_800ExtraBold.ttf')}">ExtraBold</a>. O site usa as mesmas fontes em WOFF2, mais leves.</p>`,
       { variante: 'alt', rotulo: 'fonte' },
     ),
     bloco(
       `<h2 id="capturas">Capturas de tela</h2>
-<p class="lead-bloco">Telas da demonstração da Clarevo. Os dados são fictícios, e a etiqueta "Demonstração" aparece no próprio app. Cite sempre como demonstração.</p>
+<p class="lead-bloco">Telas da demonstração da Clarevo. Os dados são fictícios: cite sempre como demonstração.</p>
 <div class="capturas-imprensa">
 ${capturas}
 </div>`,

@@ -61,8 +61,11 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
 - **Mover.** No detalhe de um lançamento comum: "Mover para o espaço Negócio" (no Pessoal) ou "Mover para o Pessoal" (no negócio), para
   quem anotou no lugar errado, com a categoria e a conta do outro espaço. Lançamento ligado (conta a pagar, fatura, rendimento de
   investimento ou retirada) não muda de espaço.
-- **Fora do negócio.** Metas e Investir mostram, no negócio, uma explicação curta e "Ir para o Pessoal". WhatsApp e Telegram não anotam
-  no negócio (continuam no espaço ligado, Pessoal ou Família; dito na tela do negócio, e o banco recusa ligar um canal ao negócio, D-113a). Exportar meus dados ganha a escolha do espaço (Pessoal ou o negócio).
+- **Fora do negócio.** Metas e Investir mostram, no negócio, uma explicação curta e "Ir para o Pessoal". O Telegram (e o WhatsApp, em
+  piloto fechado) continua ligado ao Pessoal ou à Família (o banco recusa ligar um canal ao negócio, D-113a), e desde 27/11/2026 a
+  mensagem que começa com a palavra "negócio" anota no negócio da própria pessoa ("negócio material 120", "negócio recebi 300 conserto"),
+  com as categorias e os cartões do negócio (`docs/35_TELEGRAM.md`, seção 1a; migração 0049). A tela do negócio diz isso a quem
+  administra; no negócio de outra pessoa (Plus), a frase de antes. Exportar meus dados ganha a escolha do espaço (Pessoal ou o negócio).
 - **Nome e encerrar.** "Mudar o nome" e "Encerrar o espaço Negócio" ficam em "Seu negócio". Encerrar tira o espaço do app; os
   lançamentos ficam guardados, sem leitura, e são apagados de vez depois de 6 meses (como a Família encerrada); as retiradas que já estão
   no Pessoal continuam lá, como recebimentos comuns. Depois de encerrar, pode criar outro.
@@ -121,9 +124,9 @@ continuar à vista sem rolar em 390 × 844.
   proposto (o nome que a pessoa dá ao negócio e o que ela anota nele, como na seção 3.2; só ela vê; sem CNPJ nem dados da empresa;
   encerrar e excluir a conta), e a seção 11 ganhou a linha do espaço encerrado. A versão dos termos (`LEGAL_VERSION` = 1) não mudou: a
   pergunta 62 do resumo para o advogado pergunta se o espaço pede versão nova e se o tratamento de dados de pessoa jurídica muda algo.
-- **WhatsApp e Telegram no negócio.** Hoje anotam só no Pessoal. Para escolher o negócio, o caminho simples seria uma palavra no começo
-  da mensagem ("negócio 50 frutas"), lida pelas regras de `packages/core/src/whatsapp` e `telegram`, com `clarevo_chat_note` aceitando o
-  contexto do negócio da pessoa; ficou para depois.
+- **WhatsApp e Telegram no negócio (feito em 27/11/2026).** A palavra "negócio" no começo da mensagem anota no negócio da própria
+  pessoa, achado no banco pela pessoa ligada (`clarevo_own_business`, migração 0049), pelas funções novas `telegram_add_business_record`,
+  `telegram_add_business_card_purchase` e as duas do WhatsApp. Detalhes em `docs/35_TELEGRAM.md`, seção 1a.
 - **Editar a retirada** (hoje: excluir e anotar de novo), **sugestões de orçamento depois de importar** no negócio (hoje só nas
   categorias do Pessoal) e uma **retirada pelo WhatsApp**.
 - **Ver o negócio encerrado** (hoje: sem leitura até a limpeza dos 6 meses; exportar antes).

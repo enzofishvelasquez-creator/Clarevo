@@ -13,7 +13,7 @@ import { SpaceSheet, useSpaceChoices } from '@/components/space-sheet';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
 import { STORE_CAPTURE } from '@/lib/capture';
 import type { HelpScreen } from '@/lib/guide';
-import { WIDE_CONTENT_MAX, WIDE_GUTTER, WIDE_TAB_MAX, WIDE_TOP, useWideLayout } from '@/lib/layout';
+import { WIDE_CONTENT_MAX, WIDE_GUTTER, WIDE_TAB_MAX, WIDE_TOP, useShortLandscape, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { ProfileAvatar } from '@/components/profile-photo';
 import { canGoForward, useView } from '@/state/data';
@@ -222,7 +222,10 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
   const showBack = !(card && normalizePath(pathname) === '/conta' && overTabs);
   // Celular (e web estreita): a pílula do contexto fica sempre na linha de baixo, alinhada ao título. Antes, ia ao lado ou embaixo conforme
   // o tamanho do título, e a faixa mudava de altura de uma tela para outra (60, 80 e 95 px); em 320 px, a pílula quebrava em duas linhas.
-  const stacked = !sideNav;
+  // Celular deitado (revisão dos tamanhos de tela, 27/11/2026): a faixa tem 560 px de largura e a tela, menos de 500 de altura; a pílula vai
+  // ao lado do título, como no computador (e desce para baixo dele só se não couber), e a faixa fixa perde a segunda linha (90 para 64 px).
+  const short = useShortLandscape();
+  const stacked = !sideNav && !short;
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
   const backButton = showBack ? (
     <Pressable

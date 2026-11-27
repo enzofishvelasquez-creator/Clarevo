@@ -116,6 +116,22 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     expect(todos.find((c) => c.nome === 'google-descricao-curta')!.texto).not.toMatch(/Sem ligar a contas bancárias/);
   });
 
+  // As seis capturas (D-125; a 6 trocada em 27/11/2026): a lista da ficha tem o mesmo arquivo e a mesma frase que o script grava.
+  it('a lista das capturas na ficha bate com scripts/capturas-lojas.js (arquivo, frase e ordem), e a captura 6 é o convite para a Família', () => {
+    const script = ler('scripts/capturas-lojas.js');
+    const doScript = [...script.matchAll(/id: '(loja-\d-[a-z-]+)',\s*frase: '([^']+)'/g)].map((m) => [m[1], m[2]]);
+    const md = ler('docs/lojas/ficha.md');
+    const naFicha = [...md.matchAll(/^\| (\d) \| `(loja-\d-[a-z-]+)\.png` \| ([^|]+) \|/gm)].map((m) => [m[2], m[3]!.trim()]);
+    expect(doScript).toHaveLength(6);
+    expect(naFicha).toEqual(doScript);
+    expect(doScript[5]).toEqual(['loja-6-privacidade', 'Seus registros pessoais continuam só seus']);
+    expect(script).toContain("confere: ['Convite para a Família', 'Casa Alves', 'Anota e vê', 'Aceitar não mostra nem copia o seu Pessoal', 'Aceitar convite']");
+    for (const [, frase] of doScript) {
+      expect(frase!.length, frase).toBeLessThanOrEqual(52);
+      expect(frase, frase).not.toMatch(/[–—!]|grátis|plus\b/i);
+    }
+  });
+
   it('as descrições citam só o que o app faz: a exclusão da conta, o recibo sem foto guardada e os limites da Família', () => {
     const t = todos.find((c) => c.nome === 'apple-descricao')!.texto;
     expect(t).toContain('nenhuma foto é guardada');
