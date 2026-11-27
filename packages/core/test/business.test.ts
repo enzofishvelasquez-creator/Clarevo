@@ -584,11 +584,19 @@ describe('correções da revisão independente (D-113a)', () => {
     expect(unsavedChangesText('pessoal')).toBe('Você tem alterações que ainda não foram salvas em Pessoal.');
   });
 
-  it('WhatsApp e Telegram: a frase diz que não anotam no negócio (o canal pode estar ligado à Família), e o código de ligar recusa o negócio', async () => {
+  it('WhatsApp e Telegram: o canal continua ligado ao Pessoal ou à Família (o código de ligar recusa o negócio); a palavra "negócio" anota no negócio de quem administra (27/11/2026)', async () => {
+    // Quem administra: a palavra "negócio" no começo da mensagem (migração 0049). No negócio de outra pessoa (Plus, desligado), a frase de antes.
+    expect(BUSINESS_TEXT.chatNoteOwner).toBe('Pelo Telegram, comece a mensagem com a palavra negócio para anotar no espaço Negócio, como negócio material 120.');
     expect(BUSINESS_TEXT.chatNote).toBe('O WhatsApp e o Telegram não anotam no espaço Negócio.');
     const entry = guideEntry('negocio')!;
-    expect(entry.steps.at(-1)).toContain(BUSINESS_TEXT.chatNote);
-    for (const t of [BUSINESS_TEXT.chatNote, ...entry.steps]) expect(t).not.toContain('vão para o Pessoal');
+    expect(entry.steps.at(-1)).toContain(BUSINESS_TEXT.chatNoteOwner);
+    expect(entry.steps.join(' ')).not.toContain(BUSINESS_TEXT.chatNote);
+    expect(guideEntry('telegram')!.steps.join(' ')).toContain('Com o espaço Negócio, comece com a palavra negócio para anotar nele, como negócio material 120.');
+    for (const t of [BUSINESS_TEXT.chatNote, BUSINESS_TEXT.chatNoteOwner, ...entry.steps]) {
+      expect(t).not.toContain('vão para o Pessoal');
+      expect(t).not.toMatch(FORBIDDEN);
+      expect(t).not.toMatch(JUDGMENT);
+    }
     const { repo, personal } = await person();
     const b = await repo.createBusiness(newOperationKey(), 'Sacolé da Bia');
     expect(await code(repo.createChatCode('telegram', newOperationKey(), b.id))).toBe('contexto_invalido');

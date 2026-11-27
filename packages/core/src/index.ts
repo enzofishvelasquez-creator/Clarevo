@@ -66,6 +66,7 @@ export * from './boleto';
 export * from './navigation';
 export * from './legal';
 export * from './welcome';
+export * from './plano-escolhido';
 export * from './budget';
 export * from './accounts';
 export * from './search';

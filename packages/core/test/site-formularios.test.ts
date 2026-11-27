@@ -1390,17 +1390,20 @@ describe('site público: kit de imprensa', () => {
 
   it('tem 6 capturas da demonstração, em tamanho original, com texto alternativo e a legenda de dados fictícios', () => {
     const capturas = ['01-resumo', '02-anotar-gasto', '03-contas-a-pagar', '04-cartoes', '05-evolucao', '06-metas'];
-    const lojas = ['01_resumo', '02_anotar_gasto', '03_contas_a_pagar', '04_cartoes', '05_evolucao', '07_metas'];
+    // Desde 27/11/2026, as telas de O app sem o selo "Demonstração" (gravadas por scripts/gravar-videos-site.js --capturas, no tamanho da
+    // captura da App Store de 6,3 pol.), no lugar das telas cruas de docs/lojas/capturas, que têm o selo.
+    const telas = ['app-resumo', 'app-anotar-gasto', 'app-contas-a-pagar', 'app-cartoes', 'app-evolucao', 'app-metas'];
     expect(capturas.length).toBeGreaterThanOrEqual(4);
     expect(capturas.length).toBeLessThanOrEqual(6);
     capturas.forEach((nome, i) => {
-      const original = readFileSync(join(ROOT, 'docs', 'lojas', 'capturas', 'apple-iphone-6-3pol-1206x2622', `${lojas[i]}.png`));
+      const original = readFileSync(join(ROOT, 'site-src', 'imagens', 'telas', `${telas[i]}.png`));
       expect((g.arquivos.get(`imprensa/capturas/${nome}.png`) as Buffer).equals(original), nome).toBe(true);
       expect(h).toContain(`href="imprensa/capturas/${nome}.png" download>Baixar em tamanho original (1206 x 2622 px,`);
     });
     // Desde 18/11/2026 (D-115), a mesma legenda de toda tela da demonstração no site.
     expect([...h.matchAll(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)]).toHaveLength(capturas.length);
-    expect(h).toContain('a etiqueta "Demonstração" aparece no próprio app');
+    expect(h).toContain('Telas da demonstração da Clarevo. Os dados são fictícios: cite sempre como demonstração.');
+    expect(h).not.toContain('a etiqueta "Demonstração"');
     for (const m of h.matchAll(/<img\b[^>]*src="imagens\/[^"]+"[^>]*>/g)) expect(m[0]).toMatch(/\salt="[^"]{20,}"/);
   });
 

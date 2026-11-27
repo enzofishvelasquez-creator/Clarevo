@@ -85,6 +85,8 @@ ${require('./indicadores').cartaoDosIndicadores(arquivo)}
 <a class="botao botao-suave" href="${rel(arquivo, 'novidades/como-escrevemos.html')}">Como escrevemos</a>
 </div>`;
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: 'Aprender',
     descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, com fontes, data de revisão e exemplos calculados quando cabem.',
@@ -164,6 +166,8 @@ ${t.subtitle ? `<p class="lead">${esc(t.subtitle)}</p>` : ''}
     ...(dominio ? { mainEntityOfPage: urlDoSite(valores, arquivo), image: `https://${dominio}/og/clarevo.png` } : {}),
   };
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: t.title,
     descricao: descricaoCurta(t.short),
@@ -214,6 +218,8 @@ ${meses.join('\n')}
     ),
   ].join('\n');
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: 'Agenda financeira',
     descricao: 'Mês a mês, os temas de educação financeira que costumam importar: 13º salário, férias, volta às aulas, Imposto de Renda e as contas do começo do ano.',

@@ -1,7 +1,7 @@
 import { BAR_TEXT, BUSINESS_WORDS, barModeFor, isNoTabArea, topicTabFor } from '@clarevo/core';
 import { router, usePathname } from 'expo-router';
 import { Eye, EyeOff, MonitorSmartphone, Plus } from 'lucide-react-native';
-import { type GestureResponderEvent, Pressable, StyleSheet, View } from 'react-native';
+import { type GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/brand';
 import { ProfileAvatar } from '@/components/profile-photo';
@@ -55,6 +55,9 @@ export function DesktopNav() {
 
   return (
     <View style={styles.nav} role="navigation" aria-label={BAR_TEXT.label}>
+      {/* Janela baixa (revisão dos tamanhos de tela, 27/11/2026: num notebook de 1366 × 768, com as barras do navegador, sobram uns 620 px, e
+          com "Instalar no computador" a Conta ficava cortada no pé): a barra rola por dentro. Na altura de sempre, nada muda. */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View style={styles.brandRow}>
         {/* O logotipo leva ao Resumo, a tela inicial (pedido do Enzo, 23/11/2026), como o Resumo da lista de baixo. */}
         <Pressable
@@ -143,6 +146,7 @@ export function DesktopNav() {
           </Txt>
         </View>
       </Pressable>
+      </ScrollView>
     </View>
   );
 }
@@ -153,6 +157,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRightWidth: 1,
     borderRightColor: colors.border,
+  },
+  scroll: { flex: 1 },
+  // flexGrow: o espaço entre as áreas e "Ocultar valores" continua empurrando a Conta para o pé quando tudo cabe.
+  content: {
+    flexGrow: 1,
     paddingHorizontal: space[4],
     paddingTop: space[6],
     paddingBottom: space[5],

@@ -38,7 +38,7 @@ const PARA_MEI = [
 const LEVE_E_SO_SEU = [
   'Incluído na assinatura, no plano Individual e no Família: um negócio por pessoa, sem custo a mais.',
   'Só quem criou o negócio vê o negócio. A Família não vê o negócio, e o negócio não vê a Família.',
-  'Metas e Investir ficam no Pessoal, e o Telegram anota no Pessoal ou na Família.',
+  'Metas e Investir ficam no Pessoal. Pelo Telegram, comece a mensagem com a palavra negócio para anotar no negócio, como negócio material 120.',
   'A Clarevo não faz contabilidade, não calcula imposto e não diz o que declarar: os valores são os que você anota.',
 ];
 

@@ -5,7 +5,7 @@
  */
 import { formatBRL } from '../money';
 import { PERIOD_NAME, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, type BillingPeriod, type PlanKind } from '../plano-precos';
-import { trialEndPhrase, type TrialEndRelation } from './primeira-cobranca';
+import { parseOwnWebEntitlements, pendingFirstCharge, trialEndPhrase, type OwnWebEntitlement, type TrialEndRelation } from './primeira-cobranca';
 
 /** "mês" ou "ano", e o preço do plano no período ("R$ 29,90", "R$ 269,90"), para os botões do Pix de quem já paga com Pix. */
 const pixUnit = (period: BillingPeriod) => (period === 'anual' ? 'ano' : 'mês');
@@ -79,6 +79,11 @@ export const WEB_SUBSCRIPTION_TEXT = {
         : 'No cartão, o plano mensal é cobrado todo mês e renova sozinho, pelo mesmo preço, até você cancelar.'
     } Para cancelar, volte a esta tela e toque em Cancelar assinatura, quando quiser: o acesso completo continua até o fim do período já pago, sem nova cobrança. O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo; os dados do cartão ficam só com o Asaas, e a Clarevo não vê nem guarda.`,
   /**
+   * O que a página de pagamento do cartão pede (jornada de compra de 27/11/2026: o CPF pedido sem aviso fazia muita gente parar), dito antes
+   * dos botões. É o que o Asaas pede no Checkout (docs/39, seção 1, item 2); a Clarevo não coleta nenhum desses dados.
+   */
+  paymentPageAsks: 'Na página de pagamento, você informa nome, CPF, e-mail e os dados do cartão.',
+  /**
    * Quem assina no teste grátis (D-129): a primeira cobrança no cartão é no fim do teste (o dia de `paidStartDay`, do servidor, em Brasília),
    * e cancelar antes dela não cobra nada. `rel`: como esse dia fica perto do fim do teste no dia da pessoa (`trialEndRelation`).
    */
@@ -148,3 +153,27 @@ export const WEB_SUBSCRIPTION_TEXT = {
     tente_de_novo: 'Não foi possível concluir. Tente de novo em instantes.',
   },
 } as const;
+
+/**
+ * As linhas do próprio direito pela web (`plan_entitlements`: `valid_from`, `valid_until` e `plan`), lidas como em `parseOwnWebEntitlements`,
+ * com o plano de cada uma quando é um dos dois (outro valor fica sem plano). Fica aqui, e não em `primeira-cobranca.ts`, porque aquele
+ * arquivo vai na função do servidor `assinatura-web`, e o plano só serve à tela (revisão independente da D-131).
+ */
+export function parseOwnWebEntitlementsWithPlan(raw: unknown): OwnWebEntitlement[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) =>
+    parseOwnWebEntitlements([r]).map((e) => {
+      const plan = (r as { plan?: unknown }).plan;
+      return plan === 'individual' || plan === 'familiar' ? { ...e, plan } : e;
+    }),
+  );
+}
+
+/**
+ * O plano da assinatura no cartão marcada para o fim do teste e ainda não paga (a mesma de `pendingFirstCharge`), quando a linha traz o
+ * plano; null nas outras situações. No teste, o banco diz "teste" sem plano (`my_access`): é por aqui que a tela Assinatura sabe que quem
+ * acabou de assinar escolheu o Família (`familyPlanNextStep`).
+ */
+export function pendingFirstChargePlan(entitlements: readonly OwnWebEntitlement[], now: Date, cancelled = false): PlanKind | null {
+  return entitlements.find((e) => pendingFirstCharge([e], now, cancelled) !== null)?.plan ?? null;
+}

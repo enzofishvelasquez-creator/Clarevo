@@ -252,7 +252,7 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
             {T.settingsTitle}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            {T.chatNote}
+            {T.chatNoteOwner}
           </Txt>
           {canWrite ? <Button label={T.rename} icon={Pencil} tone="soft" onPress={() => router.push('/negocio/nome')} /> : null}
           {/* Com outras pessoas ativas, encerrar não vale (negocio_com_membros): a frase diz o que fazer antes. */}

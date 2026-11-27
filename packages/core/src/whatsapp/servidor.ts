@@ -112,11 +112,22 @@ export function whatsappInbound(payload: unknown, phoneNumberId: string): WhatsA
   return out;
 }
 
-export type WhatsAppFunction = 'whatsapp_note' | 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_add_card_purchase' | 'whatsapp_undo' | 'whatsapp_unlink';
+export type WhatsAppFunction =
+  | 'whatsapp_note'
+  | 'whatsapp_link'
+  | 'whatsapp_add_record'
+  | 'whatsapp_add_card_purchase'
+  | 'whatsapp_add_business_record'
+  | 'whatsapp_add_business_card_purchase'
+  | 'whatsapp_undo'
+  | 'whatsapp_unlink';
 export type WhatsAppRpc = (fn: WhatsAppFunction, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
-/** O que a mensagem pede ao banco, igual nos dois canais: a função de cada canal é `<canal>_<op>` (whatsapp_link, telegram_link...). */
-export type ChatOp = 'note' | 'link' | 'add_record' | 'add_card_purchase' | 'undo' | 'unlink';
+/**
+ * O que a mensagem pede ao banco, igual nos dois canais: a função de cada canal é `<canal>_<op>` (whatsapp_link, telegram_link...). As de
+ * negócio (migração 0049) são as de anotar com a palavra "negócio" no começo: o banco acha o negócio da pessoa ligada.
+ */
+export type ChatOp = 'note' | 'link' | 'add_record' | 'add_card_purchase' | 'add_business_record' | 'add_business_card_purchase' | 'undo' | 'unlink';
 /** Chamada ao banco já com o identificador da mensagem e o resumo de quem escreve: aqui só entram os argumentos da operação. */
 export type ChatCall = (op: ChatOp, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
@@ -140,7 +151,9 @@ export async function answerChatMessage(msg: ChatMessage, call: ChatCall): Promi
   const sentAt = new Date(msg.timestamp * 1000).toISOString();
   const noted = async (outcome: 'ajuda' | 'midia' | 'nao_entendi', reply: string) => {
     const r = await call('note', { p_outcome: outcome });
-    return r.result === 'registrada' ? reply : whatsappOutcomeReply(r, today, msg.channel);
+    if (r.result !== 'registrada') return whatsappOutcomeReply(r, today, msg.channel);
+    // A ajuda de quem tem o próprio negócio ensina a palavra "negócio" (o banco diz, migração 0049; sem a chave, a ajuda de sempre).
+    return outcome === 'ajuda' && r.negocio === true ? replies.ajuda_negocio : reply;
   };
   if (msg.kind === 'boas_vindas') return noted('ajuda', replies.ajuda);
   if (msg.kind !== 'texto' || msg.text === null) return noted('midia', replies.midia);
@@ -161,9 +174,10 @@ export async function answerChatMessage(msg: ChatMessage, call: ChatCall): Promi
       outcome = await call('unlink', {});
       break;
     case 'anotar':
-      // "hoje" e "ontem" pelo dia da pessoa no fuso dela (o banco calcula); a data escrita vai como está.
+      // "hoje" e "ontem" pelo dia da pessoa no fuso dela (o banco calcula); a data escrita vai como está. Com a palavra "negócio", as
+      // funções de negócio, com os mesmos argumentos: o espaço não vai na chamada, o banco acha o negócio da pessoa ligada.
       outcome = cmd.card
-        ? await call('add_card_purchase', {
+        ? await call(cmd.business ? 'add_business_card_purchase' : 'add_card_purchase', {
             p_sent_at: sentAt,
             p_amount_cents: cmd.amountCents,
             p_days_ago: cmd.daysAgo,
@@ -172,7 +186,7 @@ export async function answerChatMessage(msg: ChatMessage, call: ChatCall): Promi
             p_category: cmd.category,
             p_card_hint: cmd.card.hint,
           })
-        : await call('add_record', {
+        : await call(cmd.business ? 'add_business_record' : 'add_record', {
             p_sent_at: sentAt,
             p_kind: cmd.kind,
             p_amount_cents: cmd.amountCents,
@@ -272,7 +286,7 @@ const RESULTS = new Set([
   'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
   'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
   'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
-  'pagamento_de_fatura',
+  'pagamento_de_fatura', 'sem_negocio',
 ]);
 
 /** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta o canal mandar de novo. */

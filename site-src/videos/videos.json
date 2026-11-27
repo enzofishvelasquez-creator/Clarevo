@@ -6,12 +6,12 @@
       "duracao": 13.16,
       "mp4": {
         "arquivo": "anotar-gasto.mp4",
-        "bytes": 701928,
+        "bytes": 591122,
         "crf": 26
       },
       "webm": {
         "arquivo": "anotar-gasto.webm",
-        "bytes": 624157,
+        "bytes": 565288,
         "crf": 36
       },
       "capa": "anotar-gasto-capa.png"
@@ -22,12 +22,12 @@
       "duracao": 19.6,
       "mp4": {
         "arquivo": "resumo-do-mes.mp4",
-        "bytes": 706893,
+        "bytes": 695757,
         "crf": 26
       },
       "webm": {
         "arquivo": "resumo-do-mes.webm",
-        "bytes": 708784,
+        "bytes": 694840,
         "crf": 36
       },
       "capa": "resumo-do-mes-capa.png"
@@ -35,15 +35,15 @@
     "metas": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 16.28,
+      "duracao": 16.16,
       "mp4": {
         "arquivo": "metas.mp4",
-        "bytes": 958834,
+        "bytes": 1022933,
         "crf": 26
       },
       "webm": {
         "arquivo": "metas.webm",
-        "bytes": 872422,
+        "bytes": 857307,
         "crf": 36
       },
       "capa": "metas-capa.png"
@@ -54,12 +54,12 @@
       "duracao": 14.8,
       "mp4": {
         "arquivo": "investir.mp4",
-        "bytes": 707850,
+        "bytes": 735293,
         "crf": 26
       },
       "webm": {
         "arquivo": "investir.webm",
-        "bytes": 653748,
+        "bytes": 649255,
         "crf": 36
       },
       "capa": "investir-capa.png"
@@ -67,15 +67,15 @@
     "importar-fatura-print": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 18.4,
+      "duracao": 18.04,
       "mp4": {
         "arquivo": "importar-fatura-print.mp4",
-        "bytes": 714808,
+        "bytes": 716387,
         "crf": 26
       },
       "webm": {
         "arquivo": "importar-fatura-print.webm",
-        "bytes": 823288,
+        "bytes": 826926,
         "crf": 36
       },
       "capa": "importar-fatura-print-capa.png"
@@ -83,15 +83,15 @@
     "calendario-do-mes": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 14.92,
+      "duracao": 15.08,
       "mp4": {
         "arquivo": "calendario-do-mes.mp4",
-        "bytes": 598567,
+        "bytes": 684633,
         "crf": 26
       },
       "webm": {
         "arquivo": "calendario-do-mes.webm",
-        "bytes": 569300,
+        "bytes": 647687,
         "crf": 36
       },
       "capa": "calendario-do-mes-capa.png"
@@ -99,18 +99,82 @@
     "tema-escuro-claro": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 13.36,
+      "duracao": 13.6,
       "mp4": {
         "arquivo": "tema-escuro-claro.mp4",
-        "bytes": 709487,
+        "bytes": 792999,
         "crf": 26
       },
       "webm": {
         "arquivo": "tema-escuro-claro.webm",
-        "bytes": 806168,
+        "bytes": 826079,
         "crf": 36
       },
       "capa": "tema-escuro-claro-capa.png"
+    },
+    "computador-resumo": {
+      "largura": 1600,
+      "altura": 1000,
+      "duracao": 14.72,
+      "mp4": {
+        "arquivo": "computador-resumo.mp4",
+        "bytes": 669834,
+        "crf": 27
+      },
+      "webm": {
+        "arquivo": "computador-resumo.webm",
+        "bytes": 549247,
+        "crf": 38
+      },
+      "capa": "computador-resumo-capa.png"
+    },
+    "computador-anotar": {
+      "largura": 1600,
+      "altura": 1000,
+      "duracao": 12.12,
+      "mp4": {
+        "arquivo": "computador-anotar.mp4",
+        "bytes": 494523,
+        "crf": 27
+      },
+      "webm": {
+        "arquivo": "computador-anotar.webm",
+        "bytes": 478449,
+        "crf": 38
+      },
+      "capa": "computador-anotar-capa.png"
+    },
+    "computador-importar": {
+      "largura": 1600,
+      "altura": 1000,
+      "duracao": 16.48,
+      "mp4": {
+        "arquivo": "computador-importar.mp4",
+        "bytes": 545759,
+        "crf": 27
+      },
+      "webm": {
+        "arquivo": "computador-importar.webm",
+        "bytes": 537842,
+        "crf": 38
+      },
+      "capa": "computador-importar-capa.png"
+    },
+    "computador-contas": {
+      "largura": 1600,
+      "altura": 1000,
+      "duracao": 12.84,
+      "mp4": {
+        "arquivo": "computador-contas.mp4",
+        "bytes": 378077,
+        "crf": 27
+      },
+      "webm": {
+        "arquivo": "computador-contas.webm",
+        "bytes": 359654,
+        "crf": 38
+      },
+      "capa": "computador-contas-capa.png"
     }
   }
 }

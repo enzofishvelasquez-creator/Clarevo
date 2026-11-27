@@ -85,6 +85,13 @@ export interface ChatScreenText {
   changeSpace: string;
   examplesTitle: string;
   examples: readonly string[];
+  /**
+   * Só para quem tem o próprio negócio (27/11/2026, migração 0049): a palavra "negócio" no começo da mensagem anota no negócio, com
+   * as categorias dele. O vínculo continua no Pessoal ou na Família.
+   */
+  businessTitle: string;
+  businessBody: (business: string) => string;
+  businessExamples: readonly string[];
   unlink: string;
   unlinkTitle: string;
   unlinkBody: string;
@@ -132,6 +139,10 @@ export const WHATSAPP_TEXT = {
     'DESFAZER: apaga a última anotação feita por lá',
     'DESLIGAR: desliga o número',
   ],
+  businessTitle: 'No seu negócio',
+  businessBody: (business: string) =>
+    `Comece a mensagem com a palavra negócio para anotar no espaço ${business}, com as categorias do negócio.`,
+  businessExamples: ['negócio material 120', 'negócio recebi 300 conserto', 'negócio gasolina 80 cartão: compra num cartão do negócio'],
   unlink: 'Desligar o WhatsApp',
   unlinkTitle: 'Desligar o WhatsApp?',
   unlinkBody: 'As mensagens deste número deixam de anotar. O que já foi anotado continua no app.',

@@ -418,6 +418,18 @@ setInterval(async () => {
   // D-064 (privacidade e termos no app): o texto de aceite fica acima do botão "Criar conta", sem caixa de seleção. O build de demonstração
   // sobe com EXPO_PUBLIC_SITE_URL vazia, então os dois nomes aparecem sem link (nem botão, nem endereço do site).
   const cadTxt = await body();
+  // Jornada de compra de 27/11/2026 (item 2): o "Assine aqui" do site chega aqui direto; logo abaixo do título, o teste grátis, como nas
+  // boas-vindas, e, com a compra fechada, que o acesso é completo e nada é cobrado (a frase da tela Assinatura).
+  const cadTrial = await p.evaluate(() => {
+    const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const FRASE = '14 dias grátis, sem cartão. Por enquanto, o acesso é completo e nada é cobrado.';
+    const linha = [...document.querySelectorAll('div,span')].filter(shown).find((e) => e.children.length === 0 && (e.textContent || '').trim() === FRASE);
+    const h1 = [...document.querySelectorAll('[role=heading][aria-level="1"],h1')].filter(shown).find((e) => e.textContent === 'Criar conta');
+    const campo = [...document.querySelectorAll('input')].filter(shown)[0];
+    return linha && h1 && campo ? { linha: Math.round(linha.getBoundingClientRect().top), h1: Math.round(h1.getBoundingClientRect().bottom), campo: Math.round(campo.getBoundingClientRect().top) } : null;
+  });
+  ok('cadastro (jornada de compra de 27/11/2026): logo abaixo do título, "14 dias grátis, sem cartão. Por enquanto, o acesso é completo e nada é cobrado.", antes dos campos, e o subtítulo de sempre',
+    cadTrial !== null && cadTrial.linha >= cadTrial.h1 - 1 && cadTrial.linha < cadTrial.campo && cadTxt.includes('Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.'), JSON.stringify(cadTrial));
   const cadConsent = 'Ao criar a conta, você confirma que tem 18 anos ou mais e concorda com os Termos de uso e a Política de privacidade.';
   const cadOrder = await p.evaluate((frase) => {
     const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
@@ -3338,6 +3350,49 @@ setInterval(async () => {
     }
     return found;
   }, ALLOWED_FIXED.source);
+  // Próximas faturas em barras no topo de Cartões (análise geral de 26/11/2026, sinal 24 do estudo de mercado; antes, uma frase só):
+  // a lista com nome, cada linha com o nome acessível "Novembro: R$ 550,00, previsto", o mês e o valor em texto, a barra oculta do leitor de
+  // tela e numa cor só (a de gráfico, `brandMark`, sobre `brandTint`), e a geometria (largura do preenchimento sobre o trilho, trilho
+  // abaixo do texto, dentro do card e da tela, texto sem corte nem um por cima do outro). `page`: outra aba (a do modo escuro).
+  const CARD_BARS_LIST = 'Próximas faturas, valores previstos por mês';
+  const cardBars = (page = p) => page.evaluate((listName) => {
+    const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const list = [...document.querySelectorAll('[role=list]')].find((e) => shown(e) && e.getAttribute('aria-label') === listName);
+    if (!list) return null;
+    const card = list.closest('[data-card]');
+    const cb = card ? card.getBoundingClientRect() : null;
+    const heading = [...(card || document).querySelectorAll('[role=heading]')].filter(shown).map((h) => `${h.getAttribute('aria-level')}:${h.textContent}`);
+    const items = [...list.querySelectorAll('[role=listitem]')].filter((li) => shown(li) && li.closest('[role=list]') === list).map((li) => {
+      const track = li.querySelector('[data-testid="barra-fatura-prevista"]');
+      const fill = track ? track.firstElementChild : null;
+      const tb = track ? track.getBoundingClientRect() : null;
+      const fb = fill ? fill.getBoundingClientRect() : null;
+      const texts = [...li.querySelectorAll('div,span')].filter((e) => e.children.length === 0 && shown(e) && (e.textContent || '').trim() && !e.closest('[aria-hidden="true"]'));
+      const boxes = texts.map((e) => { const r = document.createRange(); r.selectNodeContents(e); return r.getBoundingClientRect(); });
+      const crossed = boxes.some((a, i) => boxes.some((c, j) => j > i && Math.min(a.right, c.right) - Math.max(a.left, c.left) > 1 && Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top) > 1));
+      return {
+        label: li.getAttribute('aria-label'),
+        texts: texts.map((e) => e.textContent.replace(/\u00a0/g, ' ')),
+        hidden: track ? track.getAttribute('aria-hidden') : null,
+        ratio: tb && fb && tb.width > 0 ? Math.round((fb.width / tb.width) * 1000) / 1000 : null,
+        trackW: tb ? Math.round(tb.width) : 0,
+        fill: fill ? getComputedStyle(fill).backgroundColor : null,
+        track: track ? getComputedStyle(track).backgroundColor : null,
+        inside: Boolean(tb && cb && tb.left >= cb.left - 0.5 && tb.right <= cb.right + 0.5 && tb.right <= innerWidth + 0.5 && boxes.every((b) => b.left >= cb.left - 0.5 && b.right <= cb.right + 0.5 && b.right <= innerWidth + 0.5)),
+        cut: texts.some((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2),
+        crossed,
+        belowText: Boolean(tb && boxes.every((b) => b.bottom <= tb.top + 1)),
+      };
+    });
+    return { heading, items };
+  }, CARD_BARS_LIST);
+  // As barras da demonstração (hoje 07/10/2026): novembro R$ 550,00 (a maior, barra cheia), dezembro e janeiro de 2027 R$ 350,00 (350/550).
+  const DEMO_CARD_BARS = [['Novembro', 'R$ 550,00', 1], ['Dezembro', 'R$ 350,00', 0.636], ['Janeiro de 2027', 'R$ 350,00', 0.636]];
+  // As linhas batem com o esperado ([mês, valor, largura relativa]); `fill`: a cor do preenchimento (a de gráfico do tema).
+  const cardBarsOk = (r, expected, fill = 'rgb(36, 87, 245)') => Boolean(r) && r.items.length === expected.length && r.heading.includes('3:Próximas faturas (previsto)') &&
+    r.items.every((it, i) => it.label === `${expected[i][0]}: ${expected[i][1]}, previsto` && JSON.stringify(it.texts) === JSON.stringify([expected[i][0], expected[i][1]]) &&
+      it.hidden === 'true' && it.ratio !== null && Math.abs(it.ratio - expected[i][2]) < 0.01 && it.fill === fill && it.inside && !it.cut && !it.crossed && it.belowText) &&
+    new Set(r.items.map((it) => it.trackW)).size === 1 && new Set(r.items.map((it) => it.fill)).size === 1;
   const spokenHidden = () => p.evaluate(() => [...document.querySelectorAll('[aria-label],[aria-valuetext]')].filter((e) => e.getBoundingClientRect().width > 0 && /valor oculto/.test((e.getAttribute('aria-label') || '') + (e.getAttribute('aria-valuetext') || ''))).length);
   const hiddenShows = async (name) => {
     await p.waitForTimeout(300);
@@ -3893,11 +3948,26 @@ setInterval(async () => {
     (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · R\$ 550,00 · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: R\$ 2\.300,00 de R\$ 5\.000,00\.$/)) === 1 && (await visibleCount('button', 'Adicionar outro cartão')) === 1 &&
       (await visibleCount('button', 'Cadastrar cartão')) === 0 && !t.includes('Cadastre seus cartões para anotar as compras na fatura.'));
   ok('E Cartões: sem cor de alerta nem julgamento (sem "disponível", "estourou", "saldo")', !NO_BALANCE.test(t) && !/estourou|dispon[ií]vel|saldo/i.test(t));
+  {
+    // Próximas faturas em barras (sinal 24): uma por mês, com o mês e o valor em texto e o nome acessível de cada linha; a barra é só desenho.
+    const bars390 = await cardBars();
+    ok('E Cartões, próximas faturas em barras (390 px): o título "Próximas faturas (previsto)" e uma linha por mês (novembro, dezembro e janeiro de 2027), cada uma com o mês, o valor e o nome acessível "Novembro: R$ 550,00, previsto"',
+      cardBarsOk(bars390, DEMO_CARD_BARS) && !t.includes('Próximas faturas (previsto):'), JSON.stringify(bars390));
+    ok('E Cartões, barras: a lista e as linhas chegam ao leitor de tela com nome (lista e itens), e o desenho fica oculto',
+      (await p.getByRole('list', { name: CARD_BARS_LIST }).filter({ visible: true }).count()) === 1 &&
+        (await p.getByRole('listitem', { name: 'Dezembro: R$ 350,00, previsto', exact: true }).filter({ visible: true }).count()) === 1 &&
+        (await p.locator('[data-testid="barra-fatura-prevista"]:not([aria-hidden="true"])').filter({ visible: true }).count()) === 0);
+    ok('E Cartões, barras: numa cor só, a azul de gráfico sobre o trilho azul-claro, sem vermelho nem laranja', Boolean(bars390) && bars390.items.every((it) => it.fill === 'rgb(36, 87, 245)' && it.track === 'rgb(234, 240, 255)'), JSON.stringify(bars390?.items.map((it) => [it.fill, it.track])));
+  }
   await keepText();
   await innerChecks('cartões 390px');
   await shot('130_cartoes');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('cartões 320px');
+  {
+    const bars320 = await cardBars();
+    ok('E Cartões, barras em 320 px: as três linhas inteiras dentro do card e da tela, sem texto cortado nem por cima de outro, e as mesmas larguras relativas', cardBarsOk(bars320, DEMO_CARD_BARS), JSON.stringify(bars320));
+  }
   await shot('130_cartoes_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
@@ -6238,7 +6308,7 @@ setInterval(async () => {
   await demoHome();
   await d42OpenCards(); t = await body();
   ok('D42 Cartões, demonstração: "Faturas de outubro", nenhuma fatura vence em outubro (as do Cartão Exemplo começam em novembro) e as próximas faturas, previstas',
-    t.includes('Faturas de outubro') && t.includes('Nenhuma fatura vence em outubro.') && t.includes('Próximas faturas (previsto): novembro R$ 550,00, dezembro R$ 350,00, janeiro R$ 350,00') && !t.includes('da sua renda de referência'), t.slice(0, 500));
+    t.includes('Faturas de outubro') && t.includes('Nenhuma fatura vence em outubro.') && t.includes('Próximas faturas (previsto)') && cardBarsOk(await cardBars(), DEMO_CARD_BARS) && !t.includes('da sua renda de referência'), t.slice(0, 500));
   ok('D42 Cartões: o card vem no topo, antes do cartão (com cartão cadastrado, sem o texto de apresentação)', !t.includes('Cadastre seus cartões') && t.indexOf('Faturas de outubro') < t.indexOf('Cartão Exemplo'));
   ok('D42 Cartões: explica que já entra na renda comprometida e tem o link "Ver na renda comprometida"', t.includes('Já entra na sua renda comprometida, no grupo Faturas de cartão.') && (await visibleCount('button', /^Ver na renda comprometida/)) === 1);
   ok('D42 Cartões: neutro, sem cor de alerta nem julgamento', !D42_NO_ALERT.test(t));
@@ -6254,7 +6324,8 @@ setInterval(async () => {
   });
   await waitText('6,7% da sua renda de referência', 8000); await p.waitForTimeout(400); t = await body();
   ok('D42 Cartões com a fatura de outubro: R$ 400,00 (300,00 + a parcela 1 de 2 do sofá), "6,7% da sua renda de referência" e as próximas faturas (novembro R$ 650,00)',
-    t.includes('Faturas de outubro') && t.includes('R$ 400,00') && t.includes('6,7% da sua renda de referência') && t.includes('Próximas faturas (previsto): novembro R$ 650,00, dezembro R$ 350,00, janeiro R$ 350,00') &&
+    t.includes('Faturas de outubro') && t.includes('R$ 400,00') && t.includes('6,7% da sua renda de referência') && t.includes('Próximas faturas (previsto)') &&
+    cardBarsOk(await cardBars(), [['Novembro', 'R$ 650,00', 1], ['Dezembro', 'R$ 350,00', 0.538], ['Janeiro de 2027', 'R$ 350,00', 0.538]]) &&
     t.includes('Fatura paga entra pelo valor pago; as demais, pelo total previsto.') && !t.includes('Nenhuma fatura vence'), t.slice(0, 500));
   ok('D42 Cartões: sem renda de referência o card não aparece com "Informe sua renda" aqui (a demonstração tem renda de R$ 6.000,00)', !t.includes('Informe sua renda para ver quanto isso representa.'));
   ok('D42 Cartões: neutro, sem cor de alerta nem julgamento (com percentual)', !D42_NO_ALERT.test(t));
@@ -6278,8 +6349,9 @@ setInterval(async () => {
     await repo.payInvoice(`e2e-${Math.random()}`, card.id, '2026-10', bill.version, 25000, '2026-10-07');
   });
   await waitText('4,2% da sua renda de referência', 8000); await p.waitForTimeout(400); t = await body();
-  ok('D42 Cartões com fatura paga em parte: R$ 250,00 (o valor pago), "4,2% da sua renda de referência", e o que ficou vai para novembro (R$ 800,00)',
-    t.includes('Faturas de outubro') && t.includes('R$ 250,00') && t.includes('4,2% da sua renda de referência') && t.includes('novembro R$ 800,00'), t.slice(0, 500));
+  ok('D42 Cartões com fatura paga em parte: R$ 250,00 (o valor pago), "4,2% da sua renda de referência", e o que ficou vai para novembro (R$ 800,00), a barra cheia',
+    t.includes('Faturas de outubro') && t.includes('R$ 250,00') && t.includes('4,2% da sua renda de referência') &&
+      cardBarsOk(await cardBars(), [['Novembro', 'R$ 800,00', 1], ['Dezembro', 'R$ 350,00', 0.438], ['Janeiro de 2027', 'R$ 350,00', 0.438]]), t.slice(0, 500));
   await p.getByRole('button', { name: /^Ver na renda comprometida/ }).filter({ visible: true }).first().click(); await waitText('Renda comprometida'); await p.waitForTimeout(800); t = await body();
   ok('D42 renda comprometida de outubro com a fatura paga em parte: "Faturas de cartão · R$ 250,00 · 4,2%", igual ao card dos cartões', t.includes('Faturas de cartão · R$ 250,00 · 4,2%'), t.slice(0, 300));
   await btn('Voltar').click(); await waitText('Faturas de outubro'); await p.waitForTimeout(400);
@@ -6290,7 +6362,9 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await d42OpenCards(); await waitText('Faturas de outubro'); await p.waitForTimeout(500); t = await body();
   const d42Leaks = await moneyLeaks();
-  ok('D42 Cartões com valores ocultos: total e próximas faturas em "R$ ••••", o percentual à vista e nenhum valor em reais legível', t.includes('R$ ••••') && t.includes('4,2% da sua renda de referência') && t.includes('Próximas faturas (previsto): novembro R$ ••••') &&
+  const d42HiddenBars = await cardBars();
+  ok('D42 Cartões com valores ocultos: total e próximas faturas em "R$ ••••", o percentual à vista e nenhum valor em reais legível', t.includes('R$ ••••') && t.includes('4,2% da sua renda de referência') && t.includes('Próximas faturas (previsto)') &&
+    Boolean(d42HiddenBars) && d42HiddenBars.items.length === 3 && d42HiddenBars.items.every((it) => it.texts[1] === 'R$ ••••' && /^(Novembro|Dezembro|Janeiro de 2027): valor oculto, previsto$/.test(it.label || '')) &&
     !/R\$ \d/.test(t.split('Cartão Exemplo')[0]) && d42Leaks.length === 0, d42Leaks.slice(0, 3).join(' | ') + ' ' + t.slice(0, 300));
   await shot('217_cartoes_faturas_do_mes_valores_ocultos');
   await d42GoTab('Resumo'); await waitText('Diferença do mês');
@@ -14781,6 +14855,9 @@ setInterval(async () => {
   ];
   let acShotN = 592;
   const acHero = [];
+  // As barras das próximas faturas em Cartões (sinal 24) com a letra grande: o mês e o valor inteiros, um sem cobrir o outro (o valor desce
+  // para baixo do mês quando não cabe ao lado), a barra abaixo deles e tudo dentro do card e da tela.
+  const acCardBars = [];
   for (const [scale, width, suffix] of [[1.3, 360, '130'], [2, 359, '200']]) {
     acResetFound();
     await acEnter();
@@ -14792,6 +14869,7 @@ setInterval(async () => {
       await p.evaluate((k) => window.__acc.scale(k), scale);
       await p.waitForTimeout(500);
       await acScan(`${name} ${scale}x`);
+      if (name === 'cartões') acCardBars.push([scale, width, await cardBars()]);
       if (name === 'resumo') {
         // O valor do topo do Resumo (D-125, sinal 20): uma linha só, que diminui a letra para caber (na web, pelo zoom do próprio texto).
         acHero.push([scale, await p.evaluate(() => {
@@ -14812,6 +14890,8 @@ setInterval(async () => {
     ok(`Acessibilidade, letra grande ${scale}x em ${width} px (D-125): nenhum rótulo de aba com reticências ("Resu…")`, acFound.abas.length === 0, acFound.abas.slice(0, 4).join(' | '));
     await acKeep();
   }
+  ok('Acessibilidade, letra grande (sinal 24): as barras das próximas faturas em Cartões, a 1,3 vez (360 px) e a 2,0 vezes (359 px), com o mês, o valor e o nome acessível de cada linha, nada cortado, por cima de outro texto nem fora do card e da tela',
+    acCardBars.length === 2 && acCardBars.every(([, , r]) => cardBarsOk(r, DEMO_CARD_BARS)), JSON.stringify(acCardBars));
   ok('Acessibilidade, letra grande (D-125): o valor do topo do Resumo fica numa linha só, sem quebrar no meio nem cortar, a 1,3 e a 2,0 vezes',
     acHero.length === 2 && acHero.every(([, h]) => h !== null && h.lines === 1 && h.sw <= h.cw + 1 && h.ws === 'nowrap' && h.right <= h.w), JSON.stringify(acHero));
   // Revisão de 26/11/2026: os rótulos das abas continuam à vista com a letra a 2,0 vezes, também em 320 px (até 1,3 vez, encolhendo para
@@ -14964,6 +15044,52 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Telegram no espaço Negócio (27/11/2026, migração 0049): a palavra "negócio" no começo da mensagem anota no negócio da própria pessoa.
+  // A tela do Telegram mostra "No seu negócio" só para quem administra o próprio negócio (cenário "negocio": Maria e "Sacolé da Maria"),
+  // nunca sem negócio nem no negócio de outra pessoa (cenário "negocio-plus-membro"); a tela do negócio diz o mesmo em "Nome e encerrar".
+  // Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const tnWrites0 = writes.length;
+    const TN_TITLE = 'No seu negócio';
+    const TN_BODY = 'Comece a mensagem com a palavra negócio para anotar no espaço Sacolé da Maria, com as categorias do negócio.';
+    const TN_NOTE = 'Pelo Telegram, comece a mensagem com a palavra negócio para anotar no espaço Negócio, como negócio material 120.';
+    const tnEnter = async (path, cenario, text) => {
+      await p.goto(`http://localhost:${PORT}${path}${cenario ? `?cenario=${cenario}` : ''}`); await waitText('Cuidar da vida financeira');
+      await btn('Ver a demonstração').click(); await waitText(text, 12000); await p.waitForTimeout(600);
+    };
+    // 1. Sem negócio (demonstração padrão): sem o card.
+    await tnEnter('/conta/telegram', null, 'Na demonstração, o Telegram não é ligado.');
+    let tn = await body();
+    ok('Telegram no negócio: sem negócio, a tela do Telegram não mostra "No seu negócio" nem a palavra negócio',
+      !(await headingShown(TN_TITLE)) && !tn.includes('negócio material 120') && !tn.includes('palavra negócio'), tn.slice(0, 600));
+    // 2. Quem administra o próprio negócio: o card, com o nome do negócio e os três exemplos, depois de "O que dá para mandar".
+    await tnEnter('/conta/telegram', 'negocio', 'Na demonstração, o Telegram não é ligado.');
+    await waitText(TN_TITLE, 12000).catch(() => {}); await p.waitForTimeout(300);
+    tn = await body(); screenTexts.push(tn);
+    ok('Telegram no negócio: quem administra vê "No seu negócio" (título de nível 2), com o nome do negócio e os exemplos "negócio material 120", "negócio recebi 300 conserto" e o do cartão',
+      (await p.getByRole('heading', { name: TN_TITLE, level: 2 }).filter({ visible: true }).count()) === 1 && tn.includes(TN_BODY) &&
+        tn.includes('negócio material 120') && tn.includes('negócio recebi 300 conserto') && tn.includes('negócio gasolina 80 cartão: compra num cartão do negócio') &&
+        tn.indexOf('O que dá para mandar') >= 0 && tn.indexOf('O que dá para mandar') < tn.indexOf(TN_TITLE) && !/whatsapp|\bmeta\b|número|—|–/i.test(tn),
+      tn.slice(0, 900));
+    await atWidths(async (w) => {
+      await p.getByRole('heading', { name: TN_TITLE, exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded().catch(() => {});
+      await layoutChecks(`Telegram no negócio ${w}px`);
+    });
+    // 3. No negócio de outra pessoa (Plus, cenário de teste): sem o card (a palavra anota só no negócio da própria pessoa).
+    await tnEnter('/conta/telegram', 'negocio-plus-membro', 'Na demonstração, o Telegram não é ligado.');
+    await p.waitForTimeout(600);
+    tn = await body();
+    ok('Telegram no negócio: quem só anota no negócio de outra pessoa não vê "No seu negócio"', !(await headingShown(TN_TITLE)) && !tn.includes('negócio material 120'), tn.slice(0, 600));
+    // 4. A tela do negócio, em "Nome e encerrar", diz a quem administra como anotar pelo Telegram.
+    await tnEnter('/negocio', 'negocio', 'Nome e encerrar');
+    tn = await body();
+    ok('Telegram no negócio: a tela do negócio, em "Nome e encerrar", diz a frase da palavra negócio e não mais que o Telegram não anota no negócio',
+      tn.includes(TN_NOTE) && !tn.includes('O WhatsApp e o Telegram não anotam no espaço Negócio.'), tn.slice(0, 900));
+    ok('Telegram no negócio: nada vai à rede na demonstração', writes.length === tnWrites0, writes.slice(tnWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // Assinatura (D-083): na demonstração, a conta está no teste grátis (14 dias, contados do relógio real). Conta mostra o card
   // "Assinatura" com a situação e "Ver a assinatura"; a tela traz a situação, os planos com os preços, como pagar e que a compra pelo app
   // ainda não abriu. Sem aviso no Resumo (faltam mais de 3 dias) e nada vai à rede.
@@ -14989,24 +15115,22 @@ setInterval(async () => {
       !/cartão ou Pix|App Store|Google Play|abre no lançamento/.test(t) && t.includes('você vê tudo, exporta e pode excluir a conta'), t.slice(0, 900));
     ok('Assinatura na demonstração: nenhum botão de assinar, pagar ou restaurar compra', (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0);
     ok('Assinatura: os planos são lidos inteiros pelo leitor de tela, com os dois períodos',
-      (await p.locator('[aria-label="Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
-    // Plano anual (D-127): a escolha "Anual" ou "Mensal", o anual primeiro e marcado, sem prazo, sem alarme e sem promessa de economia; o preço
-    // do período escolhido em destaque, o equivalente por mês dito como equivalente, a diferença exata para 12 mensalidades e o outro período
-    // sempre à vista. Na demonstração, a escolha só muda o preço mostrado: nenhum botão de compra.
+      (await p.locator('[aria-label="Plano Individual mensal, R$ 29,90 por mês. No anual, R$ 269,90 por ano. Para você."]').filter({ visible: true }).count()) === 1);
+    // Plano anual (D-127), com o mensal primeiro desde 27/11/2026 (decisão do Enzo, no lugar do anual primeiro): a escolha "Mensal" ou "Anual",
+    // o mensal primeiro e marcado, sem prazo, sem alarme e sem promessa de economia; o preço do período escolhido em destaque, no anual o
+    // equivalente por mês dito como equivalente e a diferença exata para 12 mensalidades, e o outro período sempre à vista. Na demonstração, a
+    // escolha só muda o preço mostrado: nenhum botão de compra.
     const periodos = () => p.evaluate(() => {
       const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura' && e.getBoundingClientRect().width > 0);
       return g ? [...g.querySelectorAll('[role=radio]')].map((r) => [r.getAttribute('aria-label') || r.textContent, r.getAttribute('aria-checked')]) : null;
     });
-    ok('Assinatura (D-127): a escolha do período, com o anual primeiro e já marcado, e o mensal ao lado',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]), JSON.stringify(await periodos()));
-    ok('Assinatura (D-127): no anual, R$ 269,90 e R$ 629,90 por ano, "Equivale a R$ 22,49 por mês" e "R$ 88,90 a menos que 12 mensalidades" (Família: R$ 52,49 e R$ 208,90), com o mensal à vista e a nota do anual',
-      t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
-        t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
-        t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
-        // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
-        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.') &&
-        !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
-        !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
+    ok('Assinatura (D-127, mensal primeiro desde 27/11/2026): a escolha do período, com o mensal primeiro e já marcado, e o anual ao lado',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]), JSON.stringify(await periodos()));
+    ok('Assinatura (D-127): no mensal, marcado ao abrir, o mensal em destaque e o anual à vista, com o equivalente por mês, sem botão de compra na demonstração',
+      t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && t.includes('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês') &&
+        !t.includes('a menos que 12 mensalidades') && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
+        (await p.locator('[aria-label="Plano Família mensal, R$ 69,90 por mês. No anual, R$ 629,90 por ano. Para você e as pessoas da sua Família na Clarevo, até 6 pessoas."]').filter({ visible: true }).count()) === 1,
+      t.slice(0, 1200));
     // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
     const alarme = await p.evaluate(() => {
       const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura');
@@ -15017,15 +15141,20 @@ setInterval(async () => {
     ok('Assinatura (D-127): nenhuma cor de alerta (vermelho) na escolha do período nem nos planos', alarme.length === 0, alarme.slice(0, 4).join(' | '));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
-    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await p.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     t = await body();
-    ok('Assinatura (D-127): escolher "Mensal" põe o mensal em destaque e deixa o anual à vista, com o equivalente por mês, sem botão de compra na demonstração',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'false'], ['Mensal, uma cobrança por mês', 'true']]) &&
-        t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && t.includes('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês') &&
-        !t.includes('a menos que 12 mensalidades') && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
-        (await p.locator('[aria-label="Plano Família mensal, R$ 69,90 por mês. No anual, R$ 629,90 por ano. Para você e as pessoas da sua Família na Clarevo, até 6 pessoas."]').filter({ visible: true }).count()) === 1,
-      t.slice(0, 1200));
-    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração, mensal ${w}px`); if (w === 390) await shot('615b_assinatura_demonstracao_mensal'); });
+    ok('Assinatura (D-127): escolher "Anual" mostra R$ 269,90 e R$ 629,90 por ano, "Equivale a R$ 22,49 por mês" e "R$ 88,90 a menos que 12 mensalidades" (Família: R$ 52,49 e R$ 208,90), com o mensal à vista e a nota do anual',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'false'], ['Anual, uma cobrança por ano', 'true']]) &&
+        t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
+        t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
+        t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
+        // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
+        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.') &&
+        !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
+        !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t) && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
+        (await p.locator('[aria-label="Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1,
+      t.slice(0, 1400));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração, anual ${w}px`); if (w === 390) await shot('615b_assinatura_demonstracao_anual'); });
     // O teste da equipe no sandbox (`?assinar=teste`, docs/39) mostra os botões do cartão e do Pix numa conta de verdade. Na demonstração,
     // nem com ele (revisão de 26/11/2026, diretriz 3.1.1): nenhum botão de compra, só a nota neutra.
     await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
@@ -15034,14 +15163,16 @@ setInterval(async () => {
     ok('Assinatura na demonstração, mesmo com "?assinar=teste": nenhum botão de assinar ou de pagar com cartão ou Pix, sem o texto do Pix, e a nota neutra',
       new URL(p.url()).pathname === '/conta/assinatura' && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !t.includes('Ou pague um mês por vez, com Pix') &&
         !/cartão ou Pix/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
-    // D-127: com "?assinar=teste", a escolha do anual aparece (é só preço), e trocar de período continua sem botão de compra, nem do anual.
-    ok('Assinatura na demonstração com "?assinar=teste" (D-127): a escolha "Anual" ou "Mensal" com o anual marcado e os preços do ano, sem botão de compra',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]) &&
-        t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && !/Assinar o plano|Pagar um (mês|ano)|Ou pague o ano de uma vez/.test(t), t.slice(0, 900));
-    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    // D-127: com "?assinar=teste", a escolha do período aparece (é só preço), com o mensal primeiro e marcado (27/11/2026), e trocar de período
+    // continua sem botão de compra, nem do anual.
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): a escolha "Mensal" ou "Anual" com o mensal marcado e os preços do mês, com o anual à vista, sem botão de compra',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]) &&
+        t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && !/Assinar o plano|Pagar um (mês|ano)|Ou pague um mês por vez/.test(t), t.slice(0, 900));
+    await p.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     t = await body();
-    ok('Assinatura na demonstração com "?assinar=teste" (D-127): no mensal, também nenhum botão de assinar, pagar ou restaurar',
-      (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !/Assinar o plano|Pagar um (mês|ano)/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): no anual, os preços do ano e também nenhum botão de assinar, pagar ou restaurar',
+      (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') &&
+        !/Assinar o plano|Pagar um (mês|ano)|Ou pague o ano de uma vez/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
@@ -15119,8 +15250,17 @@ setInterval(async () => {
         new URL(cp.url()).pathname === '/conta/assinatura' && t.includes(FECHADA) && !/lançamento|Até lá/.test(t) && t.includes(NOTA_WEB) &&
           (await cpCount('button', /^(Assinar|Pagar)/)) === 0 && !t.includes('A primeira cobrança é em'), t.slice(0, 1400));
       await cpShot('617_assinatura_compra_fechada');
-      // 2. Com "?assinar=teste" (o teste da equipe no sandbox): a área de compra, sem a frase da compra fechada.
-      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual anual');
+      // 2. Com "?assinar=teste" (o teste da equipe no sandbox): a área de compra, sem a frase da compra fechada. Desde 27/11/2026, a tela abre
+      // no mensal (o primeiro e marcado), com os botões do mensal; o anual, um toque depois.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      const cpPeriodos = () => cp.evaluate(() => [...document.querySelectorAll('[role=radiogroup] [role=radio]')].filter((r) => r.getBoundingClientRect().width > 0).map((r) => [r.getAttribute('aria-label'), r.getAttribute('aria-checked')]));
+      ok('Compra na web (27/11/2026): com a área de compra, a escolha abre no mensal, o primeiro e marcado, com os botões do cartão e do Pix do mensal',
+        JSON.stringify(await cpPeriodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]) &&
+          (await cpCount('button', 'Assinar o plano Individual mensal')) === 1 && (await cpCount('button', 'Assinar o plano Família mensal')) === 1 &&
+          (await cpCount('button', 'Pagar um mês do plano Individual com Pix')) === 1 && (await cpCount('button', /^Assinar o plano .* anual$/)) === 0,
+        JSON.stringify(await cpPeriodos()));
+      await cp.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click();
+      await cpWait('Assinar o plano Individual anual'); await cp.waitForTimeout(400);
       t = await cpBody();
       const fimDoTeste = /termina em \d+ dias, em (\d{2}\/\d{2}\/\d{4})/.exec(t)?.[1] ?? null;
       const ordem = (a, b2) => t.indexOf(a) >= 0 && t.indexOf(b2) > t.indexOf(a);
@@ -15137,8 +15277,10 @@ setInterval(async () => {
           t.includes(`Com Pix, você paga um ano de uma vez, na página do Asaas. ${PIX_NAO_RENOVA}`), t.slice(0, 1800));
       const termos = cp.getByRole('button', { name: 'Termos de uso', exact: true }).filter({ visible: true });
       const politica = cp.getByRole('button', { name: 'Política de privacidade', exact: true }).filter({ visible: true });
-      ok('Compra na web (D-129): os links "Termos de uso" e "Política de privacidade" junto da compra, como na tela das lojas, depois dos botões e antes de "Depois de pagar"',
-        (await termos.count()) === 1 && (await politica.count()) === 1 && ordem('Pagar um ano do plano Família com Pix', 'Termos de uso') && ordem('Política de privacidade', 'Depois de pagar, você volta para esta tela'), t.slice(0, 2000));
+      // Jornada de compra de 27/11/2026: os links fazem parte do resumo do contrato, sempre à vista antes dos botões do cartão (antes, depois
+      // dos botões do Pix), e "Depois de pagar" continua depois deles.
+      ok('Compra na web (D-129): os links "Termos de uso" e "Política de privacidade" junto da compra, como na tela das lojas, no resumo antes dos botões do cartão e antes de "Depois de pagar"',
+        (await termos.count()) === 1 && (await politica.count()) === 1 && ordem('Termos de uso', 'Assinar o plano Individual anual') && ordem('Política de privacidade', 'Depois de pagar, você volta para esta tela'), t.slice(0, 2000));
       await termos.first().click(); await cp.waitForTimeout(300);
       await politica.first().click(); await cp.waitForTimeout(300);
       const abertas = await cp.evaluate(() => window.__abertas);
@@ -15153,6 +15295,150 @@ setInterval(async () => {
           t.includes(`Com Pix, você paga um mês por vez, na página do Asaas. ${PIX_NAO_RENOVA}`) && (await cpCount('button', 'Assinar o plano Individual mensal')) === 1 &&
           fimDoTeste !== null && t.includes(`A primeira cobrança é em ${fimDoTeste}`), t.slice(0, 1800));
       await cpShot('619_assinatura_compra_web_mensal');
+      // Jornada de compra de 27/11/2026 (item 5): a escolha do período, o resumo do contrato (a cobrança, a renovação, como cancelar, quem
+      // processa, o que a página de pagamento pede e os Termos e a Política) sempre aberto antes dos botões, cada plano com o próprio botão
+      // dentro do cartão, o Pix como segunda opção e "O que a assinatura libera" depois dos botões. No celular, o primeiro botão de assinar
+      // ficava a 1.852 px do alto da tela.
+      const cpOrdem = () => cp.evaluate(() => {
+        const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        const sc = [...document.querySelectorAll('*')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10 && shown(e)).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+        const base = sc ? sc.getBoundingClientRect().top - sc.scrollTop : 0;
+        const y = (e) => (e ? Math.round(e.getBoundingClientRect().top - base) : null);
+        const leaf = (pred) => [...document.querySelectorAll('div,span,h2,h3')].filter(shown).find((e) => e.children.length === 0 && pred((e.textContent || '').replace(/\u00a0/g, ' ').trim()));
+        const button = (name) => [...document.querySelectorAll('[role=button]')].filter(shown).find((e) => (e.getAttribute('aria-label') || e.textContent || '').trim() === name);
+        const plan = (name) => [...document.querySelectorAll('[aria-label]')].filter(shown).find((e) => (e.getAttribute('aria-label') || '').startsWith(`Plano ${name} mensal,`));
+        const ind = button('Assinar o plano Individual mensal'); const fam = button('Assinar o plano Família mensal');
+        const indCard = plan('Individual'); const famCard = plan('Família');
+        return {
+          periodo: y([...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura')),
+          contrato: y(leaf((t) => t.startsWith('No cartão, o plano mensal é cobrado todo mês'))),
+          pagina: y(leaf((t) => t === 'Na página de pagamento, você informa nome, CPF, e-mail e os dados do cartão.')),
+          termos: y(button('Termos de uso')),
+          individual: y(ind), familia: y(fam),
+          pix: y(leaf((t) => t === 'Ou pague um mês por vez, com Pix')),
+          libera: y([...document.querySelectorAll('[role=heading]')].filter(shown).find((e) => e.textContent === 'O que a assinatura libera')),
+          // O botão fica no mesmo cartão do plano (ao lado do bloco lido pelo leitor de tela, fora dele), e não numa lista à parte.
+          dentro: Boolean(ind && indCard && fam && famCard && indCard.parentElement.contains(ind) && !indCard.contains(ind) && !indCard.parentElement.contains(fam) &&
+            famCard.parentElement.contains(fam) && !famCard.contains(fam) && !famCard.parentElement.contains(ind)),
+          lado: ind && fam ? Math.round(fam.getBoundingClientRect().left - ind.getBoundingClientRect().left) : null,
+          mesmaAltura: ind && fam ? Math.abs(Math.round(fam.getBoundingClientRect().top - ind.getBoundingClientRect().top)) : null,
+        };
+      });
+      const o390 = await cpOrdem();
+      // No celular, um plano embaixo do outro; no computador, lado a lado (o Família na mesma altura do Individual, e o Pix depois dos dois).
+      const crescente = (o, ks = ['periodo', 'contrato', 'pagina', 'termos', 'individual', 'familia', 'pix', 'libera']) => ks.every((k, i) => o[k] !== null && (i === 0 || o[k] > o[ks[i - 1]]));
+      ok('Assinatura, ordem nova (jornada de compra de 27/11/2026): o período, o resumo do contrato aberto (com "Na página de pagamento, você informa nome, CPF, e-mail e os dados do cartão." e os Termos), o botão de cada plano dentro do cartão dele, o Pix como segunda opção e "O que a assinatura libera" depois dos botões',
+        crescente(o390) && o390.dentro, JSON.stringify(o390));
+      ok('Assinatura, ordem nova: no celular (390 px), o primeiro botão de assinar fica bem mais perto do alto (antes, a 1.852 px)', o390.individual !== null && o390.individual < 1450, JSON.stringify(o390));
+      await cp.setViewportSize({ width: 1280, height: 900 }); await cp.waitForTimeout(500);
+      const o1280 = await cpOrdem();
+      ok('Assinatura, ordem nova, no computador (1280 px): os dois planos lado a lado, cada um com o seu botão na mesma altura, e a mesma ordem',
+        crescente(o1280, ['periodo', 'contrato', 'pagina', 'termos', 'individual', 'pix', 'libera']) && o1280.familia !== null && o1280.familia < o1280.pix && o1280.dentro && o1280.lado !== null && o1280.lado > 200 && o1280.mesmaAltura !== null && o1280.mesmaAltura <= 2 && !(await cp.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), JSON.stringify(o1280));
+      await cpShot('619b_assinatura_compra_web_computador_planos');
+      await cp.setViewportSize({ width: 390, height: 844 }); await cp.waitForTimeout(400);
+      // Jornada de compra de 27/11/2026 (item 15): o plano e o período escolhidos no site (`/criar-conta?plano=familia&periodo=mensal`) ficam
+      // só no aparelho e marcam a tela Assinatura na primeira vez que ela abre, sem comprar nem marcar mais nada; depois disso saem do aparelho.
+      const chave = () => cp.evaluate(() => { try { return localStorage.getItem('clarevo.plano-escolhido.v1'); } catch { return 'erro'; } });
+      // O link de cadastro do site (27/11/2026): sem sessão, o endereço de Criar conta aberto direto abre Criar conta (a tela de carregamento
+      // decide), sem passar pelas boas-vindas, com a linha do teste grátis; a escolha já ficou guardada na primeira carga
+      // (`rememberChosenPlanFromLocation`, em _layout.tsx). Na demonstração, Criar conta tem o mesmo aviso de quando se chega pelas boas-vindas.
+      const CRIAR_TESTE = '14 dias grátis, sem cartão.';
+      const AVISO_DEMO = 'Esta é a demonstração: a conta criada aqui é só para testar e some ao fechar a página.';
+      const cpCriar = async (endereco) => {
+        await cp.goto(`http://localhost:${PORT}${endereco}`); await cpWait(CRIAR_TESTE); await cp.waitForTimeout(400);
+        const u = new URL(cp.url());
+        return { caminho: u.pathname, busca: u.search, texto: await cpBody(), botao: await cpCount('button', 'Criar conta'), boasVindas: await cp.getByText('Cuidar da vida financeira', { exact: false }).filter({ visible: true }).count() };
+      };
+      const criarInvalido = await cpCriar('/criar-conta?plano=empresa&periodo=anual');
+      const invalido = await chave();
+      ok('Link de cadastro do site (27/11/2026): sem sessão, "/criar-conta?plano=empresa" abre Criar conta direto (sem as boas-vindas), sem a escolha inválida no endereço',
+        criarInvalido.caminho === '/criar-conta' && criarInvalido.busca === '' && criarInvalido.botao === 1 && criarInvalido.boasVindas === 0 && criarInvalido.texto.includes(AVISO_DEMO), JSON.stringify({ ...criarInvalido, texto: criarInvalido.texto.slice(0, 500) }));
+      // Item 15: o período escolhido no site marca a tela mesmo quando não é o de sempre (o anual; o mensal já vem marcado).
+      const criar = await cpCriar('/criar-conta?plano=familia&periodo=anual');
+      const guardado = await chave();
+      ok('Link de cadastro do site (27/11/2026): sem sessão, "/criar-conta?plano=familia&periodo=anual" abre Criar conta direto, com o título, a linha do teste grátis, o plano no endereço e o aviso da demonstração',
+        criar.caminho === '/criar-conta' && criar.busca === '?plano=familia&periodo=anual' && criar.botao === 1 && criar.boasVindas === 0 &&
+          (await cp.getByRole('heading', { name: 'Criar conta', exact: true }).filter({ visible: true }).count()) === 1 && criar.texto.includes(CRIAR_TESTE) && criar.texto.includes(AVISO_DEMO),
+        JSON.stringify({ ...criar, texto: criar.texto.slice(0, 500) }));
+      await cpShot('619e_criar_conta_pelo_link_do_site');
+      // Revisão independente da D-131: guardada com o instante, para valer só por 24 horas ("familia:anual@<milissegundos>").
+      ok('Plano do site (item 15): "?plano=empresa" não guarda nada; "?plano=familia&periodo=anual" fica só no aparelho, como "familia:anual" com o instante em que foi guardada', invalido === null && /^familia:anual@\d{13}$/.test(guardado ?? ''), JSON.stringify({ invalido, guardado }));
+      // Voltar, de Criar conta aberta direto, leva às boas-vindas; "Já tenho conta · Entrar", a Entrar, como antes.
+      await cp.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).first().click();
+      await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(300);
+      const voltou = new URL(cp.url()).pathname;
+      await cpCriar('/criar-conta');
+      await cp.getByRole('button', { name: 'Já tenho conta · Entrar', exact: true }).filter({ visible: true }).first().click(); await cp.waitForTimeout(600);
+      const entrou = new URL(cp.url()).pathname;
+      ok('Link de cadastro do site (27/11/2026): de Criar conta aberta direto, "Voltar" leva às boas-vindas e "Já tenho conta · Entrar" a Entrar', voltou === '/boas-vindas' && entrou === '/entrar', JSON.stringify({ voltou, entrou }));
+      // A raiz e Entrar, sem sessão, continuam nas boas-vindas, como antes.
+      const inicio = {};
+      for (const endereco of ['/', '/entrar']) {
+        await cp.goto(`http://localhost:${PORT}${endereco}`); await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(300);
+        inicio[endereco] = new URL(cp.url()).pathname;
+      }
+      ok('Link de cadastro do site (27/11/2026): sem sessão, a raiz e Entrar continuam abrindo as boas-vindas', inicio['/'] === '/boas-vindas' && inicio['/entrar'] === '/boas-vindas', JSON.stringify(inicio));
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Família anual');
+      t = await cpBody();
+      const escolhido = await cp.evaluate(() => {
+        const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura' && e.getBoundingClientRect().width > 0);
+        const radios = g ? [...g.querySelectorAll('[role=radio]')].map((r) => [r.getAttribute('aria-label'), r.getAttribute('aria-checked')]) : null;
+        const fam = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Família anual,') && e.getBoundingClientRect().width > 0);
+        const ind = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Individual anual,') && e.getBoundingClientRect().width > 0);
+        const bg = (name) => { const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || e.textContent || '').trim() === name && e.getBoundingClientRect().width > 0); return b ? getComputedStyle(b).backgroundColor : null; };
+        return { radios, fam: fam?.getAttribute('aria-label') ?? null, ind: ind?.getAttribute('aria-label') ?? null, famBg: bg('Assinar o plano Família anual'), indBg: bg('Assinar o plano Individual anual'), checks: document.querySelectorAll('[role=checkbox],[role=switch]').length };
+      });
+      const usado = await chave();
+      ok('Plano do site (item 15): a tela Assinatura abre no anual escolhido no site (e não no mensal de sempre), o cartão do Família com o selo "O plano que você escolheu" (também para o leitor de tela) e o botão principal, sem nada mais marcado; a escolha sai do aparelho',
+        JSON.stringify(escolhido.radios) === JSON.stringify([['Mensal, uma cobrança por mês', 'false'], ['Anual, uma cobrança por ano', 'true']]) &&
+          (t.match(/O plano que você escolheu/g) || []).length === 1 && (escolhido.fam || '').endsWith('É o plano que você escolheu.') && !(escolhido.ind || '').includes('escolheu') &&
+          escolhido.famBg === 'rgb(36, 87, 245)' && escolhido.indBg !== escolhido.famBg && escolhido.checks === 0 && usado === null, JSON.stringify({ escolhido, usado }));
+      await cpShot('619c_assinatura_plano_escolhido_no_site');
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      t = await cpBody();
+      ok('Plano do site (item 15): na segunda abertura, a tela volta ao de sempre (o mensal primeiro e marcado, e nenhum selo)',
+        JSON.stringify(await cp.evaluate(() => [...document.querySelectorAll('[role=radiogroup] [role=radio]')].filter((r) => r.getBoundingClientRect().width > 0).map((r) => r.getAttribute('aria-checked')))) === JSON.stringify(['true', 'false']) &&
+          !t.includes('O plano que você escolheu'), t.slice(0, 600));
+      // Jornada de compra de 27/11/2026 (item 4): com o plano Família pago e sem Família, o próximo passo, "Crie a Família e convide até 5
+      // pessoas", leva à criação da Família; titular sozinha, sem convite, "Convidar para a Família". Simulado no repositório da demonstração.
+      await cpOpen('/conta/assinatura', FECHADA);
+      await cp.evaluate(async () => {
+        const repo = await window.__cp.repo();
+        repo.getMyAccess = async () => ({ status: 'assinatura', plan: 'familiar', until: '2027-01-07T12:00:00.000Z', canWrite: true, provider: 'web', period: 'mensal' });
+        repo.getWebSubscriptionStatus = async () => ({ active: true, nextDueDate: '2026-11-07' });
+        repo.getOwnWebEntitlements = async () => [];
+        repo.getFamily = async () => null;
+        await window.__cp.refresh();
+      });
+      await cpWait('Crie a Família e convide até 5 pessoas'); await cp.waitForTimeout(500);
+      t = await cpBody();
+      ok('Família pago (item 4): sem Família, "Crie a Família e convide até 5 pessoas", com o Pessoal de cada pessoa só dela e o botão "Criar a Família"; sem os planos',
+        t.includes('O plano Família vale para você e até 5 pessoas na sua Família da Clarevo. O Pessoal de cada pessoa continua só dela.') &&
+          (await cpCount('button', 'Criar a Família')) === 1 && !t.includes('Período da assinatura'), t.slice(0, 900));
+      await cpShot('619d_assinatura_familia_paga_sem_familia');
+      await cp.getByRole('button', { name: 'Criar a Família', exact: true }).filter({ visible: true }).first().click(); await cp.waitForTimeout(800);
+      ok('Família pago (item 4): "Criar a Família" abre a criação da Família que já existe (/familia/nova)', new URL(cp.url()).pathname === '/familia/nova', cp.url());
+      await cpOpen('/conta/assinatura', FECHADA);
+      await cp.evaluate(async () => {
+        const repo = await window.__cp.repo();
+        repo.getMyAccess = async () => ({ status: 'assinatura', plan: 'familiar', until: '2027-01-07T12:00:00.000Z', canWrite: true, provider: 'web', period: 'mensal' });
+        repo.getWebSubscriptionStatus = async () => ({ active: true, nextDueDate: '2026-11-07' });
+        repo.getOwnWebEntitlements = async () => [];
+        repo.getFamily = async () => ({ context: { id: 'f-e2e', name: 'Casa Exemplo' }, role: 'titular', members: [{ personId: 'me', firstName: 'Maria', role: 'titular', status: 'ativo', isMe: true, joinedAt: '2026-10-07', leftAt: null }], invites: [] });
+        await window.__cp.refresh();
+      });
+      await cpWait('Convide até 5 pessoas para a Família'); await cp.waitForTimeout(400);
+      ok('Família pago (item 4): com a Família criada e ninguém convidado, "Convidar para a Família"; com outra pessoa, o passo some',
+        (await cpCount('button', 'Convidar para a Família')) === 1 && (await cpCount('button', 'Criar a Família')) === 0, (await cpBody()).slice(0, 600));
+      await cp.evaluate(async () => {
+        const repo = await window.__cp.repo();
+        repo.getFamily = async () => ({ context: { id: 'f-e2e', name: 'Casa Exemplo' }, role: 'titular', members: [{ personId: 'me', firstName: 'Maria', role: 'titular', status: 'ativo', isMe: true, joinedAt: '2026-10-07', leftAt: null }, { personId: 'b', firstName: 'Davi', role: 'membro', status: 'ativo', isMe: false, joinedAt: '2026-10-07', leftAt: null }], invites: [] });
+        await window.__cp.refresh();
+      });
+      await cp.waitForTimeout(900);
+      ok('Família pago (item 4): com outra pessoa na Família, nenhum próximo passo', (await cpCount('button', /^(Convidar para a Família|Criar a Família)$/)) === 0 && !(await cpBody()).includes('Convide até 5 pessoas'));
+      // De volta à área de compra do teste grátis (a página nova traz a demonstração de novo, sem as simulações acima), para o passo seguinte.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
       // 4. Quem assinou no cartão durante o teste (D-129, revisão): o próprio direito no banco tem a janela da primeira cobrança (o começo do
       // dia do fim do teste, em Brasília, até o fim do terceiro dia seguinte), e o Asaas diz que a assinatura está ativa. Simulado no
       // repositório da demonstração (em memória), sem rede. A situação continua "Teste grátis", com o selo "Assinatura feita", o dia da
@@ -19271,6 +19557,8 @@ setInterval(async () => {
       ['Anotar gasto', 'registro/novo', { tipo: 'despesa' }, 'Valor em reais', '709_escuro_anotar_gasto'],
       ['meta', 'meta/[id]/index', { id: dkIds.goal }, 'Guardar', '710_escuro_meta'],
       ['cartão', 'cartoes/[id]/index', { id: dkIds.card }, 'Fatura', '711_escuro_cartao'],
+      // Análise geral de 26/11/2026 (sinal 24): a lista de Cartões, com as próximas faturas em barras.
+      ['Cartões', 'cartoes/index', {}, 'Próximas faturas (previsto)', '718_escuro_cartoes'],
       ['Orçamento', 'orcamento/index', {}, 'Orçamento', '712_escuro_orcamento'],
       ['Família', 'familia/index', {}, 'Família', '713_escuro_familia'],
       ['Multa e juros', 'calcular/[slug]', { slug: 'multa-e-juros' }, 'Multa e juros', '714_escuro_multa_e_juros'],
@@ -19280,13 +19568,186 @@ setInterval(async () => {
       ['Calendário', 'calendario', {}, 'Previsto em contas e faturas', '716_escuro_calendario'],
       ['Rever metas', 'meta/rever', {}, 'Três perguntas para cada meta', '717_escuro_rever_metas'],
     ];
-    for (const [name, route, params, text, shotName] of DK_ROUTES) { await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName); }
+    let dkBars = null;
+    for (const [name, route, params, text, shotName] of DK_ROUTES) {
+      await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName);
+      if (name === 'Cartões') dkBars = await cardBars(dp);
+    }
+    ok('Modo escuro (sinal 24): em Cartões, as barras das próximas faturas no azul de gráfico do tema escuro (#7A9CFF) sobre o trilho azul (#283B70), com o mês, o valor e o nome acessível de cada linha',
+      cardBarsOk(dkBars, DEMO_CARD_BARS, 'rgb(122, 156, 255)') && dkBars.items.every((it) => it.track === 'rgb(40, 59, 112)'), JSON.stringify(dkBars));
     ok(`Modo escuro, ${dkScreens} telas: o fundo de cada tela é escuro (azul-marinho, luminância abaixo de 0,05)`, dkScreens >= 15 && dkFound.fundo.length === 0, dkFound.fundo.slice(0, 4).join(' | '));
     ok('Modo escuro: nenhuma caixa clara grande esquecida (cartão, campo ou pílula branca fora do azul)', dkFound.claro.length === 0, dkFound.claro.slice(0, 4).join(' | '));
     ok(`Modo escuro, ${dkScreens} telas: o contraste de cada texto visível chega a 4,5:1 (3:1 no texto grande), fora o botão desabilitado (${dkTexts} textos conferidos)`, dkTexts > 400 && dkFound.contraste.length === 0, dkFound.contraste.slice(0, 4).join(' | '));
     ok('Modo escuro: nada passa da largura em 390, 360 e 320 px', dkFound.largura.length === 0, dkFound.largura.slice(0, 4).join(' | '));
     ok('Modo escuro: sem erros de JavaScript e nada vai à rede', dkErrors.length === 0 && dkWrites.length === 0, [...dkErrors, ...dkWrites].slice(0, 3).join(' | '));
     await dkCtx.close();
+  }
+
+  // ==================================================================================================================
+  // Tamanhos de tela (revisão de 27/11/2026; pergunta do Enzo: o app, até a sessão logada, se adapta aos tipos e tamanhos de tela, do
+  // computador ao celular?). Num contexto à parte, na demonstração, as telas principais em tablet em pé (768 × 1024), celular deitado
+  // (844 × 390) e monitor grande (1920 × 1080): sem rolagem lateral, nada fora da largura, nenhum valor em reais cortado nem quebrado no
+  // meio e, no tablet e no celular deitado, alvos de toque de 44 px. Celular deitado (`useShortLandscape`, lib/layout.ts): o cabeçalho das
+  // telas internas numa linha só (o título e a pílula lado a lado), a barra de baixo com o ícone ao lado do rótulo e 44 px de alvo, pelo
+  // menos 65% da altura para o conteúdo e a folha "Como usar" inteira na tela. Em 1920 px, os cartões seguem limitados (até 1080 px) e nenhum
+  // texto longo vira uma linha de mais de 780 px. Numa janela baixa de computador (1280 × 560), a barra lateral rola por dentro e a Conta, no
+  // pé dela, fica alcançável. Capturas 890 a 893. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const szCtx = await b.newContext({ viewport: { width: 768, height: 1024 }, deviceScaleFactor: 1 });
+    await szCtx.addInitScript(() => {
+      window.__szRepo = async () => {
+        const root = document.getElementById('root');
+        const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+        const stack = key ? [root[key].stateNode.current] : [];
+        while (stack.length > 0) {
+          const f = stack.pop();
+          const v = f.memoizedProps?.value;
+          if (v && typeof v === 'object' && 'repo' in v && 'auth' in v && 'user' in v) return v.user.email === 'demo@clarevo.app' ? await v.auth.demoRepo : v.repo;
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
+        return null;
+      };
+    });
+    const sp = await szCtx.newPage();
+    const szErrors = [];
+    sp.on('pageerror', (e) => szErrors.push(e.message));
+    sp.on('console', (m) => m.type() === 'error' && szErrors.push(m.text().slice(0, 200)));
+    const szWrites = [];
+    sp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && szWrites.push(`${r.method()} ${r.url()}`));
+    const szNav = (route, params = {}) => sp.evaluate(({ route, params }) => {
+      const root = document.getElementById('root');
+      const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+      const stack = [root[key].stateNode.current];
+      while (stack.length > 0) {
+        const f = stack.pop();
+        const v = f.memoizedProps?.value;
+        if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      throw new Error('navegador de rotas não encontrado');
+    }, { route, params });
+    await sp.goto(`http://localhost:${PORT}/`); await sp.getByText('Cuidar da vida financeira').filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await sp.getByRole('button', { name: 'Ver a demonstração', exact: true }).filter({ visible: true }).first().click();
+    await sp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await sp.waitForTimeout(800);
+    const szIds = await sp.evaluate(async () => {
+      const repo = await window.__szRepo(); const space = await repo.getSpace(); const ctx = space.personalContextId;
+      return { card: (await repo.listCards(ctx))[0].id, goal: (await repo.listGoals(ctx))[0].id };
+    });
+    const SZ_SCREENS = [
+      ['Resumo', '(tabs)', { screen: 'index' }], ['Movimentos', '(tabs)', { screen: 'movimentacoes' }], ['Metas', '(tabs)', { screen: 'metas' }],
+      ['Investir', '(tabs)', { screen: 'investimentos' }], ['Aprender', '(tabs)', { screen: 'aprender' }], ['Conta', 'conta', {}], ['Assinatura', 'conta/assinatura', {}],
+      ['Cartões', 'cartoes/index', {}], ['fatura', 'cartoes/[id]/fatura/[mes]/index', { id: szIds.card, mes: '2026-10' }], ['Contas a pagar', 'a-pagar/index', {}],
+      ['Orçamento', 'orcamento/index', {}], ['Análises', 'analises', {}], ['Evolução', 'evolucao', {}], ['meta', 'meta/[id]/index', { id: szIds.goal }],
+      ['calculadora da reserva', 'calcular/[slug]', { slug: 'reserva', valor: '300000' }], ['Anotar gasto', 'registro/novo', { tipo: 'despesa' }],
+    ];
+    // O que se vê na tela: rolagem lateral, o que passa da largura, valor em reais cortado ou quebrado no meio, alvos abaixo de 44 px, o
+    // cartão mais largo e os textos longos numa linha larga demais. A tela de trás de um painel (inert) não conta.
+    const szScan = () => sp.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert],[aria-hidden="true"]'); };
+      const W = innerWidth;
+      const all = [...document.querySelectorAll('body *')].filter(shown);
+      const name = (e) => (e.getAttribute('aria-label') || e.textContent || e.tagName).replace(/\s+/g, ' ').trim().slice(0, 40);
+      const leaves = all.filter((e) => (e.tagName === 'DIV' || e.tagName === 'SPAN') && e.childElementCount === 0 && (e.textContent || '').trim() !== '');
+      const out = [];
+      if (document.documentElement.scrollWidth > W + 1) out.push('rolagem lateral');
+      for (const e of all) { const r = e.getBoundingClientRect(); if (r.right > W + 0.5 || r.left < -0.5) { out.push(`fora: ${name(e)}`); break; } }
+      for (const e of leaves) if (/R\$/.test(e.textContent) && e.scrollWidth > e.clientWidth + 1) out.push(`cortado: ${e.textContent}`);
+      for (const e of leaves) {
+        const t = e.firstChild; const m = t && t.nodeType === 3 ? /R\$\s?[\d.]+,\d\d/.exec(t.textContent) : null;
+        if (!m) continue;
+        const range = document.createRange(); range.setStart(t, m.index); range.setEnd(t, m.index + m[0].length);
+        if (new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size > 1) out.push(`quebrado: ${m[0]}`);
+      }
+      const small = all.filter((e) => e.matches('[role=button],[role=tab],[role=radio],[role=checkbox],[role=link],button') && e.getBoundingClientRect().height < 43.5).map(name);
+      const cards = [...document.querySelectorAll('[data-card]')].filter(shown);
+      const maxCard = cards.length ? Math.round(Math.max(...cards.map((e) => e.getBoundingClientRect().width))) : 0;
+      const longLines = leaves.filter((e) => (e.textContent || '').length > 90 && e.getBoundingClientRect().width > 780).map(name);
+      return { out, small, maxCard, longLines };
+    });
+    const szFound = { largura: [], alvos: [], cartoes: [], linhas: [] };
+    const szSweep = async (label, w, h, touch, shotName) => {
+      await sp.setViewportSize({ width: w, height: h }); await sp.waitForTimeout(600);
+      for (const [screen, route, params] of SZ_SCREENS) {
+        await szNav(route, params); await sp.waitForTimeout(1200);
+        const s = await szScan();
+        for (const x of s.out) szFound.largura.push(`${label} ${screen}: ${x}`);
+        if (touch) for (const x of s.small) szFound.alvos.push(`${label} ${screen}: ${x}`);
+        if (s.maxCard > 1080) szFound.cartoes.push(`${label} ${screen}: ${s.maxCard} px`);
+        for (const x of s.longLines) szFound.linhas.push(`${label} ${screen}: ${x}`);
+        if (shotName && screen === 'Cartões') await sp.screenshot({ path: `${OUT}/${shotName}.png` });
+        await szNav('(tabs)', { screen: 'index' }); await sp.waitForTimeout(400);
+      }
+    };
+    // 1. Tablet em pé: o app como no celular (abaixo de 1024 px), com a coluna de 560 px no meio.
+    await szSweep('768 × 1024', 768, 1024, true, '890_tamanho_tablet_em_pe');
+    // 2. Celular deitado.
+    await szSweep('844 × 390', 844, 390, true, null);
+    await szNav('cartoes/index'); await sp.waitForTimeout(1200);
+    const szLand = await sp.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert],[aria-hidden="true"]'); };
+      const band = [...document.querySelectorAll('[data-band]')].find(shown);
+      const h1 = band ? [...band.querySelectorAll('[role=heading][aria-level="1"]')].find(shown) : null;
+      const pill = band ? [...band.querySelectorAll('[aria-label^="Espaço:"]')].find(shown) : null;
+      const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'];
+      const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => shown(e) && names.includes(e.getAttribute('aria-label')));
+      const tr = tabs.map((e) => e.getBoundingClientRect());
+      const scrollers = [...document.querySelectorAll('body *')].filter((e) => { if (!shown(e)) return false; const cs = getComputedStyle(e); return (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && e.clientHeight > 80; });
+      const main = scrollers.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
+      const mr = main ? main.getBoundingClientRect() : null;
+      const top = band ? band.getBoundingClientRect().bottom : 0;
+      const bottom = tr.length ? Math.min(...tr.map((r) => r.top)) - 4 : innerHeight;
+      const mid = (r) => (r.top + r.bottom) / 2;
+      return {
+        bandH: band ? Math.round(band.getBoundingClientRect().height) : null,
+        sameRow: Boolean(h1 && pill) && Math.abs(mid(h1.getBoundingClientRect()) - mid(pill.getBoundingClientRect())) < 12,
+        tabs: tabs.length, tabMinH: tr.length ? Math.round(Math.min(...tr.map((r) => r.height))) : 0, tabMaxH: tr.length ? Math.round(Math.max(...tr.map((r) => r.height))) : 0,
+        // Ícone ao lado do rótulo: o desenho e o texto da aba na mesma altura.
+        side: tabs.every((e) => { const svg = e.querySelector('svg'); const txt = [...e.querySelectorAll('div,span')].find((x) => x.childElementCount === 0 && x.textContent); return svg && txt && Math.abs(mid(svg.getBoundingClientRect()) - mid(txt.getBoundingClientRect())) < 6; }),
+        free: mr ? Math.round(Math.min(bottom, mr.bottom) - Math.max(top, mr.top)) : 0, h: innerHeight,
+      };
+    });
+    ok('Tamanhos, celular deitado (844 × 390): o cabeçalho de Cartões numa linha só (título e pílula lado a lado, faixa de até 72 px), a barra de baixo com as cinco abas, o ícone ao lado do rótulo e 44 a 50 px de alvo, e pelo menos 65% da altura para o conteúdo',
+      szLand.bandH !== null && szLand.bandH <= 72 && szLand.sameRow && szLand.tabs === 5 && szLand.tabMinH >= 44 && szLand.tabMaxH <= 50 && szLand.side && szLand.free >= szLand.h * 0.65, JSON.stringify(szLand));
+    await sp.screenshot({ path: `${OUT}/891_tamanho_celular_deitado.png` });
+    await sp.getByRole('button', { name: /^Como usar/ }).filter({ visible: true }).first().click(); await sp.waitForTimeout(700);
+    const szSheet = await sp.evaluate(() => {
+      const d = [...document.querySelectorAll('[role=dialog],[aria-modal="true"]')].filter((e) => e.getBoundingClientRect().width > 0).pop();
+      if (!d) return null;
+      for (const s of d.querySelectorAll('*')) { const cs = getComputedStyle(s); if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && s.scrollHeight > s.clientHeight + 1) s.scrollTop = s.scrollHeight; }
+      const buttons = [...d.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0);
+      const last = buttons.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom)[0];
+      const r = last ? last.getBoundingClientRect() : null;
+      return { last: last ? last.getAttribute('aria-label') || last.textContent : null, top: r ? Math.round(r.top) : null, bottom: r ? Math.round(r.bottom) : null, h: innerHeight };
+    });
+    ok('Tamanhos, celular deitado: a folha "Como usar" de Cartões cabe na tela e o "Fechar" do fim fica à vista (o texto rola por dentro)',
+      szSheet !== null && szSheet.last === 'Fechar' && szSheet.top >= 0 && szSheet.bottom <= szSheet.h, JSON.stringify(szSheet));
+    await sp.keyboard.press('Escape'); await sp.waitForTimeout(500);
+    await szNav('(tabs)', { screen: 'index' }); await sp.waitForTimeout(500);
+    // 3. Monitor grande: a barra lateral e o conteúdo limitado, no meio da área à direita dela.
+    await szSweep('1920 × 1080', 1920, 1080, false, '892_tamanho_monitor_1920');
+    // 4. Janela baixa de computador: a barra lateral rola por dentro, e a Conta, no pé, fica alcançável.
+    await sp.setViewportSize({ width: 1280, height: 560 }); await sp.waitForTimeout(700);
+    const szNavBar = await sp.evaluate(() => {
+      const nav = [...document.querySelectorAll('[role=navigation]')].find((e) => e.getBoundingClientRect().width > 0);
+      const sc = nav ? [...nav.querySelectorAll('*')].find((e) => { const cs = getComputedStyle(e); return cs.overflowY === 'auto' || cs.overflowY === 'scroll'; }) : null;
+      if (!nav || !sc) return null;
+      const before = { scroll: sc.scrollHeight, client: sc.clientHeight };
+      sc.scrollTop = sc.scrollHeight;
+      const conta = [...nav.querySelectorAll('[role=link]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Conta:'));
+      const r = conta ? conta.getBoundingClientRect() : null;
+      return { ...before, contaBottom: r ? Math.round(r.bottom) : null, h: innerHeight, navBottom: Math.round(nav.getBoundingClientRect().bottom) };
+    });
+    ok('Tamanhos, janela baixa (1280 × 560): a barra lateral rola por dentro e a Conta, no pé dela, fica inteira à vista depois de rolar',
+      szNavBar !== null && szNavBar.scroll > szNavBar.client && szNavBar.contaBottom !== null && szNavBar.contaBottom <= szNavBar.h && szNavBar.navBottom <= szNavBar.h + 0.5, JSON.stringify(szNavBar));
+    await sp.screenshot({ path: `${OUT}/893_tamanho_janela_baixa_barra_lateral.png` });
+    ok(`Tamanhos: em 768 × 1024, 844 × 390 e 1920 × 1080, nas ${SZ_SCREENS.length} telas principais, sem rolagem lateral, nada fora da largura e nenhum valor em reais cortado ou quebrado no meio`, szFound.largura.length === 0, szFound.largura.slice(0, 4).join(' | '));
+    ok('Tamanhos: no tablet em pé e no celular deitado, alvos de toque com 44 px ou mais', szFound.alvos.length === 0, szFound.alvos.slice(0, 4).join(' | '));
+    ok('Tamanhos: em 1920 px, nenhum cartão passa de 1080 px e nenhum texto longo vira uma linha de mais de 780 px', szFound.cartoes.length === 0 && szFound.linhas.length === 0, [...szFound.cartoes, ...szFound.linhas].slice(0, 4).join(' | '));
+    ok('Tamanhos: sem erros de JavaScript e nada vai à rede', szErrors.length === 0 && szWrites.length === 0, [...szErrors, ...szWrites].slice(0, 3).join(' | '));
+    await szCtx.close();
   }
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

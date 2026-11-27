@@ -70,6 +70,32 @@ const VIDEOS = [
     titulo: 'Do tema escuro ao claro',
     descricao: 'Com o aparelho no tema escuro, a tela Conta aparece escura. Mais abaixo, no card Tema, a pessoa escolhe Claro e toca em Aplicar agora. O app passa para o tema claro, com uma transição suave no lugar da recarga da página, e o Resumo aparece claro.',
   },
+  // Os vídeos do computador (27/11/2026, pedido do Enzo para `web.html`: "focar em demonstração por vídeos do app"): a versão web numa janela
+  // de 1280 x 800, com o menu ao lado, em 1600 x 1000 (`aparelho: 'computador'`, `telaLargaComVideo`).
+  {
+    id: 'computador-resumo',
+    aparelho: 'computador',
+    titulo: 'O Resumo no computador',
+    descricao: 'No navegador do computador, o menu fica ao lado, com Anotar gasto, Resumo, Movimentos, Metas, Investir e Aprender. O Resumo de outubro mostra a Diferença do mês, o Recebido e o Pago, o que ainda falta pagar, a renda comprometida e os atalhos para as análises e o calendário; mais abaixo, os pagamentos do mês e as metas. Pelo menu, Movimentos abre os lançamentos de outubro numa tabela, e Resumo volta.',
+  },
+  {
+    id: 'computador-anotar',
+    aparelho: 'computador',
+    titulo: 'Anotar um gasto no computador',
+    descricao: 'No navegador do computador, o formulário Anotar gasto, aberto pelo botão do alto do menu, fica à direita, sem sair do Resumo: a pessoa escreve Farmácia, digita o valor, escolhe a categoria Saúde e salva. O app mostra o gasto salvo, com a data, a categoria e de onde saiu o dinheiro, e, de volta ao Resumo, o Pago e a Diferença do mês já contam o gasto.',
+  },
+  {
+    id: 'computador-importar',
+    aparelho: 'computador',
+    titulo: 'Importar um extrato no computador',
+    descricao: 'Em Movimentos, a pessoa clica em Importar extrato ou fatura e escolhe uma planilha de extrato com dados fictícios, lida no próprio navegador: o arquivo não sai do computador. A Clarevo diz quantas linhas leu, e a pessoa escolhe o banco ou a carteira para onde vão os lançamentos. Na revisão, cada linha aparece marcada, com a data, a categoria sugerida e o valor, e a pessoa importa os quatro lançamentos. No fim, a Clarevo sugere um orçamento a partir do arquivo, sem mudar nada sem confirmação.',
+  },
+  {
+    id: 'computador-contas',
+    aparelho: 'computador',
+    titulo: 'As contas do mês no computador',
+    descricao: 'No navegador do computador, o Calendário de outubro mostra o previsto em contas e faturas, separado do que já foi pago, e um título por dia com as contas. Em novembro, aparece a fatura do cartão no dia do vencimento.',
+  },
 ];
 
 /** O manifesto que `gravar-videos-site.js` grava: duração, dimensões e arquivos de cada vídeo. */
@@ -101,7 +127,7 @@ function videosDoSite() {
       caminhos[tipo] = `videos/${v.id}.${resumo(bytes)}.${tipo}`;
       arquivos.set(caminhos[tipo], bytes);
     }
-    info[v.id] = { ...v, ...caminhos, largura: m.largura, altura: m.altura, duracao: m.duracao, bytes: { mp4: m.mp4.bytes, webm: m.webm.bytes } };
+    info[v.id] = { ...v, aparelho: v.aparelho || 'celular', ...caminhos, largura: m.largura, altura: m.altura, duracao: m.duracao, bytes: { mp4: m.mp4.bytes, webm: m.webm.bytes } };
   }
   return { arquivos, info };
 }
@@ -126,18 +152,45 @@ const SCRIPT_DOS_VIDEOS = 'js/videos.js';
  * `classe`: uma classe a mais na figura.
  */
 function celularComVideo(id, { videos, img }, arquivo, { capa: idDaCapa = null, classe = '' } = {}) {
+  const { v, video } = elementoDoVideo(id, { videos, img }, arquivo, { idDaCapa, aparelho: 'celular' });
+  return `<figure class="celular celular-video${classe ? ` ${classe}` : ''}" data-video data-titulo="${esc(v.titulo)}"><div class="celular-moldura">${video}</div>
+${textoDoVideo(id, videos)}
+<figcaption>${LEGENDA_TELA}</figcaption></figure>`;
+}
+
+/**
+ * O vídeo `id` do computador (`aparelho: 'computador'`) na moldura larga, no lugar de uma captura larga (`telaLarga()` de `modelo.js`), com
+ * a mesma figura, o mesmo texto para o leitor de tela e a mesma legenda dos vídeos de celular, e o mesmo comportamento (`js/videos.js`
+ * acha a figura pelo `data-video`). 27/11/2026: `web.html` mostra a versão web por vídeos, no lugar das capturas paradas.
+ */
+function telaLargaComVideo(id, { videos, img }, arquivo, { classe = '' } = {}) {
+  const { v, video } = elementoDoVideo(id, { videos, img }, arquivo, { aparelho: 'computador' });
+  return `<figure class="larga larga-video${classe ? ` ${classe}` : ''}" data-video data-titulo="${esc(v.titulo)}"><div class="larga-moldura">${video}</div>
+${textoDoVideo(id, videos)}
+<figcaption>${LEGENDA_TELA}</figcaption></figure>`;
+}
+
+/** O elemento `<video>` (com a capa, os dois formatos e o link do MP4), igual nas duas molduras. Recusa o vídeo do outro aparelho. */
+function elementoDoVideo(id, { videos, img }, arquivo, { idDaCapa = null, aparelho }) {
   const v = VIDEOS.find((x) => x.id === id);
   const i = videos[id];
   const capa = img[idDaCapa || `video-${id}`];
   if (!v || !i || !capa) throw new Error(`o vídeo "${id}" ou a capa dele não foi carregado`);
+  if ((v.aparelho || 'celular') !== aparelho) throw new Error(`o vídeo "${id}" é do ${v.aparelho || 'celular'}: use ${v.aparelho === 'computador' ? 'telaLargaComVideo' : 'celularComVideo'}`);
   const base = `video-${id}`;
-  return `<figure class="celular celular-video${classe ? ` ${classe}` : ''}" data-video data-titulo="${esc(v.titulo)}"><div class="celular-moldura"><video muted loop playsinline preload="none" width="${i.largura}" height="${i.altura}" poster="${rel(arquivo, capa.caminho)}" aria-labelledby="${base}-nome" aria-describedby="${base}-descricao">
+  const video = `<video muted loop playsinline preload="none" width="${i.largura}" height="${i.altura}" poster="${rel(arquivo, capa.caminho)}" aria-labelledby="${base}-nome" aria-describedby="${base}-descricao">
 <source src="${rel(arquivo, i.webm)}" type="video/webm">
 <source src="${rel(arquivo, i.mp4)}" type="video/mp4">
 <a href="${rel(arquivo, i.mp4)}">Baixar o vídeo ${esc(v.titulo)} (MP4)</a>
-</video></div>
-<p class="video-texto" hidden><span id="${base}-nome">Vídeo: ${esc(v.titulo)}</span>, ${duracaoPorExtenso(i.duracao)}, sem som. <span id="${base}-descricao">${esc(v.descricao)}</span></p>
-<figcaption>${LEGENDA_TELA}</figcaption></figure>`;
+</video>`;
+  return { v, video };
 }
 
-module.exports = { VIDEOS, PASTA_VIDEOS, ARQUIVO_MANIFESTO, LEGENDA_TELA, SCRIPT_DOS_VIDEOS, videosDoSite, celularComVideo, lerManifesto };
+/** O nome e a descrição do vídeo em texto, escondidos e ligados ao vídeo por `aria-labelledby` e `aria-describedby`. */
+function textoDoVideo(id, videos) {
+  const v = VIDEOS.find((x) => x.id === id);
+  const base = `video-${id}`;
+  return `<p class="video-texto" hidden><span id="${base}-nome">Vídeo: ${esc(v.titulo)}</span>, ${duracaoPorExtenso(videos[id].duracao)}, sem som. <span id="${base}-descricao">${esc(v.descricao)}</span></p>`;
+}
+
+module.exports = { VIDEOS, PASTA_VIDEOS, ARQUIVO_MANIFESTO, LEGENDA_TELA, SCRIPT_DOS_VIDEOS, videosDoSite, celularComVideo, telaLargaComVideo, lerManifesto };

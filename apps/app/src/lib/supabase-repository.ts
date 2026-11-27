@@ -174,7 +174,7 @@ import {
   levelStateOf,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStatus,
-  parseOwnWebEntitlements,
+  parseOwnWebEntitlementsWithPlan,
   parseWebSubscriptionStart,
   STORE_SUBSCRIPTION_FUNCTION,
   WEB_SUBSCRIPTION_FUNCTION,
@@ -4340,12 +4340,12 @@ export class SupabaseRepository implements RecordsRepository {
 
   /**
    * O próprio direito pela web (D-129): `plan_entitlements` com o provedor "web", lido com a RLS (`entitlements_own_read`: só as linhas da
-   * pessoa), sem chamar o Asaas. Só o começo e o fim de cada direito.
+   * pessoa), sem chamar o Asaas. Só o começo, o fim e o plano de cada direito (o plano, para o próximo passo do Família assinado no teste).
    */
   async getOwnWebEntitlements(): Promise<OwnWebEntitlement[]> {
-    const { data, error } = await this.db.from('plan_entitlements').select('valid_from, valid_until').eq('provider', 'web');
+    const { data, error } = await this.db.from('plan_entitlements').select('valid_from, valid_until, plan').eq('provider', 'web');
     if (error) throw repoError(error);
-    return parseOwnWebEntitlements(data);
+    return parseOwnWebEntitlementsWithPlan(data);
   }
 
   /** "pix": o Checkout do Asaas de um mês (ou de um ano, D-127) com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */

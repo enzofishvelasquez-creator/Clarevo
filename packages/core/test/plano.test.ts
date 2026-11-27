@@ -1,3 +1,6 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,6 +10,8 @@ import {
   FAMILY_MAX_PEOPLE,
   FULL_ACCESS,
   MemoryRepository,
+  PLAN_PERIOD_DEFAULT,
+  PLAN_PERIOD_ORDER,
   PLAN_PERIOD_PRICE_CENTS,
   PLAN_PERIOD_TEXT,
   PLAN_PRICE_CENTS,
@@ -70,7 +75,8 @@ describe('assinatura paga (D-083): preços e textos', () => {
     expect(PLAN_PERIOD_TEXT.planLabel('individual', 'anual', 'Para você.')).toBe(
       'Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você.',
     );
-    // A escolha: o anual primeiro, sem pressão, sem prazo e sem alarme; sem prometer economia.
+    // A escolha: o mensal primeiro e marcado (decisão de 27/11/2026, no lugar do anual primeiro da D-127), sem pressão, sem prazo e sem
+    // alarme; sem prometer economia.
     const texts = [
       PLAN_PERIOD_TEXT.choiceLabel,
       PLAN_PERIOD_TEXT.note.store,
@@ -86,7 +92,17 @@ describe('assinatura paga (D-083): preços e textos', () => {
         PLAN_PERIOD_TEXT.planLabel(p, 'mensal', ''),
       ]),
     ];
-    expect(Object.keys(PLAN_PERIOD_TEXT.option)).toEqual(['anual', 'mensal']);
+    expect(Object.keys(PLAN_PERIOD_TEXT.option)).toEqual(['mensal', 'anual']);
+    expect(Object.keys(PLAN_PERIOD_TEXT.optionHint)).toEqual(['mensal', 'anual']);
+    expect(PLAN_PERIOD_ORDER).toEqual(['mensal', 'anual']);
+    expect(PLAN_PERIOD_DEFAULT).toBe('mensal');
+    // A tela segue a ordem e o marcado do núcleo, sem lista própria (apps/app/src/components/access-parts.tsx).
+    const tela = readFileSync(fileURLToPath(new URL('../../../apps/app/src/components/access-parts.tsx', import.meta.url)), 'utf8');
+    expect(tela).toContain('const options = PLAN_PERIOD_ORDER;');
+    expect(tela).toContain('chosen?.period ?? PLAN_PERIOD_DEFAULT');
+    expect(tela).not.toMatch(/\['anual', 'mensal'\]|\?\? 'anual'/);
+    // O guia de uso diz as opções na ordem da tela.
+    expect(guideEntry('assinatura')?.steps.some((t) => t.includes('escolha "Mensal" ou "Anual"'))).toBe(true);
     for (const t of texts) {
       expect(t).not.toMatch(/—|–/);
       expect(t).not.toMatch(/fa(z|ç)er? sentido|faz sentido/i);

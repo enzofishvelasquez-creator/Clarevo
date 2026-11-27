@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FitTxt } from '@/components/ui';
 import { setBrowseBarInset } from '@/lib/bar-inset';
-import { useWideLayout } from '@/lib/layout';
+import { useShortLandscape, useWideLayout } from '@/lib/layout';
 import { contaBelow, useNavState } from '@/lib/nav-state';
 import { colors, fonts, radius } from '@/theme/tokens';
 
@@ -60,6 +60,9 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
   // Cinco abas (D-093): o rótulo mais longo ("Movimentos") cabe inteiro de 320 px para cima, com letra de 12, 11 ou 10,5.
   const { width } = useWindowDimensions();
   const fontSize = width >= 375 ? 12 : width >= 340 ? 11 : 10.5;
+  // Celular deitado (revisão dos tamanhos de tela, 27/11/2026): o ícone ao lado do rótulo, em 44 px de altura, como nas barras de abas
+  // deitadas dos próprios sistemas; a barra perde 20 px e o conteúdo ganha esse espaço.
+  const short = useShortLandscape();
   return (
     <Pressable
       ref={ref}
@@ -71,11 +74,12 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
       {...(Platform.OS === 'ios' ? { accessibilityShowsLargeContentViewer: true, accessibilityLargeContentTitle: label } : {})}
       style={(s) => [
         styles.button,
+        short && styles.buttonShort,
         focused && styles.buttonActive,
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
-      <FitTxt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE} minimumFontScale={0.6}>
+      <FitTxt variant="caption" color={color} style={[{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }, short && { flexShrink: 1 }]} maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE} minimumFontScale={0.6}>
         {label}
       </FitTxt>
     </Pressable>
@@ -120,6 +124,7 @@ export function BrowseTabBar() {
   const origin = useLastTab();
   // Versão para computador (a partir de 1024 px): a barra lateral (`DesktopNav`) faz este papel.
   const wide = useWideLayout();
+  const short = useShortLandscape();
   // Endereço que não existe (+not-found, e _sitemap, que mostra a mesma tela): tela de entrada, sem barra, com a saída no botão.
   const unmatched = useSegments().some((s) => s === '+not-found' || s === '_sitemap');
   const visible = !unmatched && barModeFor(pathname) === 'consulta' && !keyboard && !wide;
@@ -134,7 +139,7 @@ export function BrowseTabBar() {
   // Sobreposta ao fim da tela (absoluta): a pilha de telas não encolhe quando a barra surge, então não há barra dupla nem salto
   // na animação. A rolagem de cada tela reserva o espaço dela (lib/bar-inset).
   return (
-    <View style={[styles.barWrap, styles.overlay, { paddingBottom: Math.max(insets.bottom, 8) }]} onLayout={(e) => setBrowseBarInset(e.nativeEvent.layout.height)}>
+    <View style={[styles.barWrap, styles.overlay, short && styles.barWrapShort, { paddingBottom: Math.max(insets.bottom, short ? 4 : 8) }]} onLayout={(e) => setBrowseBarInset(e.nativeEvent.layout.height)}>
       <View accessibilityRole="tablist" aria-label={BAR_TEXT.label} style={styles.bar}>
         {TABS.map((t) => (
           <TabFace key={t.name} focused={t.href === active} label={t.label} a11y={t.a11y} icon={t.icon} onPress={() => router.dismissTo(t.href)} />
@@ -150,6 +155,7 @@ export function BrowseTabBar() {
  */
 export function TabBar({ children, hidden = false, ...props }: TabListProps & { hidden?: boolean }) {
   const insets = useSafeAreaInsets();
+  const short = useShortLandscape();
   if (hidden) {
     return (
       <View style={{ display: 'none' }} aria-hidden>
@@ -158,7 +164,7 @@ export function TabBar({ children, hidden = false, ...props }: TabListProps & { 
     );
   }
   return (
-    <View style={[styles.barWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.barWrap, short && styles.barWrapShort, { paddingBottom: Math.max(insets.bottom, short ? 4 : 8) }]}>
       {/* A mesma lista de abas da barra das telas de consulta, com o mesmo nome para o leitor de tela. */}
       <View {...props} accessibilityRole="tablist" aria-label={BAR_TEXT.label} style={styles.bar}>
         {children}
@@ -173,4 +179,7 @@ const styles = StyleSheet.create({
   bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 4, width: '100%', maxWidth: 560, alignSelf: 'center' },
   button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
   buttonActive: { backgroundColor: colors.brandTint },
+  // Celular deitado: o ícone e o rótulo lado a lado, com o alvo de 44 px, e menos respiro em cima e embaixo da barra.
+  buttonShort: { minHeight: 44, flexDirection: 'row', gap: 6, paddingHorizontal: 4 },
+  barWrapShort: { paddingTop: 4 },
 });

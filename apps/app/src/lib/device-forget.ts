@@ -1,3 +1,4 @@
+import { clearChosenPlan } from '@/lib/chosen-plan';
 import { cancelAllReminders } from '@/lib/device';
 import { forgetPrefs } from '@/lib/device-prefs';
 import { forgetLevelSeen } from '@/lib/level-seen';
@@ -21,6 +22,8 @@ export async function forgetDevice(userId: string): Promise<void> {
   forgetFirstSteps(userId);
   forgetSignupSourcePrefs(userId);
   forgetThemeChoice();
+  // O plano escolhido no site (jornada de compra de 27/11/2026), se ainda não foi usado na tela Assinatura.
+  clearChosenPlan();
   await forgetStoreUse(userId);
   await forgetLevelSeen(userId);
   queueWidget({ kind: 'signed-out' });

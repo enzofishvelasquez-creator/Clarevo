@@ -3,7 +3,9 @@
  * (dados fictícios) com o Playwright e grava, em docs/lojas/capturas/<tamanho>/, dois conjuntos:
  *
  * 1. As capturas das lojas (`loja-1-resumo.png` a `loja-6-privacidade.png`): seis telas que contam a história (o Resumo, anotar por
- *    mensagem, contas a pagar e faturas, a Família, o espaço Negócio e a privacidade), cada uma com uma frase curta de benefício acima da
+ *    mensagem, contas a pagar e faturas, a Família, o espaço Negócio e a privacidade, que desde a análise geral de 26/11/2026 é o convite
+ *    para a Família visto por quem é convidado, com "Aceitar não mostra nem copia o seu Pessoal": a tela "Quem vê estes dados?" de antes
+ *    tinha letra pequena demais no tamanho da loja), cada uma com uma frase curta de benefício acima da
  *    tela do aparelho e a nota "Dados fictícios". São estas que vão para a App Store e o Google Play (a Apple aceita até dez; o Google, até
  *    oito; a ordem de envio está em docs/16, seção 7). Nelas, o selo "Demonstração" do app sai, só nas capturas: a marca `__clarevoCaptura`
  *    na página (apps/app/src/lib/capture.ts) esconde o selo e a linha "Fica só nesta demonstração", porque a nota "Dados fictícios" já vai
@@ -32,6 +34,8 @@
  *   node scripts/capturas-lojas.js --saida <pasta>  outra pasta de saída (padrão: docs/lojas/capturas)
  *   node scripts/capturas-lojas.js --tamanho <texto>  só os tamanhos cujo nome de pasta contém o texto
  *   node scripts/capturas-lojas.js --so-lojas       só as seis capturas das lojas (sem as telas cruas)
+ *   node scripts/capturas-lojas.js --so-captura <texto>  só as capturas das lojas cujo nome contém o texto (por exemplo, loja-6), sem as
+ *                                                    telas cruas nem o Resumo sem o selo
  *   node scripts/capturas-lojas.js --so-resumo-sem-selo  só o Resumo sem o selo, para as duas imagens (sem refazer as outras capturas)
  * Porta: E2E_PORT (padrão 8098). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -49,7 +53,8 @@ const argv = process.argv.slice(2);
 const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i + 1] : null; };
 const SAIDA = path.resolve(opcao('--saida') || path.join(RAIZ, 'docs', 'lojas', 'capturas'));
 const SO_TAMANHO = opcao('--tamanho');
-const SO_LOJAS = argv.includes('--so-lojas');
+const SO_CAPTURA = opcao('--so-captura');
+const SO_LOJAS = argv.includes('--so-lojas') || Boolean(SO_CAPTURA);
 const SO_RESUMO = argv.includes('--so-resumo-sem-selo');
 /** As pastas do Resumo sem o selo: as das capturas que a imagem do site (Apple, 6,3 pol.) e o gráfico do Google Play usam. */
 const PASTAS_DO_RESUMO_SEM_SELO = ['apple-iphone-6-3pol-1206x2622', 'google-play-celular-1080x1920'];
@@ -231,6 +236,30 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
       await f.esperar('Privacidade neste aparelho');
     };
     f.sair = async () => { await f.conta(); await f.botao('Sair da conta').click(); await f.esperar('Cuidar da vida financeira'); };
+    /**
+     * A Família (D-055) na memória da página, como quem usa: Maria cria "Casa Alves" e gera o convite (Anota e vê), sai, e Davi cria a conta
+     * e abre o link (nomes fictícios). Para na tela do convite, antes de aceitar, com Davi na conta.
+     */
+    f.conviteDaFamilia = async () => {
+      await p.goto(base + '/'); await f.esperar('Cuidar da vida financeira');
+      await f.criarConta('Maria Alves', 'maria.alves@exemplo.com');
+      await f.conta();
+      await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await f.esperar('Anotar a casa em conjunto');
+      await f.botao('Criar Família').click(); await f.esperar('Nome da Família');
+      await f.campo('Nome da Família').fill('Casa Alves');
+      await f.botao('Criar Família').click(); await f.esperar('Seu papel: Titular');
+      // O compartilhamento do aparelho não existe no Chromium de captura: o link aparece na tela.
+      await p.evaluate(() => { navigator.share = async () => {}; });
+      await f.botao('Convidar').click(); await f.esperar('O que a pessoa poderá fazer');
+      await f.botao('Gerar link').click(); await f.esperar('Link do convite'); await p.waitForTimeout(400);
+      const link = ((await f.corpo()).match(/https?:\/\/[^\s]+\/convite\/[0-9a-f]{32}/) || [])[0];
+      if (!link) throw new Error('o link do convite da Família não apareceu');
+      await f.sair();
+      await f.criarConta('Davi Alves', 'davi.alves@exemplo.com');
+      await f.conta();
+      await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+      await f.campo('Link do convite').fill(link); await f.botao('Ver convite').click(); await f.esperar('Aceitar convite');
+    };
     return { ctx, f };
   };
 
@@ -293,24 +322,7 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
       frase: 'As contas da casa, anotadas em família',
       abrir: async (f) => {
         const { p } = f;
-        await p.goto(base + '/'); await f.esperar('Cuidar da vida financeira');
-        await f.criarConta('Maria Alves', 'maria.alves@exemplo.com');
-        await f.conta();
-        await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await f.esperar('Anotar a casa em conjunto');
-        await f.botao('Criar Família').click(); await f.esperar('Nome da Família');
-        await f.campo('Nome da Família').fill('Casa Alves');
-        await f.botao('Criar Família').click(); await f.esperar('Seu papel: Titular');
-        // O compartilhamento do aparelho não existe no Chromium de captura: o link aparece na tela.
-        await p.evaluate(() => { navigator.share = async () => {}; });
-        await f.botao('Convidar').click(); await f.esperar('O que a pessoa poderá fazer');
-        await f.botao('Gerar link').click(); await f.esperar('Link do convite'); await p.waitForTimeout(400);
-        const link = ((await f.corpo()).match(/https?:\/\/[^\s]+\/convite\/[0-9a-f]{32}/) || [])[0];
-        if (!link) throw new Error('o link do convite da Família não apareceu');
-        await f.sair();
-        await f.criarConta('Davi Alves', 'davi.alves@exemplo.com');
-        await f.conta();
-        await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
-        await f.campo('Link do convite').fill(link); await f.botao('Ver convite').click(); await f.esperar('Aceitar convite');
+        await f.conviteDaFamilia();
         await f.botao('Aceitar convite').click(); await f.esperar('Você entrou na Família Casa Alves.');
         await f.sair();
         await f.botao('Entrar').click(); await f.esperar('Esqueci minha senha');
@@ -335,15 +347,16 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
       confere: ['Seu negócio', 'Sacolé da Maria', 'Últimos meses'],
     },
     {
+      // A privacidade (análise geral de 26/11/2026): o convite para a Família visto por Davi, antes de aceitar, com o que ele poderá fazer na
+      // Família ("Anota e vê") e "Aceitar não mostra nem copia o seu Pessoal". Até 26/11/2026 era "Quem vê estes dados?" (frase "Seus
+      // registros pessoais são só seus"), com nove itens em letra pequena, ilegível no tamanho da loja.
       id: 'loja-6-privacidade',
-      frase: 'Seus registros pessoais são só seus',
+      frase: 'Seus registros pessoais continuam só seus',
       abrir: async (f) => {
-        await f.entrar();
-        await f.p.getByRole('button', { name: /Quem vê estes dados/ }).filter({ visible: true }).first().click();
-        await f.p.locator('h1').filter({ hasText: /^Quem vê estes dados\?$/ }).first().waitFor({ timeout: 12000 });
+        await f.conviteDaFamilia();
         await f.p.waitForTimeout(600);
       },
-      confere: ['Quem vê estes dados?'],
+      confere: ['Convite para a Família', 'Casa Alves', 'Anota e vê', 'Aceitar não mostra nem copia o seu Pessoal', 'Aceitar convite'],
     },
   ];
   for (const tela of LOJA) {
@@ -352,7 +365,9 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
 
   try {
     const telas = new Map();
-    for (const tela of SO_RESUMO ? [] : LOJA) {
+    const lojaPedidas = LOJA.filter((tela) => !SO_CAPTURA || tela.id.includes(SO_CAPTURA));
+    if (SO_CAPTURA && lojaPedidas.length === 0) throw new Error(`nenhuma captura das lojas com "${SO_CAPTURA}" no nome`);
+    for (const tela of SO_RESUMO ? [] : lojaPedidas) {
       const { ctx, f } = await abrirContexto(APARELHO, true);
       try {
         await tela.abrir(f);
@@ -379,7 +394,7 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
       fs.mkdirSync(pasta, { recursive: true });
       const ctx = await browser.newContext({ viewport: { width: t.largura, height: t.altura }, deviceScaleFactor: t.escala });
       const p = await ctx.newPage();
-      for (const tela of LOJA) {
+      for (const tela of lojaPedidas) {
         if (!telas.has(tela.id)) continue;
         try {
           const html = path.join(pastaTemp, `${tela.id}-${t.pasta}.html`);

@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORIES, BUSINESS_NOT_ON_CARD } from '../business-categories';
 import { addDays, isValidIsoDate, type IsoDate } from '../dates';
 import { categoryByRules } from '../importar/categorias';
 import { normalizeDescription } from '../importar/dedupe';
@@ -8,6 +9,11 @@ import { CATEGORIES, type RecordKind } from '../records';
  * Anotar pelo WhatsApp (D-076), fase 1: só mensagens escritas, lidas por regras simples, sem IA. Uma mensagem vira um comando:
  * ligar este número com o código do app, desfazer a última anotação, desligar, ajuda, ou anotar um gasto ou um recebimento.
  * O texto da mensagem nunca é guardado: só o que vira registro, pelas mesmas funções do app.
+ *
+ * Negócio (27/11/2026, no lugar do item 5 da D-113 para os canais de mensagem): o vínculo continua no Pessoal ou na Família, e a mensagem
+ * que começa com a palavra "negócio" ("negócio material 120 cartão", "negócio recebi 300 conserto") anota no espaço Negócio da própria
+ * pessoa, com as categorias do negócio. Aqui só se tira a palavra e se marca a anotação; o banco acha o negócio pela pessoa ligada
+ * (clarevo_own_business, migração 0049) e confere a escrita.
  */
 
 /** Letras e algarismos do código de ligar: sem I, O, 0 e 1, que se confundem. 32 símbolos, 8 por código (cerca de 10^12). */
@@ -46,8 +52,13 @@ export type WhatsAppCommand =
        * "comprei no cartão 120 mercado". `hint` é o nome escrito (null sem nome: com um cartão só, é ele). Só em gasto.
        */
       card: { hint: string | null } | null;
+      /** Com a palavra "negócio" no começo: anota no espaço Negócio da própria pessoa (o banco acha qual). Sem a palavra, ausente. */
+      business?: true;
     }
   | { type: 'erro'; reason: WhatsAppParseError };
+
+/** Onde a anotação entra: no espaço do vínculo (Pessoal ou Família) ou, com a palavra "negócio" no começo, no negócio da pessoa. */
+export type ChatNoteSpace = 'ligado' | 'negocio';
 
 /** Sem acento e em minúsculas, para comparar palavras. */
 function fold(text: string): string {
@@ -128,6 +139,13 @@ const AMOUNT_MARK = '\u0000valor';
 
 const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
 const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
+/**
+ * No negócio, "vendi" também é de recebimento, como "recebi": decide o tipo e sai da descrição, e a categoria fica Vendas quando a descrição
+ * não diz outra ("negócio vendi 80" é a entrada Vendas). "venda", "vendas" e "vendido" ficam na descrição ("Venda de sacolé", "Bolo
+ * vendido") e são de recebimento pela regra das categorias (Vendas, em BUSINESS_INCOME_RULES): assim "taxa da venda 5" e "frete do produto
+ * vendido 20" continuam saídas, porque também trazem palavra de saída.
+ */
+const BUSINESS_SALE_WORDS = new Set(['vendi']);
 /** Palavras de ligação que saem das pontas da descrição ("52 reais de mercado" → "mercado"). */
 const EDGE_STOP = new Set([
   'de', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'em', 'com', 'pra', 'pro', 'para', 'por', 'o', 'a', 'os', 'as', 'um',
@@ -135,6 +153,20 @@ const EDGE_STOP = new Set([
 ]);
 /** Sinais soltos nas pontas ("mercado - 50", "luz = 180"), inclusive os traços que o celular troca sozinho. */
 const isEdgeStop = (folded: string) => EDGE_STOP.has(folded) || /^[-+=\u2013\u2014]+$/.test(folded);
+
+/**
+ * O DAS (a guia mensal do MEI), só no negócio: a palavra "das" (sem acento, em minúsculas, em `words`) é a guia, e não a palavra de
+ * ligação ("venda das camisetas", "300 das vendas"), quando vem com "MEI" ou logo depois de "guia" ("das do mei", "guia do das"), no fim
+ * da descrição ("paguei o DAS", "pagamento do das") ou no começo, sem outra palavra logo depois ("DAS 76", "das de novembro").
+ */
+function dasAt(words: readonly string[], k: number): boolean {
+  if (words[k] !== 'das') return false;
+  const link = (w: string | undefined) => w === 'do' || w === 'de' || w === 'da';
+  if (words[k + 1] === 'mei' || (link(words[k + 1]) && words[k + 2] === 'mei')) return true;
+  if (words[k - 1] === 'guia' || (link(words[k - 1]) && words[k - 2] === 'guia')) return true;
+  if (words.slice(k + 1).every(isEdgeStop)) return true;
+  return words.slice(0, k).every(isEdgeStop) && isEdgeStop(words[k + 1]!);
+}
 
 interface Token {
   raw: string;
@@ -161,13 +193,94 @@ function dateOf(word: string, today: IsoDate): IsoDate | null | undefined {
   return isValidIsoDate(iso) ? iso : null;
 }
 
-/** Categoria: o nome dela escrito na mensagem ("lazer 80", "saúde 120") ou, sem isso, as mesmas regras de palavras da importação. */
-export function whatsappCategory(description: string, kind: RecordKind): string | null {
+interface BusinessRule {
+  category: string;
+  words: readonly string[];
+  /** Também combina com o DAS escrito sozinho ("DAS 76", "paguei o das"), lido por `dasAt`. */
+  das?: true;
+}
+
+/**
+ * Regras de palavras do negócio, para a mensagem com a palavra "negócio": a primeira que combina vence. Palavras comuns, sem acento e em
+ * minúsculas ("x" também combina com "xs"), sem marcas. Juros antes do empréstimo ("juros do empréstimo") e a maquininha antes do
+ * equipamento ("máquina de cartão"). Só sugerem a categoria: a pessoa troca no app.
+ */
+const BUSINESS_EXPENSE_RULES: readonly BusinessRule[] = [
+  { category: 'Juros e multas', words: ['juros', 'multa'] },
+  { category: 'Parcela de empréstimo', words: ['emprestimo', 'financiamento'] },
+  { category: 'Impostos e DAS', words: ['imposto', 'tributo', 'das do mei', 'guia do das', 'guia das', 'simples nacional'], das: true },
+  { category: 'Taxas e maquininha', words: ['maquininha', 'maquina de cartao', 'taxa', 'tarifa'] },
+  { category: 'Material e mercadoria', words: ['material', 'materiais', 'mercadoria', 'estoque', 'insumo', 'embalagem', 'materia prima'] },
+  { category: 'Peças e ferramentas', words: ['peca', 'ferramenta'] },
+  {
+    category: 'Combustível e transporte',
+    words: ['combustivel', 'gasolina', 'etanol', 'diesel', 'posto', 'frete', 'pedagio', 'estacionamento', 'passagem', 'onibus', 'corrida'],
+  },
+  { category: 'Funcionários e ajudantes', words: ['funcionario', 'funcionaria', 'ajudante', 'diarista', 'diaria'] },
+  { category: 'Aluguel do ponto', words: ['aluguel'] },
+  { category: 'Contas do ponto', words: ['luz', 'energia', 'agua', 'internet', 'telefone', 'gas'] },
+  { category: 'Divulgação', words: ['divulgacao', 'anuncio', 'propaganda', 'panfleto', 'impulsionamento'] },
+  { category: 'Contabilidade e sistemas', words: ['contador', 'contadora', 'contabilidade', 'sistema'] },
+  { category: 'Equipamento', words: ['equipamento', 'maquina'] },
+];
+const BUSINESS_INCOME_RULES: readonly BusinessRule[] = [
+  { category: 'Empréstimo recebido', words: ['emprestimo'] },
+  { category: 'Vendas', words: ['venda', 'vendi', 'vendido', 'vendida'] },
+  { category: 'Serviços', words: ['servico', 'conserto', 'instalacao', 'mao de obra'] },
+];
+
+/** As regras do negócio, no tipo do lançamento. Para os testes conferirem que toda categoria delas é uma do negócio. */
+export const WHATSAPP_BUSINESS_RULES: Readonly<Record<RecordKind, readonly BusinessRule[]>> = {
+  despesa: BUSINESS_EXPENSE_RULES,
+  receita: BUSINESS_INCOME_RULES,
+};
+
+/**
+ * Categoria: o nome dela escrito na mensagem ("lazer 80", "saúde 120") ou, sem isso, as mesmas regras de palavras da importação. Com a
+ * palavra "negócio" (`space` 'negocio'), só as categorias do negócio (BUSINESS_CATEGORIES): o nome escrito ("vendas 300") ou as regras do
+ * negócio ("material 120" é Material e mercadoria; "recebi 300 conserto", Serviços).
+ */
+export function whatsappCategory(description: string, kind: RecordKind, space: ChatNoteSpace = 'ligado'): string | null {
   const padded = ` ${normalizeDescription(description)} `;
-  for (const category of CATEGORIES[kind]) {
+  for (const category of space === 'negocio' ? BUSINESS_CATEGORIES[kind] : CATEGORIES[kind]) {
     if (padded.includes(` ${normalizeDescription(category)} `)) return category;
   }
-  return categoryByRules(description, kind);
+  if (space === 'ligado') return categoryByRules(description, kind);
+  if (padded.trim() === '') return null;
+  const words = padded.trim().split(' ');
+  const das = words.some((_, k) => dasAt(words, k));
+  const rule = WHATSAPP_BUSINESS_RULES[kind].find(
+    (r) => (r.das === true && das) || r.words.some((w) => padded.includes(` ${w} `) || padded.includes(` ${w}s `)),
+  );
+  return rule?.category ?? null;
+}
+
+/**
+ * A palavra "negócio" (ou "negocio", em qualquer caixa) no começo da mensagem, com ":", "," ou "." logo depois se quiser ("Negócio: material
+ * 120", "negocio, recebi 300 conserto", "Negócio. Material 120", o ponto que o celular põe sozinho). Devolve o resto da mensagem, ou null
+ * sem a palavra ("negócios 50" e "negociação 50" não contam).
+ */
+export function businessMessageRest(text: string): string | null {
+  const m = /^\s*([^\s:,.]+)\s*[:,.]?/u.exec(text);
+  if (!m || fold(m[1]!) !== 'negocio') return null;
+  return text.slice(m[0].length);
+}
+
+/**
+ * Descrição: o que sobrou, sem a marca do valor e sem as palavras de ligação nas pontas, com a primeira letra maiúscula. No negócio, o DAS
+ * fica e é escrito "DAS", e o MEI, "MEI" ("negócio guia do das 76" é Guia do DAS). Vazia quando não sobrou nada.
+ */
+function describe(all: readonly Token[], space: ChatNoteSpace): string {
+  let tokens = all.filter((t) => t.folded !== AMOUNT_MARK);
+  const business = space === 'negocio';
+  const das = (k: number) => business && dasAt(tokens.map((t) => t.folded), k);
+  while (tokens.length > 0 && isEdgeStop(tokens[0]!.folded) && !das(0)) tokens = tokens.slice(1);
+  while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1]!.folded) && !das(tokens.length - 1)) tokens = tokens.slice(0, -1);
+  const joined = tokens
+    .map((t, k) => (das(k) ? 'DAS' : business && t.folded === 'mei' ? 'MEI' : t.word))
+    .filter((w) => w !== '')
+    .join(' ');
+  return joined === '' ? '' : clip(joined.charAt(0).toUpperCase() + joined.slice(1));
 }
 
 /** Até 80 caracteres, cortando no último espaço quando dá. */
@@ -185,6 +298,18 @@ function clip(text: string): string {
  * senão, gasto.
  */
 export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppCommand {
+  const rest = businessMessageRest(text);
+  if (rest === null) return readCommand(text, today, 'ligado');
+  // Com a palavra "negócio", só anotar vale (e DESFAZER, que é sempre a última anotação do canal). "negócio" sozinho, ligar, desligar e
+  // ajuda depois da palavra recebem a ajuda: DESLIGAR desliga o canal todo, então não vale escondido atrás de "negócio".
+  const cmd = readCommand(rest, today, 'negocio');
+  if (cmd.type === 'anotar') return { ...cmd, business: true };
+  if (cmd.type === 'desfazer' || (cmd.type === 'erro' && cmd.reason !== 'codigo_invalido')) return cmd;
+  return { type: 'ajuda' };
+}
+
+/** Uma mensagem (ou o resto dela, depois da palavra "negócio"), com as categorias do espaço da anotação. */
+function readCommand(text: string, today: IsoDate, space: ChatNoteSpace): WhatsAppCommand {
   const form = commandForm(text);
   if (UNDO.has(form)) return { type: 'desfazer' };
   if (UNLINK.has(form)) return { type: 'desligar' };
@@ -210,10 +335,14 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     const word = trimPunct(rest);
     tokens = word === '' ? tokens.slice(1) : [{ raw: rest, word, folded: fold(word) }, ...tokens.slice(1)];
   }
-  // A primeira palavra de recebimento ou de gasto decide o tipo e sai da descrição.
-  const verb = tokens.findIndex((t) => INCOME_WORDS.has(t.folded) || EXPENSE_WORDS.has(t.folded));
+  // A primeira palavra de recebimento ou de gasto decide o tipo e sai da descrição (no negócio, também "vendi").
+  const business = space === 'negocio';
+  const income = (folded: string) => INCOME_WORDS.has(folded) || (business && BUSINESS_SALE_WORDS.has(folded));
+  const verb = tokens.findIndex((t) => income(t.folded) || EXPENSE_WORDS.has(t.folded));
+  let sale = false;
   if (verb >= 0) {
-    if (kind === null) kind = INCOME_WORDS.has(tokens[verb]!.folded) ? 'receita' : 'despesa';
+    if (kind === null) kind = income(tokens[verb]!.folded) ? 'receita' : 'despesa';
+    sale = business && BUSINESS_SALE_WORDS.has(tokens[verb]!.folded);
     tokens = tokens.filter((_, i) => i !== verb);
   }
 
@@ -278,9 +407,12 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
   // Compra no cartão de crédito (D-089 C), só em gasto e fora de estorno, reembolso, fatura, pagamento e recarga: a palavra sai da
   // descrição; o nome do cartão é o que vem depois dela, até o valor (se o valor vem depois) ou até o fim ("farmácia 41 cartão
   // azul", "cartão azul 50 mercado", "mercado 120 no cartão nubank"); "de crédito" logo depois só qualifica o cartão. Se o nome
-  // levaria a descrição inteira ("cartão mercado 50"), as palavras são a descrição.
+  // levaria a descrição inteira ("cartão mercado 50"), as palavras são a descrição. No negócio, a palavra também sai da entrada
+  // ("vendi 80 no cartão", "recebi 300 conserto no cartão": é como a clientela pagou), e entrada nunca vira compra no cartão (abaixo).
+  const beforeCard = tokens;
   let card: { hint: string | null } | null = null;
-  if (kind !== 'receita' && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
+  let cardOnly = false;
+  if ((kind !== 'receita' || business) && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
     const i = tokens.findIndex(
       (t, k) =>
         (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
@@ -302,23 +434,27 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
       while (name.length > 0 && loose(name[name.length - 1]!)) name = name.slice(0, -1);
       const hint = name.map((t) => t.word).join(' ').trim();
       card = { hint: hint === '' ? null : clip(hint) };
+      cardOnly = !hasDescription;
       tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];
-      kind = 'despesa';
     }
   }
-  tokens = tokens.filter((t) => t.folded !== AMOUNT_MARK);
 
-  // Descrição: o que sobrou, sem as palavras de ligação nas pontas.
-  while (tokens.length > 0 && isEdgeStop(tokens[0]!.folded)) tokens = tokens.slice(1);
-  while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1]!.folded)) tokens = tokens.slice(0, -1);
-  const joined = tokens.map((t) => t.word).filter((w) => w !== '').join(' ');
-  if (joined === '') return { type: 'erro', reason: 'sem_descricao' };
-  const description = clip(joined.charAt(0).toUpperCase() + joined.slice(1));
-
-  if (kind === null) {
-    // Sem palavra de tipo: recebimento só quando a descrição é de recebimento e não de gasto ("salário 3000", "reembolso 80").
-    kind = whatsappCategory(description, 'receita') !== null && whatsappCategory(description, 'despesa') === null ? 'receita' : 'despesa';
+  // Sem palavra de tipo: recebimento só quando a descrição é de recebimento e não de gasto ("salário 3000", "reembolso 80").
+  const incomeByWords = (d: string) => whatsappCategory(d, 'receita', space) !== null && whatsappCategory(d, 'despesa', space) === null;
+  let description = describe(tokens, space);
+  if (card !== null && business && (kind === 'receita' || (kind === null && description !== '' && incomeByWords(description)))) {
+    // Entrada do negócio paga no cartão ("vendi 80 no cartão", "venda 80 cartão"): é venda, não compra no cartão do negócio. Sem nada
+    // além do cartão, a venda é Vendas (abaixo) e outra entrada fica com as palavras escritas, como antes ("recebi 300 cartão").
+    if (cardOnly) description = sale ? '' : kind === 'receita' ? describe(beforeCard, space) : description;
+    kind = 'receita';
+    card = null;
   }
+  if (card !== null) kind = 'despesa';
+  if (description === '' && sale && kind === 'receita') description = 'Vendas';
+  if (description === '') return { type: 'erro', reason: 'sem_descricao' };
+
+  if (kind === null) kind = incomeByWords(description) ? 'receita' : 'despesa';
+  const category = whatsappCategory(description, kind, space) ?? (sale && kind === 'receita' ? 'Vendas' : null);
   return {
     type: 'anotar',
     kind,
@@ -326,7 +462,8 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     occurredOn: date,
     daysAgo: occurredOn === null ? 0 : daysAgo,
     description,
-    category: whatsappCategory(description, kind),
+    // No cartão do negócio, sem as saídas de fora da operação (D-121: a compra no cartão fica na operação, pelo pagamento da fatura).
+    category: card && space === 'negocio' && category !== null && BUSINESS_NOT_ON_CARD.includes(category) ? null : category,
     card,
   };
 }

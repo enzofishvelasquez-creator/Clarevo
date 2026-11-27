@@ -12,11 +12,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { accessRefused } from '@/lib/access-refused';
+import { forgetChosenPlanUnlessUseful } from '@/lib/chosen-plan';
 import { useSession } from '@/state/session';
 
 /**
  * A situação do acesso da pessoa (assinatura paga, D-083): my_access. Recarrega quando o banco recusa uma escrita por falta de
- * assinatura (o teste acabou com o app aberto) e ao voltar para o app depois de um tempo (staleTime padrão).
+ * assinatura (o teste acabou com o app aberto) e ao voltar para o app depois de um tempo (staleTime padrão). Quando a situação chega e a
+ * conta já não escolhe plano (por exemplo, quem entrou já assina), o plano escolhido no site sai do aparelho (revisão independente da D-131).
  */
 export function useAccess() {
   const { repo, user } = useSession();
@@ -29,11 +31,16 @@ export function useAccess() {
       }),
     [qc],
   );
-  return useQuery({
+  const query = useQuery({
     queryKey: ['access', user?.id ?? null],
     queryFn: (): Promise<Access> => repo!.getMyAccess(),
     enabled: Boolean(repo && user),
   });
+  const status = query.data?.status;
+  useEffect(() => {
+    if (status) forgetChosenPlanUnlessUseful(status);
+  }, [status]);
+  return query;
 }
 
 /**

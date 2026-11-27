@@ -282,8 +282,8 @@ const __mods = [
             return names[0] ?? '';
         return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
     }
-    function recordLines(r, today) {
-        const what = r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
+    function recordLines(r, today, business = false) {
+        const what = business ? (r.kind === 'despesa' ? 'Saída' : 'Entrada') : r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
         const account = r.kind === 'despesa' ? 'Saiu de' : 'Entrou em';
         return [
             `${what}: ${r.description}, ${(0, money_1.formatBRL)(r.amount_cents)}`,
@@ -305,6 +305,12 @@ const __mods = [
         'farmácia 41 cartão',
         'Com mais de um cartão, o nome dele depois: "farmácia 41 cartão azul".',
     ].join('\n');
+    const BUSINESS_EXAMPLES = [
+        'Para anotar no seu negócio, comece com a palavra negócio:',
+        'negócio material 120',
+        'negócio recebi 300 conserto',
+    ].join('\n');
+    const examplesFor = (business) => (business ? `${EXAMPLES}\n\n${BUSINESS_EXAMPLES}` : EXAMPLES);
     const CHANNEL_WORDS = {
         whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp', inAccount: canais_1.WHATSAPP_IN_ACCOUNT },
         telegram: { name: 'Telegram', who: 'este Telegram', whoLinked: 'este Telegram', inAccount: canais_1.TELEGRAM_IN_ACCOUNT },
@@ -331,9 +337,11 @@ const __mods = [
         const where = whereTo(channel);
         const words = `DESFAZER apaga a última anotação feita por aqui, AJUDA mostra os exemplos e DESLIGAR desliga ${w.who} da Clarevo.`;
         const howToLink = where.link;
+        const help = (business) => `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${examplesFor(business)}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`;
         return {
             words,
-            ajuda: `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${EXAMPLES}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`,
+            ajuda: help(false),
+            ajuda_negocio: help(true),
             midia: 'Por enquanto, a Clarevo entende só mensagens escritas. Dica: o microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
             nao_ligado: `${upperFirst(w.who)} ainda não está ligado a uma conta da Clarevo. ${howToLink}`,
             codigo_invalido: `Este código não vale mais ou não existe. ${where.newCode} Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
@@ -344,13 +352,14 @@ const __mods = [
             nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
             pagamento_de_fatura: 'A última anotação feita por aqui virou o pagamento de uma fatura no app e não sai por aqui. No app, abra o gasto e toque em Desligar da fatura; depois, se quiser, exclua o gasto.',
             desligado: `Pronto, ${w.whoLinked} foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.`,
+            sem_negocio: 'Nada foi anotado. Para anotar no negócio por aqui, crie antes o espaço Negócio no app: abra Conta e toque em Criar o espaço Negócio. Sem a palavra negócio no começo, a mensagem anota como sempre.',
             data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
             valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
             valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
             descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
             erro: `Não foi possível anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
-            ligado: (space, name) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
-            sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
+            ligado: (space, name, business = false) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${examplesFor(business)}\n\n${words}`,
+            sem_permissao: (space) => space.kind === 'negocio' ? `Você não anota mais no ${spaceLabel(space)}.` : `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
         };
     }
     const REPLIES = { whatsapp: chatReplies('whatsapp'), telegram: chatReplies('telegram') };
@@ -391,25 +400,33 @@ const __mods = [
             case 'registrada':
                 return null;
             case 'ligado':
-                return r.ligado(outcome.space, outcome.name);
+                return r.ligado(outcome.space, outcome.name, outcome.negocio === true);
             case 'anotado':
-                return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
+                return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today, outcome.space.kind === 'negocio')}\n\nSe algo ficou errado, responda DESFAZER.`;
             case 'desfeito':
-                return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}`;
+                return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today, outcome.space.kind === 'negocio')}`;
             case 'sem_permissao':
                 return r.sem_permissao(outcome.space);
             case 'sem_conta':
-                return `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
+                return outcome.space.kind === 'negocio'
+                    ? `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, escolha o negócio no topo, abra Conta e escolha a opção principal em Bancos e carteira.`
+                    : `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
             case 'compra_anotada':
                 return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
             case 'compra_desfeita':
                 return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
             case 'sem_cartao':
+                if (outcome.space.kind === 'negocio') {
+                    return `O ${spaceLabel(outcome.space)} não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, com o negócio escolhido no topo, em Movimentos, Cartões. Para anotar como saída já paga, mande de novo sem a palavra cartão.`;
+                }
                 return outcome.space.kind === 'pessoal'
                     ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Movimentos, Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
                     : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
-            case 'qual_cartao':
-                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+            case 'qual_cartao': {
+                const name = withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase();
+                const example = outcome.space.kind === 'negocio' ? `negócio material 120 cartão ${name}` : `farmácia 41 cartão ${name}`;
+                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "${example}".`;
+            }
             case 'fatura_paga':
                 return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
             case 'limite_do_cartao':
@@ -898,7 +915,9 @@ const __mods = [
         const sentAt = new Date(msg.timestamp * 1000).toISOString();
         const noted = async (outcome, reply) => {
             const r = await call('note', { p_outcome: outcome });
-            return r.result === 'registrada' ? reply : (0, respostas_1.whatsappOutcomeReply)(r, today, msg.channel);
+            if (r.result !== 'registrada')
+                return (0, respostas_1.whatsappOutcomeReply)(r, today, msg.channel);
+            return outcome === 'ajuda' && r.negocio === true ? replies.ajuda_negocio : reply;
         };
         if (msg.kind === 'boas_vindas')
             return noted('ajuda', replies.ajuda);
@@ -922,7 +941,7 @@ const __mods = [
                 break;
             case 'anotar':
                 outcome = cmd.card
-                    ? await call('add_card_purchase', {
+                    ? await call(cmd.business ? 'add_business_card_purchase' : 'add_card_purchase', {
                         p_sent_at: sentAt,
                         p_amount_cents: cmd.amountCents,
                         p_days_ago: cmd.daysAgo,
@@ -931,7 +950,7 @@ const __mods = [
                         p_category: cmd.category,
                         p_card_hint: cmd.card.hint,
                     })
-                    : await call('add_record', {
+                    : await call(cmd.business ? 'add_business_record' : 'add_record', {
                         p_sent_at: sentAt,
                         p_kind: cmd.kind,
                         p_amount_cents: cmd.amountCents,
@@ -984,7 +1003,7 @@ const __mods = [
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
         'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
-        'pagamento_de_fatura',
+        'pagamento_de_fatura', 'sem_negocio',
     ]);
     class WhatsAppFinalError extends Error {
     }
@@ -1143,14 +1162,16 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WHATSAPP_DESCRIPTION_MAX = exports.WHATSAPP_CODE_LENGTH = exports.WHATSAPP_CODE_ALPHABET = void 0;
+    exports.WHATSAPP_BUSINESS_RULES = exports.WHATSAPP_DESCRIPTION_MAX = exports.WHATSAPP_CODE_LENGTH = exports.WHATSAPP_CODE_ALPHABET = void 0;
     exports.normalizeWhatsAppCode = normalizeWhatsAppCode;
     exports.formatWhatsAppCode = formatWhatsAppCode;
     exports.whatsappCategory = whatsappCategory;
+    exports.businessMessageRest = businessMessageRest;
     exports.readWhatsAppMessage = readWhatsAppMessage;
+    const business_categories_1 = __req(11);
     const dates_1 = __req(3);
-    const categorias_1 = __req(11);
-    const dedupe_1 = __req(12);
+    const categorias_1 = __req(12);
+    const dedupe_1 = __req(13);
     const money_1 = __req(5);
     const records_1 = __req(6);
     exports.WHATSAPP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1210,11 +1231,24 @@ const __mods = [
     const AMOUNT_MARK = '\u0000valor';
     const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
     const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
+    const BUSINESS_SALE_WORDS = new Set(['vendi']);
     const EDGE_STOP = new Set([
         'de', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'em', 'com', 'pra', 'pro', 'para', 'por', 'o', 'a', 'os', 'as', 'um',
         'uma', 'e', 'reais', 'real', 'r$', 'rs', 'foi',
     ]);
     const isEdgeStop = (folded) => EDGE_STOP.has(folded) || /^[-+=\u2013\u2014]+$/.test(folded);
+    function dasAt(words, k) {
+        if (words[k] !== 'das')
+            return false;
+        const link = (w) => w === 'do' || w === 'de' || w === 'da';
+        if (words[k + 1] === 'mei' || (link(words[k + 1]) && words[k + 2] === 'mei'))
+            return true;
+        if (words[k - 1] === 'guia' || (link(words[k - 1]) && words[k - 2] === 'guia'))
+            return true;
+        if (words.slice(k + 1).every(isEdgeStop))
+            return true;
+        return words.slice(0, k).every(isEdgeStop) && isEdgeStop(words[k + 1]);
+    }
     function moneyOf(folded) {
         const t = folded.replace(/[.,]+$/, '');
         if (!/^(r\$)?\d[\d.,]*$/.test(t))
@@ -1232,13 +1266,67 @@ const __mods = [
         const iso = `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
         return (0, dates_1.isValidIsoDate)(iso) ? iso : null;
     }
-    function whatsappCategory(description, kind) {
+    const BUSINESS_EXPENSE_RULES = [
+        { category: 'Juros e multas', words: ['juros', 'multa'] },
+        { category: 'Parcela de empréstimo', words: ['emprestimo', 'financiamento'] },
+        { category: 'Impostos e DAS', words: ['imposto', 'tributo', 'das do mei', 'guia do das', 'guia das', 'simples nacional'], das: true },
+        { category: 'Taxas e maquininha', words: ['maquininha', 'maquina de cartao', 'taxa', 'tarifa'] },
+        { category: 'Material e mercadoria', words: ['material', 'materiais', 'mercadoria', 'estoque', 'insumo', 'embalagem', 'materia prima'] },
+        { category: 'Peças e ferramentas', words: ['peca', 'ferramenta'] },
+        {
+            category: 'Combustível e transporte',
+            words: ['combustivel', 'gasolina', 'etanol', 'diesel', 'posto', 'frete', 'pedagio', 'estacionamento', 'passagem', 'onibus', 'corrida'],
+        },
+        { category: 'Funcionários e ajudantes', words: ['funcionario', 'funcionaria', 'ajudante', 'diarista', 'diaria'] },
+        { category: 'Aluguel do ponto', words: ['aluguel'] },
+        { category: 'Contas do ponto', words: ['luz', 'energia', 'agua', 'internet', 'telefone', 'gas'] },
+        { category: 'Divulgação', words: ['divulgacao', 'anuncio', 'propaganda', 'panfleto', 'impulsionamento'] },
+        { category: 'Contabilidade e sistemas', words: ['contador', 'contadora', 'contabilidade', 'sistema'] },
+        { category: 'Equipamento', words: ['equipamento', 'maquina'] },
+    ];
+    const BUSINESS_INCOME_RULES = [
+        { category: 'Empréstimo recebido', words: ['emprestimo'] },
+        { category: 'Vendas', words: ['venda', 'vendi', 'vendido', 'vendida'] },
+        { category: 'Serviços', words: ['servico', 'conserto', 'instalacao', 'mao de obra'] },
+    ];
+    exports.WHATSAPP_BUSINESS_RULES = {
+        despesa: BUSINESS_EXPENSE_RULES,
+        receita: BUSINESS_INCOME_RULES,
+    };
+    function whatsappCategory(description, kind, space = 'ligado') {
         const padded = ` ${(0, dedupe_1.normalizeDescription)(description)} `;
-        for (const category of records_1.CATEGORIES[kind]) {
+        for (const category of space === 'negocio' ? business_categories_1.BUSINESS_CATEGORIES[kind] : records_1.CATEGORIES[kind]) {
             if (padded.includes(` ${(0, dedupe_1.normalizeDescription)(category)} `))
                 return category;
         }
-        return (0, categorias_1.categoryByRules)(description, kind);
+        if (space === 'ligado')
+            return (0, categorias_1.categoryByRules)(description, kind);
+        if (padded.trim() === '')
+            return null;
+        const words = padded.trim().split(' ');
+        const das = words.some((_, k) => dasAt(words, k));
+        const rule = exports.WHATSAPP_BUSINESS_RULES[kind].find((r) => (r.das === true && das) || r.words.some((w) => padded.includes(` ${w} `) || padded.includes(` ${w}s `)));
+        return rule?.category ?? null;
+    }
+    function businessMessageRest(text) {
+        const m = /^\s*([^\s:,.]+)\s*[:,.]?/u.exec(text);
+        if (!m || fold(m[1]) !== 'negocio')
+            return null;
+        return text.slice(m[0].length);
+    }
+    function describe(all, space) {
+        let tokens = all.filter((t) => t.folded !== AMOUNT_MARK);
+        const business = space === 'negocio';
+        const das = (k) => business && dasAt(tokens.map((t) => t.folded), k);
+        while (tokens.length > 0 && isEdgeStop(tokens[0].folded) && !das(0))
+            tokens = tokens.slice(1);
+        while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1].folded) && !das(tokens.length - 1))
+            tokens = tokens.slice(0, -1);
+        const joined = tokens
+            .map((t, k) => (das(k) ? 'DAS' : business && t.folded === 'mei' ? 'MEI' : t.word))
+            .filter((w) => w !== '')
+            .join(' ');
+        return joined === '' ? '' : clip(joined.charAt(0).toUpperCase() + joined.slice(1));
     }
     function clip(text) {
         if (text.length <= exports.WHATSAPP_DESCRIPTION_MAX)
@@ -1248,6 +1336,17 @@ const __mods = [
         return (space >= 20 ? cut.slice(0, space) : cut).trim();
     }
     function readWhatsAppMessage(text, today) {
+        const rest = businessMessageRest(text);
+        if (rest === null)
+            return readCommand(text, today, 'ligado');
+        const cmd = readCommand(rest, today, 'negocio');
+        if (cmd.type === 'anotar')
+            return { ...cmd, business: true };
+        if (cmd.type === 'desfazer' || (cmd.type === 'erro' && cmd.reason !== 'codigo_invalido'))
+            return cmd;
+        return { type: 'ajuda' };
+    }
+    function readCommand(text, today, space) {
         const form = commandForm(text);
         if (UNDO.has(form))
             return { type: 'desfazer' };
@@ -1274,10 +1373,14 @@ const __mods = [
             const word = trimPunct(rest);
             tokens = word === '' ? tokens.slice(1) : [{ raw: rest, word, folded: fold(word) }, ...tokens.slice(1)];
         }
-        const verb = tokens.findIndex((t) => INCOME_WORDS.has(t.folded) || EXPENSE_WORDS.has(t.folded));
+        const business = space === 'negocio';
+        const income = (folded) => INCOME_WORDS.has(folded) || (business && BUSINESS_SALE_WORDS.has(folded));
+        const verb = tokens.findIndex((t) => income(t.folded) || EXPENSE_WORDS.has(t.folded));
+        let sale = false;
         if (verb >= 0) {
             if (kind === null)
-                kind = INCOME_WORDS.has(tokens[verb].folded) ? 'receita' : 'despesa';
+                kind = income(tokens[verb].folded) ? 'receita' : 'despesa';
+            sale = business && BUSINESS_SALE_WORDS.has(tokens[verb].folded);
             tokens = tokens.filter((_, i) => i !== verb);
         }
         let occurredOn = null;
@@ -1345,8 +1448,10 @@ const __mods = [
             return { type: 'erro', reason: 'valor_acima_do_limite' };
         const at = chosen.idx[0];
         tokens = tokens.flatMap((t, i) => (i === at ? [{ ...t, folded: AMOUNT_MARK, word: '' }] : chosen.idx.includes(i) ? [] : [t]));
+        const beforeCard = tokens;
         let card = null;
-        if (kind !== 'receita' && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
+        let cardOnly = false;
+        if ((kind !== 'receita' || business) && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
             const i = tokens.findIndex((t, k) => (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
                 (t.folded === 'credito' && CARD_PREPOSITIONS.has(tokens[k - 1]?.folded ?? '')));
             if (i >= 0) {
@@ -1368,22 +1473,27 @@ const __mods = [
                     name = name.slice(0, -1);
                 const hint = name.map((t) => t.word).join(' ').trim();
                 card = { hint: hint === '' ? null : clip(hint) };
+                cardOnly = !hasDescription;
                 tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];
-                kind = 'despesa';
             }
         }
-        tokens = tokens.filter((t) => t.folded !== AMOUNT_MARK);
-        while (tokens.length > 0 && isEdgeStop(tokens[0].folded))
-            tokens = tokens.slice(1);
-        while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1].folded))
-            tokens = tokens.slice(0, -1);
-        const joined = tokens.map((t) => t.word).filter((w) => w !== '').join(' ');
-        if (joined === '')
-            return { type: 'erro', reason: 'sem_descricao' };
-        const description = clip(joined.charAt(0).toUpperCase() + joined.slice(1));
-        if (kind === null) {
-            kind = whatsappCategory(description, 'receita') !== null && whatsappCategory(description, 'despesa') === null ? 'receita' : 'despesa';
+        const incomeByWords = (d) => whatsappCategory(d, 'receita', space) !== null && whatsappCategory(d, 'despesa', space) === null;
+        let description = describe(tokens, space);
+        if (card !== null && business && (kind === 'receita' || (kind === null && description !== '' && incomeByWords(description)))) {
+            if (cardOnly)
+                description = sale ? '' : kind === 'receita' ? describe(beforeCard, space) : description;
+            kind = 'receita';
+            card = null;
         }
+        if (card !== null)
+            kind = 'despesa';
+        if (description === '' && sale && kind === 'receita')
+            description = 'Vendas';
+        if (description === '')
+            return { type: 'erro', reason: 'sem_descricao' };
+        if (kind === null)
+            kind = incomeByWords(description) ? 'receita' : 'despesa';
+        const category = whatsappCategory(description, kind, space) ?? (sale && kind === 'receita' ? 'Vendas' : null);
         return {
             type: 'anotar',
             kind,
@@ -1391,10 +1501,36 @@ const __mods = [
             occurredOn: date,
             daysAgo: occurredOn === null ? 0 : daysAgo,
             description,
-            category: whatsappCategory(description, kind),
+            category: card && space === 'negocio' && category !== null && business_categories_1.BUSINESS_NOT_ON_CARD.includes(category) ? null : category,
             card,
         };
     }
+  },
+  // packages/core/src/business-categories.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BUSINESS_NOT_ON_CARD = exports.BUSINESS_CATEGORIES = void 0;
+    exports.BUSINESS_CATEGORIES = {
+        receita: ['Vendas', 'Serviços', 'Outras entradas', 'Empréstimo recebido'],
+        despesa: [
+            'Material e mercadoria',
+            'Peças e ferramentas',
+            'Combustível e transporte',
+            'Funcionários e ajudantes',
+            'Impostos e DAS',
+            'Aluguel do ponto',
+            'Contas do ponto',
+            'Taxas e maquininha',
+            'Divulgação',
+            'Contabilidade e sistemas',
+            'Juros e multas',
+            'Outras saídas',
+            'Parcela de empréstimo',
+            'Equipamento',
+        ],
+    };
+    exports.BUSINESS_NOT_ON_CARD = ['Parcela de empréstimo', 'Equipamento'];
   },
   // packages/core/src/importar/categorias.ts
   function (module, exports, __req) {
@@ -1407,7 +1543,7 @@ const __mods = [
     exports.suggestCategory = suggestCategory;
     exports.rememberCategories = rememberCategories;
     const records_1 = __req(6);
-    const dedupe_1 = __req(12);
+    const dedupe_1 = __req(13);
     exports.MEMORY_LIMIT = 300;
     function memoryKey(description, kind) {
         const words = (0, dedupe_1.descriptionTokens)(description).slice(0, 3);

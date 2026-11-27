@@ -20,6 +20,7 @@ const TIPOS = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ttf': 'font/ttf',
+  '.woff2': 'font/woff2',
   '.xml': 'application/xml; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   '.mp4': 'video/mp4',

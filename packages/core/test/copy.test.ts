@@ -50,6 +50,7 @@ import {
   INVOICE_SITUATION_LABEL,
   MemoryRepository,
   cardErrorText,
+  cardMonthUpcomingBars,
   cardSummaryTexts,
   cardTitle,
   closesText,
@@ -1673,10 +1674,13 @@ describe('textos dos ajustes de 10/10/2026 (D-042)', () => {
       CARD_MONTH_TEXT.none('2026-10'),
       CARD_MONTH_TEXT.percent('52,5%'),
       CARD_MONTH_TEXT.percent('menos de 0,1%'),
-      CARD_MONTH_TEXT.upcoming([
-        { month: '2026-12', cents: 120_000 },
-        { month: '2027-01', cents: 90_000 },
-      ]),
+      ...cardMonthUpcomingBars({
+        month: '2026-11',
+        upcoming: [
+          { month: '2026-12', cents: 120_000 },
+          { month: '2027-01', cents: 90_000 },
+        ],
+      }).flatMap((b) => [b.label, b.valueText, b.a11y]),
     ];
     check(texts);
     expect(CARD_MONTH_TEXT.percent('12,3%')).toBe('12,3% da sua renda de referência');

@@ -1,3 +1,4 @@
-# Versão preliminar, em revisão: nada deve ser indexado ainda.
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://clarevo.app.br/sitemap.xml

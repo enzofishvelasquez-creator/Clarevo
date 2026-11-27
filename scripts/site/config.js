@@ -23,12 +23,18 @@ const HOST_APP = 'app.clarevo.app.br';
  */
 const URL_DEMO = 'https://demo.clarevo.app.br';
 const HOST_DEMO = 'demo.clarevo.app.br';
-/** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Assine aqui" depois do lançamento (D-128). */
+/**
+ * A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Assine aqui" depois do lançamento (D-128) e, antes
+ * dele, desde 27/11/2026 (decisão do Enzo; o cadastro está aberto, D-129 A), o de "Criar conta grátis", o convite que vai sempre com a
+ * linha "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado." (`estado.js`). Vinda de uma página de plano, leva
+ * o plano (e o período, quando a página mostra um só) no endereço: `?plano=individual|familia&periodo=mensal|anual` (`urlDoCadastro` em
+ * `estado.js`, jornada de compra de 27/11/2026, item S3).
+ */
 const URL_CRIAR_CONTA = `${URL_APP}/criar-conta`;
 /**
  * A tela de entrar do app web (`apps/app/src/app/entrar.tsx`): o destino de "Entrar" no menu antes do lançamento (até 26/11/2026, "Entrar
- * (quem testa)"; D-128). A tela inicial do app web começa com "14 dias grátis, sem cartão" e "Criar conta", e o cadastro de pessoas reais só
- * abre no lançamento (D-064): antes dele, o site nunca leva à tela inicial do app, só à de entrar, para quem já tem conta.
+ * (quem testa)"; D-128). A tela inicial do app web começa com "14 dias grátis, sem cartão" e "Criar conta": antes do lançamento, o site
+ * nunca leva a ela, só à de entrar e, desde 27/11/2026, à de criar conta (`URL_CRIAR_CONTA`), pelo convite "Criar conta grátis".
  */
 const URL_ENTRAR = `${URL_APP}/entrar`;
 
@@ -37,12 +43,17 @@ const URL_ENTRAR = `${URL_APP}/entrar`;
  * `docs/22_SITE.md`, seção 19). Desde 26/11/2026 (D-128), nenhum dos dois estados fala de fase de testes, e a chamada principal é "Assine
  * aqui" em todas as páginas.
  *   - `lancado: false` (o padrão, pré-lançamento): "Assine aqui" leva aos planos, que mostram a fita "Em breve" em cada cartão, sem oferta nos
- *     dados estruturados; nada convida a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais abre por decisão do Enzo); o
- *     botão do menu é "Entrar" e leva à tela de entrar do app web (`URL_ENTRAR`).
+ *     dados estruturados; desde 27/11/2026 (decisão do Enzo; o cadastro está aberto, D-129 A), os planos, Comece aqui, Use no navegador e o
+ *     fim das páginas de conteúdo convidam a criar a conta ("Criar conta grátis", para `URL_CRIAR_CONTA`, com a linha "A assinatura abre em
+ *     breve. Por enquanto, o acesso é completo e nada é cobrado." ou, com a compra já aberta no núcleo, "14 dias grátis, sem cartão."), nunca a uma compra nem com preço além do "Em breve"; o botão do menu
+ *     continua "Entrar" e leva à tela de entrar do app web (`URL_ENTRAR`).
  *   - `lancado: true`: "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas aparecem, cada
  *     um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto a assinatura pelo app estiver fechada
  *     (`SUBSCRIBE_OPEN` em `packages/core/src/plano-precos.ts`): primeiro abre a assinatura, depois o site.
  * `lojas`: os endereços das páginas do app (só `https://apps.apple.com/...` e `https://play.google.com/...`), vazios até a publicação.
+ * `indexar`: se o site entra na busca antes dos textos legais finais (D-131); as páginas com marcador pendente ficam de fora mesmo assim.
+ * `noticiasLigadas`: se a lista de notícias (`noticias/index.html`, D-117) já mostra notícias. Desligada, a página só diz "Em breve" e os
+ * links das fontes, então fica com `noindex` e fora do sitemap. Ligue junto com a variável NOTICIAS=ligado no painel da Cloudflare.
  * `prazoDeResposta`: o prazo de resposta do atendimento que a equipe consegue cumprir sempre (por exemplo, "até 1 dia útil, de segunda a
  * sexta"). Vazio, nenhuma página promete prazo; preenchido, entra em Sobre e em Suporte. Decisão do Enzo (pergunta do estudo de 25/11).
  * Para testar outro estado sem mudar este arquivo: `node scripts/gerar-site.js --estado <arquivo.json>` (as chaves do JSON trocam as daqui).
@@ -51,6 +62,16 @@ const URL_ENTRAR = `${URL_APP}/entrar`;
  */
 const ESTADO_DO_PRODUTO = {
   lancado: false,
+  // Busca (D-131, decisão do Enzo de 27/11/2026): o site entra no Google antes dos textos legais finais. Com `indexar: true`, o robots.txt
+  // libera tudo e aponta o sitemap; as páginas que ainda têm marcador pendente (Termos, Política, Excluir conta e Versões, com a faixa
+  // "Versão preliminar") continuam com `noindex` e fora do sitemap até o `--final` passar. Com `false`, volta o "Disallow: /" de antes
+  // enquanto houver marcador pendente.
+  indexar: true,
+  // Notícias (D-117, revisão independente da D-131): com as rotas desligadas (sem NOTICIAS=ligado na Cloudflare, até a resposta do
+  // advogado), a página de notícias só mostra "Em breve" e os links das fontes; com `false`, ela fica com `noindex` e fora do sitemap
+  // (`semIndexar`, em `paginas/noticias.js`). Mude para `true` no mesmo dia em que ligar NOTICIAS=ligado. Os resumos da semana, escritos
+  // pela Clarevo, entram na busca nos dois casos.
+  noticiasLigadas: false,
   lojas: { appStore: '', googlePlay: '' },
   prazoDeResposta: 'até 1 dia útil, de segunda a sexta',
 };

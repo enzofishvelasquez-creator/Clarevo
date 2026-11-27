@@ -1,6 +1,9 @@
 import {
   ACCESS_TEXT,
+  CHOSEN_PLAN_TEXT,
   PLAN_NAME,
+  PLAN_PERIOD_DEFAULT,
+  PLAN_PERIOD_ORDER,
   PLAN_PERIOD_TEXT,
   STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
@@ -16,6 +19,7 @@ import {
   isStoreSubscription,
   paidStartDay,
   pendingFirstCharge,
+  pendingFirstChargePlan,
   periodSuffix,
   pixCanPayNext,
   pixNextPaymentFrom,
@@ -27,6 +31,7 @@ import {
   TRIAL_WARNING_DAYS,
   type Access,
   type BillingPeriod,
+  type ChosenPlan,
   type PlanKind,
   type StorePurchaseResult,
   type WebSubscriptionStart,
@@ -38,6 +43,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { PURCHASE_PREVIEW, PURCHASE_PREVIEW_SITE } from '@/lib/capture';
+import { useWideLayout } from '@/lib/layout';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases, type StoreChoice } from '@/lib/store-purchases';
 import { useAccess, useOwnWebEntitlements, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
@@ -112,7 +118,7 @@ function mayHaveWebSubscription(access: Access | undefined): boolean {
  * A assinatura no cartão da web de quem pode ter uma (D-129): primeiro o próprio direito, no banco (`useOwnWebEntitlements`, sem gastar a
  * cota do Asaas); a situação no Asaas (`situacao`) só na web e só com um direito pela web que vale (ou quem o banco já diz assinar pela web).
  * `firstCharge`: o dia da primeira cobrança ainda não paga de quem assinou no teste (antes do dia e no próprio dia, até a confirmação do
- * cartão); cancelada no Asaas, nenhum.
+ * cartão); cancelada no Asaas, nenhum. `firstChargePlan`: o plano dessa assinatura (quando a linha do banco traz).
  */
 export function useWebSubscriptionState(access: Access | undefined, now: Date) {
   const may = mayHaveWebSubscription(access);
@@ -121,7 +127,9 @@ export function useWebSubscriptionState(access: Access | undefined, now: Date) {
   const reads = Platform.OS === 'web' && may && (live || (access?.status === 'assinatura' && access.provider === 'web'));
   const status = useWebSubscriptionStatus(reads);
   const firstCharge = may && entitlements.data ? pendingFirstCharge(entitlements.data, now, status.data?.active === false) : null;
-  return { entitlements, live, reads, status, firstCharge };
+  // O plano dessa assinatura marcada: quem assinou o Família no teste já vê o próximo passo (criar a Família e convidar).
+  const firstChargePlan = may && entitlements.data ? pendingFirstChargePlan(entitlements.data, now, status.data?.active === false) : null;
+  return { entitlements, live, reads, status, firstCharge, firstChargePlan };
 }
 
 /** Card "Assinatura" em Conta: a situação, a explicação curta e o botão da tela Assinatura. */
@@ -164,17 +172,12 @@ function canSubscribeOnWeb(access: Access, webTest: boolean): boolean {
 }
 
 /**
- * Os botões de assinar na web (D-084): a função do servidor cria o Checkout do Asaas e a página de pagamento abre nesta mesma aba; o
- * Asaas devolve a pessoa a /conta/assinatura?pagamento=... No app das lojas nada disto aparece (lá a assinatura é pela loja). Só para
- * quem pode assinar (`canSubscribeOnWeb`). Antes dos botões do cartão, como na tela das lojas (análise geral de 26/11/2026, D-129): a
- * cobrança do período escolhido, a renovação automática, como cancelar e quem guarda os dados do cartão; antes dos do Pix, que ele não
- * renova nem cobra sozinho; no teste grátis, o dia em que a primeira cobrança no cartão e o período pago com Pix começam, o fim do teste
- * (`paidStartDay`, com o `until` de `my_access`, do servidor; a função do servidor usa a mesma conta); e, antes de "Depois de pagar", os
- * Termos de uso e a Política de privacidade.
+ * A compra na web (D-084), com o estado na tela dos planos (jornada de compra de 27/11/2026: cada plano com o próprio botão, no próprio
+ * cartão). A função do servidor cria o Checkout do Asaas e a página de pagamento abre nesta mesma aba; o Asaas devolve a pessoa a
+ * /conta/assinatura?pagamento=... No app das lojas nada disto aparece (lá a assinatura é pela loja). Só para quem pode assinar
+ * (`canSubscribeOnWeb`).
  */
-function WebSubscribeButtons({ access, webTest, period }: { access: Access; webTest: boolean; period: BillingPeriod }) {
-  const now = useAccessNow();
-  const timeZone = useAccessTimeZone();
+function useWebPurchase(period: BillingPeriod) {
   const repo = useRepo();
   const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | 'cancelar' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -201,12 +204,6 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
     }
     setBusy(null);
   };
-  if (!canSubscribeOnWeb(access, webTest)) return null;
-  // No teste grátis, o dia do fim do teste (em Brasília, como o vencimento do Asaas e o banco): a primeira cobrança e o período pago com Pix.
-  const startDay = paidStartDay(access.status, access.until, now);
-  const startDate = startDay ? formatDateBR(startDay) : null;
-  // O dia da cobrança é o de Brasília; o do fim do teste, o da pessoa: a frase diz quando os dois diferem (D-129).
-  const rel = startDay ? trialEndRelation(startDay, access.until, timeZone) : 'mesmo-dia';
   const subscribe = async (plan: PlanKind) => {
     if (busy) return;
     setMsg(null);
@@ -243,8 +240,31 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
     }
     setBusy(null);
   };
+  return { busy, msg, cardActive, done, subscribe, payPix, cancelCard };
+}
+type WebPurchase = ReturnType<typeof useWebPurchase>;
+
+/**
+ * No teste grátis, o dia do fim do teste (em Brasília, como o vencimento do Asaas e o banco): a primeira cobrança no cartão e o começo do
+ * período pago com Pix (`paidStartDay`, com o `until` de `my_access`, do servidor; a função do servidor usa a mesma conta). O dia da cobrança
+ * é o de Brasília; o do fim do teste, o da pessoa: a frase diz quando os dois diferem (D-129).
+ */
+function useWebStart(access: Access) {
+  const now = useAccessNow();
+  const timeZone = useAccessTimeZone();
+  const startDay = paidStartDay(access.status, access.until, now);
+  return { startDate: startDay ? formatDateBR(startDay) : null, rel: startDay ? trialEndRelation(startDay, access.until, timeZone) : ('mesmo-dia' as const) };
+}
+
+/**
+ * O resumo do contrato, antes dos botões do cartão e sempre à vista (jornada de compra de 27/11/2026; os textos são os da D-129): no teste
+ * grátis, o dia da primeira cobrança; a cobrança do período escolhido, a renovação automática, como cancelar e quem processa o pagamento
+ * (`howItWorks`); o que a página de pagamento pede (docs/39, seção 1, item 2); e os Termos de uso e a Política de privacidade.
+ */
+function WebContract({ access, period }: { access: Access; period: BillingPeriod }) {
+  const { startDate, rel } = useWebStart(access);
   return (
-    <View style={{ gap: space[3] }}>
+    <View style={styles.contract}>
       {startDate ? (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
           {W.firstChargeOn(startDate, rel)}
@@ -253,19 +273,23 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
       <Txt variant="caption" color={colors.textSecondary}>
         {W.howItWorks(period)}
       </Txt>
-      {T.plans.map((p) => (
-        <Button
-          key={p.plan}
-          label={W.subscribe(p.plan, period)}
-          icon={CreditCard}
-          tone={p.plan === 'individual' ? 'brand' : 'soft'}
-          busy={busy === p.plan}
-          busyLabel={W.subscribeBusy}
-          disabled={busy !== null && busy !== p.plan}
-          onPress={() => void subscribe(p.plan)}
-        />
-      ))}
-      <Txt variant="label" style={{ fontFamily: fonts.bold, marginTop: space[2] }}>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {W.paymentPageAsks}
+      </Txt>
+      <LegalLinks />
+    </View>
+  );
+}
+
+/**
+ * O Pix como segunda opção (D-093, caminho B; D-127), depois dos planos: o período pago de uma vez, sem renovar nem cobrar sozinho, e, no
+ * teste grátis, o dia em que o período pago começa (o fim do teste).
+ */
+function WebPixOption({ access, period, buy }: { access: Access; period: BillingPeriod; buy: WebPurchase }) {
+  const { startDate, rel } = useWebStart(access);
+  return (
+    <View style={styles.second}>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
         {period === 'anual' ? W.pixTitleAnnual : W.pixTitle}
       </Txt>
       <Txt variant="caption" color={colors.textSecondary}>
@@ -282,30 +306,37 @@ function WebSubscribeButtons({ access, webTest, period }: { access: Access; webT
           label={W.payPix(p.plan, period)}
           icon={QrCode}
           tone="soft"
-          busy={busy === `pix-${p.plan}`}
+          busy={buy.busy === `pix-${p.plan}`}
           busyLabel={W.pixBusy}
-          disabled={busy !== null && busy !== `pix-${p.plan}`}
-          onPress={() => void payPix(p.plan)}
+          disabled={buy.busy !== null && buy.busy !== `pix-${p.plan}`}
+          onPress={() => void buy.payPix(p.plan)}
         />
       ))}
-      <LegalLinks />
+    </View>
+  );
+}
+
+/** Depois dos botões da web: "Depois de pagar", o erro da última tentativa e, com o cartão ainda ativo sem pagar, cancelar para escolher de novo. */
+function WebAfter({ buy }: { buy: WebPurchase }) {
+  return (
+    <>
       <Txt variant="caption" color={colors.textSecondary}>
         {W.afterPayment}
       </Txt>
-      {msg ? (
+      {buy.msg ? (
         <Banner tone="erro" icon={AlertCircle}>
           <Txt variant="label" color={colors.error}>
-            {msg}
+            {buy.msg}
           </Txt>
         </Banner>
       ) : null}
-      {cardActive ? <Button label={W.cancelCard} tone="soft" busy={busy === 'cancelar'} busyLabel={W.cancelBusy} onPress={() => void cancelCard()} /> : null}
-      {done ? (
+      {buy.cardActive ? <Button label={W.cancelCard} tone="soft" busy={buy.busy === 'cancelar'} busyLabel={W.cancelBusy} onPress={() => void buy.cancelCard()} /> : null}
+      {buy.done ? (
         <Banner tone="sucesso" icon={CheckCircle2}>
-          <Txt variant="label">{done}</Txt>
+          <Txt variant="label">{buy.done}</Txt>
         </Banner>
       ) : null}
-    </View>
+    </>
   );
 }
 
@@ -450,21 +481,20 @@ function LegalLinks() {
 }
 
 /**
- * Os botões de assinar pela loja (D-090), no iPhone e no Android: a compra abre a folha da App Store ou do Google Play, e depois a
- * função do servidor sincroniza. Antes, o preço, a renovação mensal automática e como cancelar, com os Termos e a Política; depois,
- * "Restaurar compras". Só para quem pode assinar (antes do início da cobrança, no teste, em só leitura ou coberta pelo Plano Família de
- * outra pessoa), com a chave do RevenueCat e o endereço do site no build. Na web nada disto aparece.
+ * A compra pela loja (D-090), no iPhone e no Android, com o estado na tela dos planos, como na web (jornada de compra de 27/11/2026: cada
+ * plano com o próprio botão). A compra abre a folha da App Store ou do Google Play, e depois a função do servidor sincroniza. Só para quem
+ * pode assinar (antes do início da cobrança, no teste, em só leitura ou coberta pelo Plano Família de outra pessoa), com a chave do
+ * RevenueCat e o endereço do site no build (sem ele, não há os links dos Termos e da Política, que as lojas pedem junto da compra). Na web
+ * nada disto aparece.
  */
-function StoreSubscribeButtons({ access, period }: { access: Access; period: BillingPeriod }) {
+function useStorePurchase(access: Access, period: BillingPeriod) {
   const { user } = useSession();
   const followUp = useStoreFollowUp();
   const [busy, setBusy] = useState<PlanKind | 'restaurar' | null>(null);
   const [msg, setMsg] = useState<StoreMsg>(null);
-  // Sem o endereço do site não há os links dos Termos e da Política, que as lojas pedem junto da compra: sem eles, sem os botões.
-  if (!DEVICE_STORE || !STORE_PURCHASES_READY || !SITE_URL || !user || !canSubscribeInStore(access.status)) return null;
-  const store = DEVICE_STORE;
+  const ready = Boolean(DEVICE_STORE && STORE_PURCHASES_READY && SITE_URL && user && canSubscribeInStore(access.status));
   const subscribe = async (plan: PlanKind) => {
-    if (busy) return;
+    if (busy || !user) return;
     setMsg(null);
     setBusy(plan);
     const r = await buyPlan(user.id, { plan, period });
@@ -473,7 +503,7 @@ function StoreSubscribeButtons({ access, period }: { access: Access; period: Bil
     setBusy(null);
   };
   const restore = async () => {
-    if (busy) return;
+    if (busy || !user) return;
     setMsg(null);
     setBusy('restaurar');
     const r = await restorePurchases(user.id);
@@ -487,27 +517,33 @@ function StoreSubscribeButtons({ access, period }: { access: Access; period: Bil
     }
     setBusy(null);
   };
+  return { ready, busy, msg, subscribe, restore };
+}
+type StorePurchase = ReturnType<typeof useStorePurchase>;
+
+/**
+ * O resumo do contrato da loja, antes dos botões e sempre à vista, como a Apple e o Google pedem: quem faz a cobrança, o preço e o período,
+ * a primeira cobrança no dia da compra, a renovação, como cancelar e os Termos de uso e a Política de privacidade.
+ */
+function StoreContract() {
+  if (!DEVICE_STORE) return null;
   return (
-    <View style={{ gap: space[3] }}>
+    <View style={styles.contract}>
       <Txt variant="caption" color={colors.textSecondary}>
-        {S.howItWorks(store)}
+        {S.howItWorks(DEVICE_STORE)}
       </Txt>
-      {T.plans.map((p) => (
-        <Button
-          key={p.plan}
-          label={S.subscribe(p.plan, period)}
-          icon={CreditCard}
-          tone={p.plan === 'individual' ? 'brand' : 'soft'}
-          busy={busy === p.plan}
-          busyLabel={S.subscribeBusy}
-          disabled={busy !== null && busy !== p.plan}
-          onPress={() => void subscribe(p.plan)}
-        />
-      ))}
       <Txt variant="caption" color={colors.textSecondary}>
         {S.autoRenew}
       </Txt>
       <LegalLinks />
+    </View>
+  );
+}
+
+/** Depois dos botões da loja: "Restaurar compras" e o aviso da última compra. */
+function StoreAfter({ buy }: { buy: StorePurchase }) {
+  return (
+    <>
       <Txt variant="caption" color={colors.textSecondary}>
         {S.restoreHint}
       </Txt>
@@ -515,13 +551,13 @@ function StoreSubscribeButtons({ access, period }: { access: Access; period: Bil
         label={S.restore}
         icon={RefreshCw}
         tone="soft"
-        busy={busy === 'restaurar'}
+        busy={buy.busy === 'restaurar'}
         busyLabel={S.restoreBusy}
-        disabled={busy !== null && busy !== 'restaurar'}
-        onPress={() => void restore()}
+        disabled={buy.busy !== null && buy.busy !== 'restaurar'}
+        onPress={() => void buy.restore()}
       />
-      <StoreMessage msg={msg} />
-    </View>
+      <StoreMessage msg={buy.msg} />
+    </>
   );
 }
 
@@ -591,11 +627,12 @@ export function StoreManageCard({ access }: { access: Access }) {
 }
 
 /**
- * A escolha entre o anual e o mensal (D-127): um grupo de dois rádios em forma de segmento, o anual primeiro, cada opção com o nome e "Uma
- * cobrança por ano" ou "por mês". Sem prazo, sem alarme e sem cor de alerta: muda só o preço em destaque e os botões de assinar.
+ * A escolha entre o mensal e o anual (D-127): um grupo de dois rádios em forma de segmento, o mensal primeiro (`PLAN_PERIOD_ORDER`, decisão de
+ * 27/11/2026, no lugar do anual primeiro), cada opção com o nome e "Uma cobrança por mês" ou "por ano". Sem prazo, sem alarme e sem cor de
+ * alerta: muda só o preço em destaque e os botões de assinar.
  */
 function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (period: BillingPeriod) => void }) {
-  const options: readonly BillingPeriod[] = ['anual', 'mensal'];
+  const options = PLAN_PERIOD_ORDER;
   return (
     <View style={styles.track} accessibilityRole="radiogroup" accessibilityLabel={PLAN_PERIOD_TEXT.choiceLabel}>
       {options.map((period) => {
@@ -627,11 +664,18 @@ function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (pe
 }
 
 /**
- * Os planos e os preços, para quem ainda não paga nem tem quem pague. Desde a D-127, com a escolha entre o anual (primeiro) e o mensal: o
- * preço do período escolhido em destaque, no anual o equivalente por mês (dito como equivalente: o anual é uma cobrança só) e a diferença
- * exata para 12 mensalidades, e o preço do outro período sempre à vista, em letra menor. Com a compra aberta (SUBSCRIBE_OPEN), os botões de
+ * Os planos e os preços, para quem ainda não paga nem tem quem pague. Desde a D-127, com a escolha entre o mensal (primeiro e marcado,
+ * desde 27/11/2026) e o anual: o preço do período escolhido em destaque, no anual o equivalente por mês (dito como equivalente: o anual é
+ * uma cobrança só) e a diferença exata para 12 mensalidades, e o preço do outro período sempre à vista, em letra menor. Com a compra aberta (SUBSCRIBE_OPEN), os botões de
  * assinar do período escolhido: na web, pelo Asaas (D-084), com cartão ou Pix; no iPhone e no Android, pela loja (D-090; também no build
  * de teste da equipe, STORE_TEST).
+ * Ordem (jornada de compra de 27/11/2026: no celular, o primeiro botão ficava a 1.852 px do alto, depois de 7 blocos de texto): a escolha do
+ * período; o resumo do contrato, que precisa ser lido antes de pagar e fica sempre à vista, antes dos botões (a cobrança e a renovação, como
+ * cancelar, quem processa o pagamento, o que a página de pagamento pede, no teste o dia da primeira cobrança, e os Termos e a Política); cada
+ * plano com o próprio botão dentro do cartão (lado a lado no computador); o Pix como segunda opção; e as notas. "O que a assinatura libera"
+ * vem depois deste cartão (tela Assinatura). No app das lojas, a mesma ordem, com os textos da loja.
+ * `chosen`: o plano e o período escolhidos no site (`plano-escolhido.ts`): o período já vem marcado e o cartão do plano ganha o selo "O plano
+ * que você escolheu"; nada mais é marcado nem comprado pela pessoa.
  * `webTest`: o teste da equipe no sandbox do Asaas antes de abrir (`/conta/assinatura?assinar=teste`, docs/39): mostra os botões com a
  * compra fechada. Só faz diferença enquanto a função do servidor tem a chave do sandbox, que não cobra ninguém. `subscribeHidden`: a
  * pessoa acabou de pagar (`?pagamento=sucesso`) e o aviso do Asaas ainda não chegou: sem botões, para não abrir um segundo Checkout.
@@ -639,15 +683,28 @@ function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (pe
  * pagar na web: o app das lojas abre a demonstração da web ("Ver a demonstração"), e ela não pode levar a um pagamento fora da loja. Fica
  * a nota neutra `ACCESS_TEXT.demoNote`; a escolha do período continua, porque só muda o preço mostrado.
  */
-export function PlansCard({ access, webTest = false, subscribeHidden = false }: { access: Access; webTest?: boolean; subscribeHidden?: boolean }) {
+export function PlansCard({
+  access,
+  webTest = false,
+  subscribeHidden = false,
+  chosen = null,
+}: {
+  access: Access;
+  webTest?: boolean;
+  subscribeHidden?: boolean;
+  chosen?: ChosenPlan | null;
+}) {
   const { auth, user } = useSession();
   // O roteiro de telas (`PURCHASE_PREVIEW`, só com a marca dele na página) vê o que uma conta de verdade vê na web.
   const demo = auth.mode === 'demo' && !PURCHASE_PREVIEW;
-  const [period, setPeriod] = useState<BillingPeriod>('anual');
+  // O mensal marcado (`PLAN_PERIOD_DEFAULT`), a não ser que o site tenha mandado o período; sem `periodo` no endereço, também o mensal.
+  const [period, setPeriod] = useState<BillingPeriod>(chosen?.period ?? PLAN_PERIOD_DEFAULT);
+  const wide = useWideLayout();
   const web = Platform.OS === 'web';
+  const webBuy = useWebPurchase(period);
+  const storeBuy = useStorePurchase(access, period);
   const webButtons = !demo && (SUBSCRIBE_OPEN || webTest) && web && !subscribeHidden && canSubscribeOnWeb(access, webTest);
-  const storeButtons =
-    !demo && (SUBSCRIBE_OPEN || STORE_TEST) && !web && Boolean(DEVICE_STORE && STORE_PURCHASES_READY && SITE_URL && user && canSubscribeInStore(access.status));
+  const storeButtons = !demo && (SUBSCRIBE_OPEN || STORE_TEST) && !web && Boolean(user) && storeBuy.ready;
   // A frase da compra fechada só quando os botões não aparecem (D-129: com `?assinar=teste`, os botões e a frase apareciam juntos), e a de
   // acesso completo só para quem o tem (em só ver e exportar, a curta).
   const closedNote = SUBSCRIBE_OPEN || demo || webButtons || storeButtons ? null : access.canWrite ? T.notOpenYet : T.notOpenYetShort;
@@ -657,47 +714,88 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
         {T.plansTitle}
       </Txt>
       <PeriodChoice value={period} onChange={setPeriod} />
-      {T.plans.map((p) => {
-        // Cada plano num cartão com a cor da marca (pedido do Enzo, 12/11/2026): Individual no azul claro, Família no lima claro.
-        const family = p.plan === 'familiar';
-        const PlanIcon = family ? Users : User;
-        return (
-          <View
-            key={p.plan}
-            style={{ gap: space[2], padding: space[4], borderRadius: 16, backgroundColor: family ? colors.accentTint : colors.brandTint }}
-            accessible
-            accessibilityLabel={PLAN_PERIOD_TEXT.planLabel(p.plan, period, p.who)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-              <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: family ? colors.accent : colors.brand }}>
-                <PlanIcon size={20} color={family ? colors.textOnAccent : colors.textOnBrand} aria-hidden />
-              </View>
-              <Txt variant="title" style={{ flex: 1 }}>
-                {PLAN_NAME[p.plan]}
-              </Txt>
-            </View>
-            <Txt variant="amount" color={family ? colors.text : colors.brandTextDeep}>
-              {planPeriodPriceAmount(p.plan, period)}
-              <Txt variant="label" color={colors.textSecondary}>
-                {periodSuffix(period)}
-              </Txt>
-            </Txt>
-            {period === 'anual' ? (
-              <View style={{ gap: 2 }}>
-                <Txt variant="label">{PLAN_PERIOD_TEXT.equivalent(p.plan)}</Txt>
+      {webButtons ? <WebContract access={access} period={period} /> : storeButtons ? <StoreContract /> : null}
+      <View style={wide ? styles.plansRow : styles.plansColumn}>
+        {T.plans.map((p) => {
+          // Cada plano num cartão com a cor da marca (pedido do Enzo, 12/11/2026): Individual no azul claro, Família no lima claro.
+          const family = p.plan === 'familiar';
+          const PlanIcon = family ? Users : User;
+          const picked = chosen?.plan === p.plan;
+          // O botão principal é o do plano escolhido no site; sem escolha, o do Individual, como antes.
+          const primary = chosen ? picked : p.plan === 'individual';
+          return (
+            <View
+              key={p.plan}
+              style={[styles.plan, { backgroundColor: family ? colors.accentTint : colors.brandTint }, picked && styles.planPicked, wide && styles.planWide]}>
+              {/* O cartão do plano lido de uma vez pelo leitor de tela; o botão fica fora dele, para continuar um botão (no celular, um
+                  elemento acessível esconde o que tem dentro). */}
+              <View style={{ gap: space[2] }} accessible accessibilityLabel={PLAN_PERIOD_TEXT.planLabel(p.plan, period, p.who) + (picked ? ` ${CHOSEN_PLAN_TEXT.a11y}` : '')}>
+                {picked ? (
+                  <View style={styles.pickedBadge}>
+                    <Check size={14} color={colors.textOnBrand} strokeWidth={2.5} aria-hidden />
+                    <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+                      {CHOSEN_PLAN_TEXT.badge}
+                    </Txt>
+                  </View>
+                ) : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: family ? colors.accent : colors.brand }}>
+                    <PlanIcon size={20} color={family ? colors.textOnAccent : colors.textOnBrand} aria-hidden />
+                  </View>
+                  <Txt variant="title" style={{ flex: 1 }}>
+                    {PLAN_NAME[p.plan]}
+                  </Txt>
+                </View>
+                <Txt variant="amount" color={family ? colors.text : colors.brandTextDeep}>
+                  {planPeriodPriceAmount(p.plan, period)}
+                  <Txt variant="label" color={colors.textSecondary}>
+                    {periodSuffix(period)}
+                  </Txt>
+                </Txt>
+                {period === 'anual' ? (
+                  <View style={{ gap: 2 }}>
+                    <Txt variant="label">{PLAN_PERIOD_TEXT.equivalent(p.plan)}</Txt>
+                    <Txt variant="caption" color={colors.textSecondary}>
+                      {PLAN_PERIOD_TEXT.saving(p.plan)}
+                    </Txt>
+                  </View>
+                ) : null}
                 <Txt variant="caption" color={colors.textSecondary}>
-                  {PLAN_PERIOD_TEXT.saving(p.plan)}
+                  {PLAN_PERIOD_TEXT.other(p.plan, period)}
+                </Txt>
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {p.who}
                 </Txt>
               </View>
-            ) : null}
-            <Txt variant="caption" color={colors.textSecondary}>
-              {PLAN_PERIOD_TEXT.other(p.plan, period)}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {p.who}
-            </Txt>
-          </View>
-        );
-      })}
+              {webButtons ? (
+                <Button
+                  label={W.subscribe(p.plan, period)}
+                  icon={CreditCard}
+                  tone={primary ? 'brand' : 'soft'}
+                  busy={webBuy.busy === p.plan}
+                  busyLabel={W.subscribeBusy}
+                  disabled={webBuy.busy !== null && webBuy.busy !== p.plan}
+                  onPress={() => void webBuy.subscribe(p.plan)}
+                />
+              ) : null}
+              {storeButtons ? (
+                <Button
+                  label={S.subscribe(p.plan, period)}
+                  icon={CreditCard}
+                  tone={primary ? 'brand' : 'soft'}
+                  busy={storeBuy.busy === p.plan}
+                  busyLabel={S.subscribeBusy}
+                  disabled={storeBuy.busy !== null && storeBuy.busy !== p.plan}
+                  onPress={() => void storeBuy.subscribe(p.plan)}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+      {webButtons ? <WebPixOption access={access} period={period} buy={webBuy} /> : null}
+      {webButtons ? <WebAfter buy={webBuy} /> : null}
+      {storeButtons ? <StoreAfter buy={storeBuy} /> : null}
       <Txt variant="caption" color={colors.textSecondary}>
         {T.plansNote}
       </Txt>
@@ -708,8 +806,6 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
       <Txt variant="caption" color={colors.textSecondary}>
         {demo ? T.demoNote : web ? T.howToPay : T.howToPayStore}
       </Txt>
-      {webButtons ? <WebSubscribeButtons access={access} webTest={webTest} period={period} /> : null}
-      {!demo && (SUBSCRIBE_OPEN || STORE_TEST) && !web ? <StoreSubscribeButtons access={access} period={period} /> : null}
       {closedNote ? (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
           {closedNote}
@@ -730,4 +826,16 @@ const styles = StyleSheet.create({
   option: { flex: 1, minHeight: 56, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2], paddingVertical: space[2], gap: 2 },
   optionSelected: { backgroundColor: colors.surface },
   optionHead: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  // O resumo do contrato, antes dos botões: um bloco contornado, sempre aberto.
+  contract: { gap: space[2], padding: space[4], borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  plansColumn: { gap: space[3] },
+  // Computador: os dois planos lado a lado, cada um com o seu botão no fim.
+  plansRow: { flexDirection: 'row', gap: space[3], alignItems: 'stretch' },
+  plan: { gap: space[3], padding: space[4], borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  planWide: { flex: 1, minWidth: 0, justifyContent: 'space-between' },
+  // O plano escolhido no site: o contorno azul e o selo (nunca cor de alerta).
+  planPicked: { borderColor: colors.brandText },
+  pickedBadge: { flexDirection: 'row', alignItems: 'center', gap: space[1], alignSelf: 'flex-start', backgroundColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
+  // O Pix, segunda opção: separado dos planos por uma linha.
+  second: { gap: space[3], paddingTop: space[4], borderTopWidth: 1, borderTopColor: colors.border },
 });

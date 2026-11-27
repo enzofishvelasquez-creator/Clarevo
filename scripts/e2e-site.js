@@ -56,7 +56,8 @@ const POSTS = [
   'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro',
 ];
 /** As páginas com vídeos ou imagens novas (D-114), que a varredura do tema escuro percorre. */
-const PAGINAS_D114 = ['', 'app/', ...POSTS];
+// Desde 27/11/2026, também Use no navegador (os vídeos do computador).
+const PAGINAS_D114 = ['', 'app/', 'web', ...POSTS];
 /**
  * O retrato de teste dos indicadores (D-106), gravado na geração: números fictícios, diferentes dos que o Banco Central simulado devolve,
  * para o teste ver a troca. 13:00 UTC é 10:00 em Brasília.
@@ -296,7 +297,9 @@ function roteiros(CALC) {
 function varrerPagina() {
   const caixas = [...document.querySelectorAll('main *, footer *')].filter((e) => {
     const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
-    if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none') return false;
+    // O que está num <details> fechado não aparece (27/11/2026: parte de O app e de Para empresas fica recolhida): fica de fora, e a
+    // varredura confere essas duas páginas também com tudo aberto.
+    if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none' || !e.checkVisibility()) return false;
     if ((parseFloat(cs.borderTopLeftRadius) || 0) < 8) return false;
     const borda = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
     const fundo = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
@@ -312,7 +315,7 @@ function varrerPagina() {
     if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
   }
   // Varredura de 12/11/2026. Uma "caixa" é o mesmo que acima (fundo, borda ou sombra, com cantos arredondados), sem os campos.
-  const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
+  const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0 && e.checkVisibility(); };
   const caixa = (e) => caixas.includes(e) && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.tagName);
   const noFluxo = (e) => vis(e) && getComputedStyle(e).position !== 'absolute';
   const antes = (e) => { let x = e.previousElementSibling; while (x && !noFluxo(x)) x = x.previousElementSibling; return x; };
@@ -400,7 +403,16 @@ function varrerPagina() {
     fetchDoWorker: fetchSimulado,
   });
   const origem = servidor.url;
-  const navegador = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+  /**
+   * O navegador do roteiro não sai dos servidores locais (27/11/2026): todo pedido para fora vai para um proxy que não existe (a porta 9 do
+   * próprio computador) e falha, e só os servidores locais do roteiro passam direto. Nenhum clique chega ao app web de verdade nem a outro
+   * site (o evento `request` continua anotando a tentativa, e a conferência "nenhum pedido para fora" falha). Na mesma rodada, uma
+   * conferência antiga seguiu um link para o app web de verdade; por isso a trava, no navegador e não por rota (uma rota em cada contexto
+   * tiraria do pedido do formulário o cabeçalho Sec-Fetch-Site, que o worker confere). Os cliques que levam ao app web continuam sendo
+   * seguidos com uma página falsa (`seguirBotoes`, por rota, que responde antes da rede).
+   */
+  const SEM_REDE_DE_FORA = ['--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=127.0.0.1;localhost'];
+  const navegador = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), args: SEM_REDE_DE_FORA });
   try {
     const ctx = await navegador.newContext({ viewport: { width: 390, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
     const problemas = [];
@@ -633,9 +645,13 @@ function varrerPagina() {
       const p = await pagina();
       await p.goto(`${origem}/comece`);
       const corpo = await p.textContent('main');
+      // Antes do lançamento (27/11/2026), o primeiro passo convida a criar a conta ("Criar conta grátis"), com a linha honesta.
+      ok('comece aqui: o primeiro passo, "Crie a sua conta", com "Criar conta grátis" para a tela de criar conta e a linha de que a assinatura abre em breve',
+        JSON.stringify(await p.$$eval('#passos + ol > li:first-child a.botao', (as) => as.map((a) => [a.textContent, a.getAttribute('href')]))) === JSON.stringify([['Criar conta grátis', 'https://app.clarevo.app.br/criar-conta']]) &&
+        (await p.textContent('#passos + ol > li:first-child')).includes('A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.'));
       ok('comece aqui: título, "Assine aqui" e "Conheça o app", três passos e oito caminhos, sem fase de testes nem demonstração', (await p.textContent('h1')) === 'Comece aqui' &&
         JSON.stringify(await p.$$eval('.capa .acoes a', (as) => as.map((a) => [a.textContent, a.getAttribute('href')]))) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
-        (await p.$$eval('#passos + ol > li > h3', (hs) => hs.map((h) => h.textContent))).join('|') === 'Escolha o plano|Use no navegador ou no celular|Dê os primeiros passos' &&
+        (await p.$$eval('#passos + ol > li > h3', (hs) => hs.map((h) => h.textContent))).join('|') === 'Crie a sua conta|Use no navegador ou no celular|Dê os primeiros passos' &&
         (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'O app|Use no navegador|Planos|Para quem trabalha por conta e MEI|Para empresas|Aprender|Calculadoras|Ajuda' &&
         !/fase de testes|piloto|quem testa|lançamento|Ver a demonstração/i.test(corpo) && (await p.$$('a[href*="demo.clarevo"]')).length === 0);
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
@@ -887,8 +903,11 @@ function varrerPagina() {
     // economia de dados, nada toca até a pessoa tocar no vídeo; sem JavaScript, fica a capa, com o nome "Vídeo: título".
     {
       const LUGARES = {
-        // Desde 25/11/2026 (D-125), a página inicial tem dois vídeos: o Resumo na capa e a fatura por print em "Como funciona".
-        '/': [['.capa', 'O Resumo do mês'], ['section[aria-labelledby="como-funciona"]', 'Importar fatura por print']],
+        // Desde 25/11/2026 (D-125), a página inicial tem dois vídeos de celular: o Resumo na capa e a fatura por print em "Como funciona"; desde
+        // 27/11/2026, também o do Resumo no computador, no bloco "Use no navegador ou no celular" (só na tela larga).
+        '/': [['.capa', 'O Resumo do mês'], ['section[aria-labelledby="como-funciona"]', 'Importar fatura por print'], ['section[aria-labelledby="na-web"]', 'O Resumo no computador']],
+        // Desde 27/11/2026 (pedido do Enzo, "focar em demonstração por vídeos do app"), Use no navegador mostra a versão web por quatro vídeos.
+        '/web': [['section[aria-labelledby="no-computador"]', 'O Resumo no computador'], ['.video-web', 'Anotar um gasto no computador'], ['.video-web', 'Importar um extrato no computador'], ['.video-web', 'As contas do mês no computador']],
         '/app/': [['#resumo', 'O Resumo do mês'], ['#anotar', 'Anotar um gasto'], ['#contas', 'O Calendário do mês'], ['#cartoes', 'Importar fatura por print'], ['#metas', 'Metas'], ['#investir', 'Investir'], ['article.cartao:has(h3:text-is("Tema claro ou escuro"))', 'Do tema escuro ao claro']],
       };
       const p = await pagina();
@@ -903,17 +922,19 @@ function varrerPagina() {
         legenda: v.closest('figure').querySelector('figcaption')?.textContent || '',
         botoes: v.closest('figure').querySelectorAll('button, [class*="botao"]').length,
       })));
-      for (const caminho of ['/', '/app/']) {
+      for (const caminho of ['/', '/app/', '/web']) {
         deVideo.length = 0;
         await p.goto(`${origem}${caminho}`);
         await p.waitForTimeout(1500);
         const vs = await lerVideos();
         ok(`vídeos (${caminho}): ${LUGARES[caminho].length} vídeos, nenhuma seção "Veja o app em uso"`, vs.length === LUGARES[caminho].length && (await p.$('#em-uso')) === null, `${vs.length}`);
         const lugares = [];
-        for (const [bloco, titulo] of LUGARES[caminho]) lugares.push([bloco, await p.locator(bloco).first().locator(`figure[data-video][data-titulo="${titulo}"]`).count()]);
+        for (const [bloco, titulo] of LUGARES[caminho]) lugares.push([bloco, await p.locator(bloco).locator(`figure[data-video][data-titulo="${titulo}"]`).count()]);
         ok(`vídeos (${caminho}): cada vídeo no bloco que ele mostra`, lugares.every(([, n]) => n === 1), JSON.stringify(lugares));
         ok(`vídeos (${caminho}): nenhum com controles de player nem autoplay; todos sem som, em repetição e com preload="none"`, vs.every((v) => !v.controls && !v.autoplay && v.muted && v.loop && v.preload === 'none'), JSON.stringify(vs.map((v) => [v.titulo, v.controls, v.autoplay, v.muted, v.loop, v.preload])));
-        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
+        // O celular em 720 x 1560 e o computador (27/11/2026) em 1600 x 1000.
+        const tamanhoCerto = (v) => (/ no computador$/.test(v.titulo) ? v.largura === '1600' && v.altura === '1000' : v.largura === '720' && v.altura === '1560');
+        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && tamanhoCerto(v) &&
           v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`)) && v.reserva === v.fontes[1][0]), JSON.stringify(vs[0]));
         ok(`vídeos (${caminho}): nenhum botão dentro das figuras; o próprio vídeo é o controle (papel de botão, tabindex 0, nome "Pausar o vídeo: título" ou "Tocar o vídeo: título"), com a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
           vs.every((v) => v.botoes === 0 && v.papel === 'button' && v.tabindex === '0' && v.rotulo === null && /^(Pausar|Tocar) o vídeo: /.test(v.nome) && v.nome.endsWith(`: ${v.titulo}`) && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120),
@@ -951,7 +972,8 @@ function varrerPagina() {
       await p.waitForTimeout(900);
       const continuaPausado = await video.evaluate((v) => v.paused);
       const semBotao = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => f.querySelectorAll('button, .video-botao').length));
-      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 2 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
+      // Desde 27/11/2026, três figuras de vídeo na página inicial (com o do Resumo no computador).
+      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 3 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
       ok('vídeos: clicar no vídeo "Pausar o vídeo: Importar fatura por print" pausa, o nome passa a "Tocar o vídeo: ..." e a pausa continua depois de rolar para longe e voltar',
         antes === 'Pausar o vídeo: Importar fatura por print' && pausado.paused && pausado.nome === 'Tocar o vídeo: Importar fatura por print' && pausado.estado === 'parado' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
       // Pelo teclado: Tab chega ao vídeo, com o contorno visível do foco, e Espaço toca de novo (sem rolar a página).
@@ -992,7 +1014,7 @@ function varrerPagina() {
         q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
         await q.goto(`${origem}/`);
         await q.waitForTimeout(2000);
-        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 2 && vs.every((v) => v.paused && v.currentTime === 0));
+        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 3 && vs.every((v) => v.paused && v.currentTime === 0));
         const nomeAntes = await q.getAttribute('.capa video', 'aria-label');
         const botoes = await q.$$eval('figure[data-video] button, .video-botao', (bs) => bs.length);
         const baixadosAntes = deVideoCalmo.length;
@@ -1022,12 +1044,12 @@ function varrerPagina() {
       const largas = [];
       for (const largura of [320, 390, 1280]) {
         await q.setViewportSize({ width: largura, height: 900 });
-        for (const c of ['', 'app/', POSTS[3]]) {
+        for (const c of ['', 'app/', 'web', POSTS[3]]) {
           await q.goto(`${origem}/${c}`);
           if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
         }
       }
-      ok('vídeos e Fontes: nada passa da largura da tela em 320, 390 e 1280 px (início, O app e uma matéria)', largas.length === 0, largas.join(' | '));
+      ok('vídeos e Fontes: nada passa da largura da tela em 320, 390 e 1280 px (início, O app, Use no navegador e uma matéria)', largas.length === 0, largas.join(' | '));
       await q.setViewportSize({ width: 390, height: 900 });
       await q.close();
     }
@@ -1071,7 +1093,7 @@ function varrerPagina() {
       // D-127: cada cartão mostra também o anual, logo abaixo do mensal, com o equivalente por mês dito como equivalente.
       const anuais = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => [a.querySelector('.preco').textContent, a.querySelector('.preco-anual')?.textContent ?? ''].map((t) => t.replace(/\u00a0/g, ' '))));
       ok('planos: cada cartão da página inicial com o mensal e o anual (com o equivalente por mês), do núcleo',
-        JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)']]), JSON.stringify(anuais));
+        JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês, R$ 88,90 a menos que 12 mensalidades)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês, R$ 208,90 a menos que 12 mensalidades)']]), JSON.stringify(anuais));
       // Clicar no cartão (fora do texto do link) abre a página do plano. O clique é no canto de cima, à direita, em cima da fita "Em breve"
       // (D-128), que é só desenho e não pega o clique.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
@@ -1111,7 +1133,7 @@ function varrerPagina() {
             notOpen: /abre no lançamento|Até lá, nada é cobrado|Assinatura em breve\. Por enquanto/.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
             links: [...document.querySelectorAll('#inclui ~ .grupos-recursos a')].map((a) => a.href),
             fim: [...document.querySelectorAll('main > section.bloco .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
-            // D-129: a capa nunca é beco sem saída: antes do lançamento, a linha da assinatura em breve e "Conheça o app".
+            // D-129: a capa nunca é beco sem saída: antes do lançamento, desde 27/11/2026, "Criar conta grátis", "Conheça o app" e a linha do convite.
             capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
             avisoNaCapa: document.querySelector('.capa .estado-produto')?.textContent || null,
             telegram: [...document.querySelectorAll('.recurso-cartao')].find((c) => c.querySelector('h4')?.textContent === 'Anotar pelo Telegram')?.querySelector('.recurso-onde')?.textContent || null,
@@ -1125,14 +1147,19 @@ function varrerPagina() {
         }
         const familiaPg = nome === 'Família';
         // D-127: na capa, o mensal e, logo abaixo, o anual com o equivalente por mês (três valores, todos na capa).
-        const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)';
+        // Desde 27/11/2026 (jornada de compra, S6), com a diferença para 12 mensalidades; no Família, também a conta do preço por casa em "Para
+        // quem é" (S4): 6 valores em reais no Família, 4 no Individual.
+        const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês, R$ 208,90 a menos que 12 mensalidades)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês, R$ 88,90 a menos que 12 mensalidades)';
         ok(`planos: a página do plano ${nome} tem o nome, o preço mensal (com "Em breve" antes do lançamento) e o anual só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, sem a frase de "abre no lançamento", D-128) e o Espaço Negócio incluído, sem negócio compartilhado`,
-          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === (nome === 'Família' ? 6 : 4) && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
-        ok(`planos (D-129): antes do lançamento, a capa do plano ${nome} diz à vista "A assinatura abre em breve, na web e nas lojas." e leva a "Conheça o app"; ${familiaPg ? 'o Telegram anota no Pessoal ou na Família em que a pessoa anota' : 'sem etiqueta de onde vale'}`,
-          pg.avisoNaCapa === 'A assinatura abre em breve, na web e nas lojas.' && JSON.stringify(pg.capa) === JSON.stringify([['Conheça o app', '../app/index.html']]) &&
-            pg.telegram === (familiaPg ? 'No seu Pessoal ou na Família em que você anota.' : null),
+        // Desde 27/11/2026: "Criar conta grátis" (com o plano da página) e "Conheça o app", com a linha do convite; e o Telegram também no
+        // negócio, com a palavra "negócio" no começo da mensagem.
+        ok(`planos (D-129 e 27/11/2026): antes do lançamento, a capa do plano ${nome} tem "Criar conta grátis" (com ?plano=) e "Conheça o app", e diz à vista "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado."; ${familiaPg ? 'o Telegram anota no Pessoal, na Família em que a pessoa anota e, com a palavra negócio, no negócio' : 'sem etiqueta de onde vale'}`,
+          pg.avisoNaCapa === 'A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.' &&
+            JSON.stringify(pg.capa) === JSON.stringify([['Criar conta grátis', `https://app.clarevo.app.br/criar-conta?plano=${familiaPg ? 'familia' : 'individual'}`], ['Conheça o app', '../app/index.html']]) &&
+            pg.telegram === (familiaPg ? 'No seu Pessoal ou na Família em que você anota e, com a palavra negócio no começo da mensagem, no seu negócio.' : null),
           JSON.stringify({ capa: pg.capa, aviso: pg.avisoNaCapa, telegram: pg.telegram }));
         const outroHref = familiaPg ? 'individual.html' : 'familia.html';
         ok(`planos: no fim da página do plano ${nome}, "Ver o plano ${outro}" e "Comparar os planos"`, JSON.stringify(pg.fim) === JSON.stringify([[`Ver o plano ${outro}`, outroHref], ['Comparar os planos', '../planos.html']]), JSON.stringify(pg.fim));
@@ -1285,6 +1312,8 @@ function varrerPagina() {
       const fora = [];
       for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
         await p.goto(`${origem}/${c}`);
+        // Desde 27/11/2026, parte dos celulares de O app e de Para empresas fica num <details> recolhido: abertos, para medir de verdade.
+        await p.evaluate(() => document.querySelectorAll('main details').forEach((d) => { d.open = true; }));
         // Desde 25/11/2026 (D-125), o celular de "Como funciona" (início) fica na coluna ao lado dos passos, como o de Segurança.
         const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular, .passos-com-celular > figure.celular')].map((f) => {
           const m = f.querySelector('.celular-moldura').getBoundingClientRect();
@@ -1636,8 +1665,11 @@ function varrerPagina() {
     // Enzo), nenhum dos dois estados fala de fase de testes, piloto, "quem testa", "Preços no lançamento" ou "abre no lançamento", e a chamada
     // principal de todas as capas é "Assine aqui", com no máximo dois botões; a demonstração só aparece como link de texto em O app e em Use
     // no navegador. Antes do lançamento (o padrão), "Assine aqui" leva aos planos (a seção Planos no início, `planos.html` nas outras
-    // páginas), que mostram a fita "Em breve" em cada cartão; o menu diz "Entrar" e leva à tela de entrar; nenhuma página convida a criar conta
-    // nem leva à tela inicial do app web (D-064). Lançado (um site gerado à parte com --estado), "Assine aqui" e o menu levam à tela de criar
+    // páginas), que mostram a fita "Em breve" em cada cartão; o menu diz "Entrar" e leva à tela de entrar; nenhuma página leva à tela inicial
+    // do app web; desde 27/11/2026 (decisão do Enzo; o cadastro está aberto, D-129 A), o convite "Criar conta grátis" leva à tela de criar conta
+    // só da seção Planos do início, dos planos (com o plano no endereço), de Comece aqui, de Use no navegador e da linha do fim das páginas de
+    // conteúdo, sempre com a linha "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.", e nunca do menu.
+    // Lançado (um site gerado à parte com --estado), "Assine aqui" e o menu levam à tela de criar
     // conta do app web, a fita some e o selo aparece só para a loja com endereço. Os botões (o menu, no computador e no menu do celular,
     // "Assine aqui" das capas e o link da versão web em O app) são SEGUIDOS nos dois estados, com clique de verdade e o app web respondido por
     // uma página falsa deste teste (`route`): o clique chega aonde o botão diz e nada sai para a rede.
@@ -1657,7 +1689,11 @@ function varrerPagina() {
               breve: /em breve/i.test(main), abreNoLancamento: /abre no lançamento|acesso abre/i.test(pagina),
               fita: document.querySelectorAll('.fita-em-breve').length,
               demo: [...document.querySelectorAll('a[href*="demo.clarevo"]')].map((a) => [a.textContent, a.className, a.closest('.botao, .acoes') ? 'botão' : a.parentElement.className]),
-              criarConta: document.querySelectorAll('a[href*="/criar-conta"]').length, selos: [...document.querySelectorAll('.selo-loja')].map((a) => [a.textContent, a.getAttribute('href')]),
+              criarConta: document.querySelectorAll('a[href*="/criar-conta"]').length,
+              convite: [...document.querySelectorAll('a[href*="/criar-conta"]')].map((a) => [a.textContent, a.getAttribute('href')]),
+              conviteNoMenu: document.querySelectorAll('header a[href*="/criar-conta"]').length,
+              linhaDoConvite: main.includes('A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.'),
+              selos: [...document.querySelectorAll('.selo-loja')].map((a) => [a.textContent, a.getAttribute('href')]),
               // Links para a tela inicial do app web (o endereço sem caminho), na página toda: o menu, o texto e o aviso sem JavaScript.
               raizDoApp: [...document.querySelectorAll('a')].filter((a) => a.href === 'https://app.clarevo.app.br/').length,
               capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
@@ -1667,7 +1703,7 @@ function varrerPagina() {
               entrar: [document.querySelector('.menu-entrar')?.textContent ?? null, document.querySelector('.menu-entrar')?.getAttribute('href') ?? null],
               seguranca: [...document.querySelectorAll('.menu-lista a')].some((a) => a.textContent === 'Segurança'),
               jaTemConta: [...document.querySelectorAll('.ja-tem-conta a')].map((a) => [a.textContent, a.getAttribute('href')]),
-              avisoDaAssinatura: [...document.querySelectorAll('.capa .estado-produto, .aviso-assinatura')].map((e) => e.textContent).filter((t) => t === 'A assinatura abre em breve, na web e nas lojas.').length,
+              avisoDaAssinatura: [...document.querySelectorAll('.capa .estado-produto, .aviso-assinatura')].map((e) => e.textContent).filter((t) => t === 'A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.').length,
               // O plano anual existe desde a D-127 (o preço por ano nos planos); o Plus continua fora do site.
               plus: /Clarevo Plus/i.test(main),
               anual: /R\$ ?[\d.,]+ por ano/.test(main),
@@ -1683,7 +1719,7 @@ function varrerPagina() {
        * capas do início, de O app, de Use no navegador e do MEI, e devolve aonde cada clique chegou, o que foi pedido ao app web e o que foi
        * recusado.
        */
-      const seguirBotoes = async (base, textoDoLink, { assineNoApp = false } = {}) => {
+      const seguirBotoes = async (base, textoDoLink, { assineNoApp = false, convite = false } = {}) => {
         const contexto = await navegador.newContext({ locale: 'pt-BR' });
         const aoApp = [];
         const recusados = [];
@@ -1733,6 +1769,15 @@ function varrerPagina() {
             await Promise.all([q.waitForURL(noApp), q.click('details.menu-movel li:nth-last-child(2) a')]);
             chegou['Entrar do menu do celular'] = [q.url(), await q.title()];
           }
+          if (convite) {
+            // Antes do lançamento (27/11/2026): o convite "Criar conta grátis" e a linha do fim das páginas de conteúdo, clicados.
+            await q.setViewportSize({ width: 1280, height: 900 });
+            for (const [c, alvo] of [['', '.convite-conta a.botao-principal'], ['planos', '.capa .acoes a.botao-principal'], ['planos/familia', '.capa .acoes a.botao-principal'], ['comece', '#passos + ol a.botao-principal'], ['web', '.chamada-final a.botao-principal'], ['aprender/', 'p.ponte a']]) {
+              await q.goto(`${base}/${c}`);
+              await Promise.all([q.waitForURL(noApp), q.click(alvo)]);
+              chegou[`convite de ${c || 'início'}`] = [q.url(), await q.title()];
+            }
+          }
           if (assineNoApp) {
             for (const c of ['', 'app/', 'web', 'mei']) {
               await q.goto(`${base}/${c}`);
@@ -1751,12 +1796,21 @@ function varrerPagina() {
       const p = await pagina();
       const pre = await lerEstado(p, origem);
       const v = Object.values(pre);
-      ok('estado do produto, antes do lançamento: nenhuma página fala de fase de testes, piloto, "quem testa", "Preços no lançamento" nem "abre no lançamento" (D-128); nenhuma convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; o menu diz "Entrar" e aponta para a tela de entrar; nada do Plus',
-        v.every((x) => semFaseDeTestes(x) && x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && x.menu[0] === 'Entrar' && x.menu[1] === `${URL_APP}/entrar` && x.entrar[0] === null && !x.seguranca && x.botoesPorBloco.every((n) => n <= 2)), JSON.stringify(pre));
-      ok('estado do produto, antes do lançamento (D-129): os planos nunca são beco sem saída: "A assinatura abre em breve, na web e nas lojas." à vista na seção Planos do início, em planos.html e na capa de cada plano, que leva a "Conheça o app"; Use no navegador diz "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
+      ok('estado do produto, antes do lançamento: nenhuma página fala de fase de testes, piloto, "quem testa", "Preços no lançamento" nem "abre no lançamento" (D-128); nenhuma leva à tela inicial do app web nem mostra selo de loja; o menu diz "Entrar" e aponta para a tela de entrar; nada do Plus',
+        v.every((x) => semFaseDeTestes(x) && x.raizDoApp === 0 && x.selos.length === 0 && x.menu[0] === 'Entrar' && x.menu[1] === `${URL_APP}/entrar` && x.entrar[0] === null && !x.seguranca && x.botoesPorBloco.every((n) => n <= 2)), JSON.stringify(pre));
+      // O convite ao cadastro (27/11/2026): onde aparece, com que texto, para onde leva, sempre com a linha honesta e nunca no menu.
+      const CONVITES = {
+        'início': [['Criar conta grátis', CRIAR]], comece: [['Criar conta grátis', CRIAR]], web: [['Criar conta grátis', CRIAR]], planos: [['Criar conta grátis', CRIAR]],
+        'planos/individual': [['Criar conta grátis', `${CRIAR}?plano=individual`]], 'planos/familia': [['Criar conta grátis', `${CRIAR}?plano=familia`]],
+        'calculadoras/reserva': [['crie a sua conta na Clarevo', CRIAR]],
+      };
+      ok('estado do produto, antes do lançamento (27/11/2026): "Criar conta grátis" só na seção Planos do início, nos planos (com o plano da página), em Comece aqui e em Use no navegador, e a linha do fim nas páginas de conteúdo, sempre com "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado."; nenhum no menu, em O app, no MEI, em Sobre nem no kit de imprensa',
+        Object.entries(pre).every(([c, x]) => JSON.stringify(x.convite) === JSON.stringify(CONVITES[c] || []) && x.conviteNoMenu === 0 && (!CONVITES[c] || x.linhaDoConvite)),
+        JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.convite, x.conviteNoMenu, x.linhaDoConvite]]))));
+      ok('estado do produto, antes do lançamento (D-129 e 27/11/2026): os planos nunca são beco sem saída: "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado." à vista na seção Planos do início, em planos.html e na capa de cada plano, com "Criar conta grátis" e "Conheça o app"; Use no navegador diz "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
         pre['início'].avisoDaAssinatura === 1 && ['planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].avisoDaAssinatura === 1) &&
-          JSON.stringify(pre.planos.capa) === JSON.stringify([['Conheça o app', 'app/index.html']]) &&
-          JSON.stringify(pre['planos/familia'].capa) === JSON.stringify([['Conheça o app', '../app/index.html']]) &&
+          JSON.stringify(pre.planos.capa) === JSON.stringify([['Criar conta grátis', CRIAR], ['Conheça o app', 'app/index.html']]) &&
+          JSON.stringify(pre['planos/familia'].capa) === JSON.stringify([['Criar conta grátis', `${CRIAR}?plano=familia`], ['Conheça o app', '../app/index.html']]) &&
           JSON.stringify(pre.web.jaTemConta) === JSON.stringify([['Entrar no navegador', `${URL_APP}/entrar`], ['Entrar no navegador', `${URL_APP}/entrar`]]),
         JSON.stringify(Object.fromEntries(['início', 'planos', 'planos/individual', 'planos/familia', 'web'].map((c) => [c, [pre[c].avisoDaAssinatura, pre[c].capa, pre[c].jaTemConta]]))));
       ok('estado do produto, antes do lançamento: "Assine aqui" é a chamada principal das capas (para os planos: a seção Planos no início, planos.html nas outras), com "Conheça o app" ou "Use no navegador" ao lado, e a demonstração só como link de texto em O app e em Use no navegador',
@@ -1782,13 +1836,19 @@ function varrerPagina() {
       ok('estado do produto, antes do lançamento: "Assine aqui" clicado leva à seção Planos no início e a planos.html em O app, Use no navegador, MEI e Comece aqui, sempre com a fita "Em breve" nos dois cartões',
         naSecao.hash === '#planos' && Math.abs(naSecao.topo) < 120 && naSecao.fitas === 2 && chegadas.every(([, h1, fitas]) => h1 === 'Planos da Clarevo' && fitas === 2), JSON.stringify({ naSecao, chegadas }));
       await p.close();
-      // Antes do lançamento, os cliques do menu e de O app levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
-      const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web');
-      const destinosPre = Object.values(seguidosPre.chegou);
+      // Antes do lançamento, os cliques do menu e de O app levam à tela de entrar (/entrar), e nunca à tela inicial do app web; desde
+      // 27/11/2026, o convite "Criar conta grátis" (e a linha do fim das páginas de conteúdo) leva à tela de criar conta, com o plano da página.
+      const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web', { convite: true });
+      const destinosPre = Object.entries(seguidosPre.chegou).filter(([k]) => !k.startsWith('convite de ')).map(([, d]) => d);
+      const convitesPre = Object.fromEntries(Object.entries(seguidosPre.chegou).filter(([k]) => k.startsWith('convite de ')).map(([k, [url]]) => [k, url]));
       ok('estado do produto, antes do lançamento: o botão "Entrar" do menu (no computador e no celular), o link "Entrar na versão web" de O app e "Entrar no navegador" de Use no navegador (D-129), clicados, chegam à tela de entrar do app web, e nada sai para a rede',
         destinosPre.length === 5 && destinosPre.every(([url, titulo]) => url === `${URL_APP}/entrar` && titulo === 'App falso do teste') &&
-          seguidosPre.aoApp.length === 5 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar`) && seguidosPre.recusados.length === 0,
+          seguidosPre.aoApp.filter((u) => u === `${URL_APP}/entrar`).length === 5 && seguidosPre.recusados.length === 0,
         JSON.stringify(seguidosPre));
+      ok('estado do produto, antes do lançamento (27/11/2026): "Criar conta grátis" da seção Planos do início, de planos.html, do plano Família (com ?plano=familia), de Comece aqui e de Use no navegador, e a linha do fim de Aprender, clicados, chegam à tela de criar conta do app web',
+        JSON.stringify(convitesPre) === JSON.stringify({ 'convite de início': CRIAR, 'convite de planos': CRIAR, 'convite de planos/familia': `${CRIAR}?plano=familia`, 'convite de comece': CRIAR, 'convite de web': CRIAR, 'convite de aprender/': CRIAR }) &&
+          seguidosPre.aoApp.length === 11 && seguidosPre.aoApp.every((u) => u === `${URL_APP}/entrar` || u.startsWith(CRIAR)),
+        JSON.stringify(convitesPre));
       // O site lançado, gerado à parte com --estado, com as duas lojas: desde a D-129, o endereço do Google Play é o oficial, com o pacote em
       // `?id=` (o teste do núcleo confere que, sem o endereço de uma loja, o selo dela não aparece). Com a assinatura do núcleo ainda fechada
       // (SUBSCRIBE_OPEN), o gerador recusa "lancado": true sozinho; o teste simula a assinatura aberta (simularAssinaturaAberta, que só o
@@ -1825,8 +1885,9 @@ function varrerPagina() {
           w.every((x) => semFaseDeTestes(x) && !x.breve && x.fita === 0 && x.menu[0] === 'Assine aqui' && x.menu[1] === CRIAR && x.entrar[0] === 'Entrar' && x.entrar[1] === `${URL_APP}/entrar` && !x.seguranca && x.avisoDaAssinatura === 0 && x.botoesPorBloco.every((n) => n <= 2)) && demoCerta(pos) && erros.length === 0, JSON.stringify({ pos, erros }));
         ok('estado do produto, lançado (D-129): planos.html e a capa de cada plano com "Assine aqui" (criar conta) e "Conheça o app"; Use no navegador com "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
           JSON.stringify(pos.planos.capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
-            JSON.stringify(pos['planos/individual'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
-            JSON.stringify(pos['planos/familia'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
+            // Desde 27/11/2026 (jornada de compra, S3), a capa de cada plano leva o plano ao cadastro.
+            JSON.stringify(pos['planos/individual'].capa) === JSON.stringify([['Assine aqui', `${CRIAR}?plano=individual`], ['Conheça o app', '../app/index.html']]) &&
+            JSON.stringify(pos['planos/familia'].capa) === JSON.stringify([['Assine aqui', `${CRIAR}?plano=familia`], ['Conheça o app', '../app/index.html']]) &&
             JSON.stringify(pos.web.jaTemConta) === JSON.stringify([['Entrar no navegador', `${URL_APP}/entrar`], ['Entrar no navegador', `${URL_APP}/entrar`]]),
           JSON.stringify({ planos: pos.planos.capa, individual: pos['planos/individual'].capa, web: pos.web.jaTemConta }));
         // Lançado, os cliques do menu e de "Assine aqui" levam à tela de criar conta, e o link de O app, à tela inicial do app web.
@@ -1875,6 +1936,32 @@ function varrerPagina() {
         await q.setViewportSize({ width: 390, height: 900 });
         ok('estado do produto, lançado (D-129): o cabeçalho com "Entrar" ao lado de "Assine aqui" continua numa linha a 1120 e 1440 px, com folga entre o logotipo e o menu, e nada passa da largura',
           cabecalhos.every((c) => c.topo <= 80 && c.folga >= 16 && c.mesmaLinha && c.entrarAntes && !c.largo), JSON.stringify(cabecalhos));
+        // 27/11/2026: de 768 a 1119 px, "Entrar" e "Assine aqui" à vista antes de "Menu", numa linha, sem passar da largura (de 320 a 1440 px).
+        const meio = [];
+        await q.goto(`${lancado.url}/`);
+        for (let l = 320; l <= 1440; l += 16) {
+          await q.setViewportSize({ width: l, height: 700 });
+          meio.push(await q.evaluate((largura) => {
+            const vis = (e) => e && e.getClientRects().length > 0;
+            const itens = [...document.querySelectorAll('.topo-i .marca, .topo-i .menu-lista, .topo-i .menu-entrar, .topo-i .menu-cta, .topo-i .menu-movel > summary')].filter(vis).map((e) => e.getBoundingClientRect());
+            const entrar = document.querySelector('.menu-entrar').getBoundingClientRect();
+            const cta = document.querySelector('.menu-cta').getBoundingClientRect();
+            return { l: largura, ambos: vis(document.querySelector('.menu-entrar')) && vis(document.querySelector('.menu-cta')), antes: entrar.right <= cta.left, linhas: new Set(itens.map((r) => Math.round(r.top + r.height / 2))).size, fora: Math.max(...itens.map((r) => r.right)) > innerWidth, largo: document.documentElement.scrollWidth > innerWidth + 1 };
+          }, l));
+        }
+        const meioErrado = meio.filter((c) => c.linhas > 1 || c.fora || c.largo || (c.l >= 768 && !(c.ambos && c.antes)) || (c.l < 768 && c.ambos));
+        await q.setViewportSize({ width: 390, height: 900 });
+        ok('estado do produto, lançado (27/11): de 768 px em diante, "Entrar" e "Assine aqui" à vista no cabeçalho, nessa ordem, numa linha e sem passar da largura de 320 a 1440 px', meioErrado.length === 0, JSON.stringify(meioErrado.slice(0, 5)));
+        // A jornada de compra (S3): lançado, "Assine aqui" da capa de cada plano leva o plano ao cadastro; o do cabeçalho, não. E S2: a linha
+        // do fim das páginas de conteúdo leva ao cadastro, com o teste grátis.
+        const doPlano = {};
+        for (const c of ['planos', 'planos/individual', 'planos/familia', 'calculadoras/reserva']) {
+          await q.goto(`${lancado.url}/${c}`);
+          doPlano[c] = await q.evaluate(() => ({ capa: document.querySelector('.capa .botao-principal')?.getAttribute('href') ?? null, menu: document.querySelector('.menu-cta').getAttribute('href'), ponte: document.querySelector('.ponte') ? [document.querySelector('.ponte a').getAttribute('href'), document.querySelector('.ponte').textContent] : null }));
+        }
+        ok('estado do produto, lançado (27/11): "Assine aqui" da capa do Individual e do Família leva ?plano=individual e ?plano=familia ao cadastro; o resumo dos planos e o cabeçalho, sem parâmetro; a linha do fim de uma calculadora leva ao cadastro, com o teste grátis',
+          doPlano.planos.capa === CRIAR && doPlano['planos/individual'].capa === `${CRIAR}?plano=individual` && doPlano['planos/familia'].capa === `${CRIAR}?plano=familia` &&
+          Object.values(doPlano).every((x) => x.menu === CRIAR) && doPlano['calculadoras/reserva'].ponte[0] === CRIAR && /14 dias grátis, sem cartão\.$/.test(doPlano['calculadoras/reserva'].ponte[1]), JSON.stringify(doPlano));
         const largas = [];
         for (const largura of [320, 1280]) {
           await q.setViewportSize({ width: largura, height: 900 });
@@ -1960,17 +2047,19 @@ function varrerPagina() {
           secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
           capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
           demo: demo ? { texto: demo.textContent, botao: demo.classList.contains('botao'), rel: demo.rel, fonte: parseFloat(getComputedStyle(demo).fontSize) } : null,
-          telas: [...document.querySelectorAll('.telas-web img')].map((i) => ({ ok: i.complete && i.naturalWidth > 0, local: i.src.startsWith(location.origin + '/imagens/computador-'), alt: i.alt.length > 40 })),
+          // Desde 27/11/2026, quatro vídeos do computador logo depois da capa, no lugar das duas capturas paradas, cada um com a capa.
+          telas: [...document.querySelectorAll('section[aria-labelledby="no-computador"] figure[data-video] video')].map((v) => ({ ok: v.poster.startsWith(location.origin + '/imagens/video-computador-'), local: [...v.querySelectorAll('source')].every((f) => f.src.startsWith(location.origin + '/videos/computador-')), alt: (document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '').length > 120 })),
+          capturasParadas: document.querySelectorAll('main img[src*="/imagens/computador-"]').length,
           pagar: /cartão/.test(main) && /Pix/.test(main) && /serviço de pagamento/.test(main) && /mesmos na web, na App Store e no Google Play/.test(main),
           proibido: /desconto|mais barat|Open Finance|fase de testes|Clarevo Plus/i.test(main),
           menuAtual: document.querySelector('.menu-lista a[aria-current="page"]')?.textContent,
         };
       });
-      ok('web: o título, as seções, "Assine aqui" (para os planos) e "Conheça o app", a demonstração como link de texto menor (não botão, com noopener), as duas telas do computador carregadas, cartão ou Pix pelo serviço de pagamento com os mesmos preços, sem desconto, e "Na web" marcado no menu',
-        web.h1 === 'Use a Clarevo no navegador' && JSON.stringify(web.secoes) === JSON.stringify(['no-navegador', 'no-computador', 'pagar', 'comecar']) &&
+      ok('web: o título, as seções (os vídeos do computador logo depois da capa), "Assine aqui" (para os planos) e "Conheça o app", a demonstração como link de texto menor (não botão, com noopener), os quatro vídeos do computador com capa e descrição, cartão ou Pix pelo serviço de pagamento com os mesmos preços, sem desconto, e "Na web" marcado no menu',
+        web.h1 === 'Use a Clarevo no navegador' && JSON.stringify(web.secoes) === JSON.stringify(['no-computador', 'no-navegador', 'como-app', 'pagar', 'comecar']) &&
         JSON.stringify(web.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
         web.demo && web.demo.texto === 'Ver uma demonstração com dados fictícios' && !web.demo.botao && /noopener/.test(web.demo.rel) && web.demo.fonte <= 16 &&
-        web.telas.length === 2 && web.telas.every((t) => t.ok && t.local && t.alt) && web.pagar && !web.proibido && web.menuAtual === 'Na web', JSON.stringify(web));
+        web.telas.length === 4 && web.telas.every((t) => t.ok && t.local && t.alt) && web.capturasParadas === 0 && web.pagar && !web.proibido && web.menuAtual === 'Na web', JSON.stringify(web));
       // No menu do celular, "Na web" leva à página.
       await p.goto(`${origem}/`);
       await p.click('details.menu-movel > summary');
@@ -1983,6 +2072,128 @@ function varrerPagina() {
         if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${largura} px`);
       }
       ok('web: nada passa da largura da tela em 320, 390 e 1280 px', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+    }
+
+    // 7c13. Rodada de 27/11/2026 (análise geral de 26/11, lista "Depois", e a jornada de compra de 27/11; docs/22_SITE.md, seção 22): O app e
+    // Para empresas mais curtas, com o resto recolhido num <details> que abre pelo teclado (e os vídeos de dentro só baixam e tocam depois de
+    // abrir); as calculadoras na ordem formulário, resultado e aviso, com o aviso à vista; as fontes em WOFF2; o botão do cabeçalho à vista de
+    // 768 a 1119 px; a linha para o app no fim das páginas de conteúdo; e "Use como app no celular" em Use no navegador.
+    {
+      const p = await pagina();
+      const deVideo = [];
+      p.on('request', (q) => /\/videos\//.test(q.url()) && deVideo.push(q.url()));
+      // O app: os blocos, o <details> fechado, a altura no celular (eram cerca de 21 telas de 844 px; agora até 12) e o teclado.
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.goto(`${origem}/app/`);
+      const app = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main > section.bloco')].map((x) => x.getAttribute('aria-labelledby')),
+        aVista: [...document.querySelectorAll('section[aria-labelledby="como-funciona"] article.recurso')].map((a) => a.id),
+        fechado: !document.querySelector('#todos-os-recursos').open,
+        dentro: [...document.querySelectorAll('#todos-os-recursos article.recurso')].map((a) => a.id),
+        resumo: document.querySelector('#todos-os-recursos > summary').textContent,
+        altura: document.documentElement.scrollHeight,
+        planos: [...document.querySelectorAll('section[aria-labelledby="planos"] .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+      }));
+      ok('O app (27/11): Como funciona com Resumo, Anotar e Contas à vista, o resto recolhido e fechado em "Ver todos os recursos", Seus dados, Onde usar e a chamada dos planos, com até 12 telas de 844 px em 390 px',
+        JSON.stringify(app.secoes) === JSON.stringify(['como-funciona', 'recursos', 'seus-dados', 'onde', 'planos']) && JSON.stringify(app.aVista) === JSON.stringify(['resumo', 'anotar', 'contas']) &&
+        app.fechado && app.dentro.length === 8 && app.resumo === 'Ver todos os recursos' && app.altura <= 12 * 844 &&
+        JSON.stringify(app.planos) === JSON.stringify([['Assine aqui', '../planos.html'], ['Use no navegador', '../web.html']]), JSON.stringify(app));
+      // Rolar a página inteira com o <details> fechado: nenhum vídeo de dentro dele baixa.
+      deVideo.length = 0;
+      await p.evaluate(async () => { for (let y = 0; y < document.documentElement.scrollHeight; y += 400) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 80)); } });
+      const fechadoBaixou = deVideo.filter((u) => /\/videos\/(importar-fatura-print|metas|investir|tema-escuro-claro)\./.test(u));
+      // Pelo teclado: foco no resumo e Enter abre; o vídeo de Metas, rolado para a tela, toca.
+      await p.locator('#todos-os-recursos > summary').focus();
+      const focoNoResumo = await p.evaluate(() => { const a = document.activeElement; return a.matches('summary:focus-visible') || a.matches('summary:focus'); });
+      await p.keyboard.press('Enter');
+      const aberto = await p.evaluate(() => document.querySelector('#todos-os-recursos').open);
+      await p.locator('#metas video').evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForFunction(() => document.querySelector('#metas video').currentTime > 0.3, null, { timeout: 15000 }).catch(() => {});
+      const metas = await p.locator('#metas video').evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
+      ok('O app (27/11): com o <details> fechado nenhum vídeo de dentro baixa; Enter no resumo abre, e o vídeo de Metas toca ao aparecer', fechadoBaixou.length === 0 && focoNoResumo && aberto && !metas.paused && metas.tempo > 0.3, JSON.stringify({ fechadoBaixou, focoNoResumo, aberto, metas }));
+      // Para empresas: à vista o que a empresa recebe, o que vê e nunca vê, como funciona e a apresentação; o resto em três perguntas fechadas.
+      await p.goto(`${origem}/empresas/`);
+      const emp = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main > section.bloco')].map((x) => x.getAttribute('aria-labelledby')),
+        duvidas: [...document.querySelectorAll('section[aria-labelledby="detalhes"] details.duvida')].map((d) => [d.id, d.querySelector('summary').textContent, d.open]),
+        altura: document.documentElement.scrollHeight,
+        nuncaVe: document.querySelector('.nunca-ve').checkVisibility(),
+      }));
+      await p.locator('#painel > summary').focus();
+      await p.keyboard.press('Enter');
+      const painel = await p.evaluate(() => ({ aberto: document.querySelector('#painel').open, telas: [...document.querySelectorAll('#painel img')].filter((i) => i.checkVisibility()).length, outras: [...document.querySelectorAll('details.duvida:not(#painel)')].every((d) => !d.open) }));
+      ok('Para empresas (27/11): à vista o que a empresa recebe, o que vê e nunca vê, como funciona e a apresentação; o painel, o fim do benefício e a NR-1 em perguntas fechadas, que abrem pelo teclado; até 9 telas de 844 px em 390 px',
+        JSON.stringify(emp.secoes) === JSON.stringify(['bem-estar', 'o-que-ve', 'como-funciona', 'detalhes', 'apresentacao']) &&
+        JSON.stringify(emp.duvidas) === JSON.stringify([['painel', 'O painel, só na web', false], ['fim', 'Quando o benefício acaba', false], ['nr-1', 'Bem-estar financeiro e a NR-1', false]]) &&
+        emp.altura <= 9 * 844 && emp.nuncaVe && painel.aberto && painel.telas === 3 && painel.outras, JSON.stringify({ emp, painel }));
+      // As calculadoras: o formulário, depois o resultado (com a resposta numa frase no topo) e o aviso logo depois, à vista, sem recolher.
+      const ordens = [];
+      for (const slug of ['reserva', 'custo-por-ano', 'rendimento-cdi', 'plano-dividas', 'antes-de-financiar']) {
+        await p.goto(`${origem}/calculadoras/${slug}`);
+        await p.waitForSelector('[data-calculadora][data-pronta="sim"]');
+        ordens.push(await p.evaluate((s) => {
+          const f = document.querySelector('.calc-formulario').getBoundingClientRect();
+          const r = document.querySelector('.calc-resultados').getBoundingClientRect();
+          const aviso = document.querySelector('.calc-aviso');
+          const a = aviso.getBoundingClientRect();
+          return { slug: s, ordem: f.bottom <= r.top + 1 && r.bottom <= a.top + 1, visivel: aviso.checkVisibility(), recolhido: aviso.closest('details') !== null, estimativa: /estimativas/.test(aviso.textContent), titulo: document.querySelector('.calc-resultado h3, .calc-resultado h4')?.textContent };
+        }, slug));
+      }
+      // Com a reserva preenchida, a primeira linha do resultado é a resposta numa frase.
+      await p.goto(`${origem}/calculadoras/reserva`);
+      await p.waitForSelector('[data-calculadora][data-pronta="sim"]');
+      await p.fill('#c-essenciais', '3.750,00');
+      await p.click('label.chip:has-text("6 meses")');
+      await p.waitForTimeout(300);
+      const destaque = await p.evaluate(() => { const r = document.querySelector('.calc-resultado'); const d = r.querySelector('.calc-linhas > p'); return { classe: d.className, texto: d.textContent, avisoDepois: r.getBoundingClientRect().bottom <= document.querySelector('.calc-aviso').getBoundingClientRect().top + 1 }; });
+      ok('calculadoras (27/11): o formulário, o resultado e o aviso logo depois, à vista e sem recolher, dizendo que os resultados são estimativas; a primeira linha do resultado é a resposta, em destaque',
+        ordens.every((o) => o.ordem && o.visivel && !o.recolhido && o.estimativa && o.titulo === 'Resultado') && destaque.classe === 'calc-destaque' && /^Com estes números, a reserva de 6 meses é de R\$/.test(destaque.texto.replace(/ /g, ' ')) && destaque.avisoDepois, JSON.stringify({ ordens, destaque }));
+      // As fontes em WOFF2: o navegador pede só os WOFF2 (do próprio site, font/woff2, guardados por um ano), nenhum TTF, e as três carregam.
+      const fontes = [];
+      const q = await pagina();
+      q.on('response', (r) => /\/fontes\//.test(r.url()) && fontes.push([r.url().replace(origem, ''), r.status(), r.headers()['content-type'], /immutable/.test(r.headers()['cache-control'] || '')]));
+      await q.goto(`${origem}/`);
+      await q.evaluate(() => document.fonts.ready);
+      const carregadas = await q.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.weight).sort());
+      ok('fontes (27/11): só os três WOFF2 do próprio site, como font/woff2 e guardados por um ano, nenhum TTF, e os três pesos carregados', fontes.length === 3 && fontes.every(([u, st, tipo, guarda]) => /^\/fontes\/Manrope_\w+\.woff2$/.test(u) && st === 200 && tipo === 'font/woff2' && guarda) && JSON.stringify(carregadas) === JSON.stringify(['500', '700', '800']), JSON.stringify({ fontes, carregadas }));
+      await q.close();
+      // O cabeçalho: de 768 a 1119 px, "Entrar" à vista ao lado de "Menu"; nunca passa da largura nem quebra linha, de 320 a 1440 px; o foco.
+      const cabecalho = [];
+      await p.goto(`${origem}/`);
+      for (let l = 320; l <= 1440; l += 16) {
+        await p.setViewportSize({ width: l, height: 700 });
+        cabecalho.push(await p.evaluate((largura) => {
+          const vis = (e) => e && e.getClientRects().length > 0;
+          const itens = [...document.querySelectorAll('.topo-i .marca, .topo-i .menu-lista, .topo-i .menu-cta, .topo-i .menu-movel > summary')].filter(vis).map((e) => e.getBoundingClientRect());
+          return { l: largura, cta: vis(document.querySelector('.menu-cta')), movel: vis(document.querySelector('.menu-movel > summary')), linhas: new Set(itens.map((r) => Math.round(r.top + r.height / 2))).size, fora: Math.max(...itens.map((r) => r.right)) > innerWidth, largo: document.documentElement.scrollWidth > innerWidth + 1 };
+        }, l));
+      }
+      const errados = cabecalho.filter((c) => c.linhas > 1 || c.fora || c.largo || (c.l >= 768 && !c.cta) || (c.l < 768 && c.cta) || (c.l < 1120) !== c.movel);
+      await p.setViewportSize({ width: 900, height: 700 });
+      await p.goto(`${origem}/`);
+      await p.keyboard.press('Tab');
+      await p.keyboard.press('Tab');
+      for (let i = 0; i < 4 && !(await p.evaluate(() => document.activeElement.classList.contains('menu-cta'))); i++) await p.keyboard.press('Tab');
+      const foco = await p.evaluate(() => { const a = document.activeElement; const cs = getComputedStyle(a); return { cta: a.classList.contains('menu-cta'), texto: a.textContent, visivel: a.matches(':focus-visible'), contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      ok('cabeçalho (27/11): de 768 a 1119 px, "Entrar" à vista ao lado de "Menu" (abaixo de 768 px, só "Menu"; de 1120 px, o menu em linha), numa linha e sem passar da largura de 320 a 1440 px; o Tab chega a "Entrar" com o contorno do foco',
+        errados.length === 0 && foco.cta && foco.texto === 'Entrar' && foco.visivel && foco.contorno, JSON.stringify({ errados: errados.slice(0, 5), foco }));
+      // A linha para o app no fim das páginas de conteúdo: desde 27/11/2026, antes do lançamento, "crie a sua conta na Clarevo", para a tela
+      // de criar conta do app web, com a linha do convite. Aqui só o endereço e o lugar: o clique é seguido com o app web falso do teste, no
+      // bloco do estado do produto ("convite de aprender/"), e nunca abre o app web de verdade.
+      const pontes = [];
+      for (const c of ['aprender/', 'aprender/cet', 'calculadoras/reserva', 'ajuda/', 'novidades/']) {
+        await p.goto(`${origem}/${c}`);
+        pontes.push(await p.evaluate(() => { const a = document.querySelector('main > .bloco-ponte .ponte a'); return a ? [a.textContent, a.href, a.closest('main').lastElementChild === a.closest('.bloco-ponte'), a.closest('.ponte').textContent.includes('A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.')] : null; }));
+      }
+      ok('ponte para o app (27/11): no fim de Aprender, de uma calculadora, da Ajuda e das Novidades, "crie a sua conta na Clarevo" para a tela de criar conta, com a linha do convite, por último no conteúdo',
+        pontes.every((x) => x && x[0] === 'crie a sua conta na Clarevo' && x[1] === 'https://app.clarevo.app.br/criar-conta' && x[2] && x[3]), JSON.stringify(pontes));
+      // Use no navegador: "Use como app no celular", com os passos do iPhone e do Android.
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.goto(`${origem}/web`);
+      const comoApp = await p.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="como-app"] article')].map((a) => [a.querySelector('h3').textContent, a.querySelectorAll('ol > li').length, a.checkVisibility()]));
+      ok('web (27/11): "Use como app no celular" com os passos do iPhone (Safari) e do Android (Chrome), à vista', JSON.stringify(comoApp) === JSON.stringify([['No iPhone, pelo Safari', 3, true], ['No Android, pelo Chrome', 3, true]]), JSON.stringify(comoApp));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
     }
@@ -2048,6 +2259,14 @@ function varrerPagina() {
           for (const x of r.achados) encostados.push(`${arquivo} em ${largura} px: ${x}`);
           if (r.largo) largos.push(`${arquivo} em ${largura} px`);
           for (const k of Object.keys(varredura)) for (const x of r[k]) varredura[k].push(`${arquivo} em ${largura} px: ${x}`);
+          // O app e Para empresas (27/11/2026): de novo com os <details> abertos, para o que está recolhido seguir as mesmas regras.
+          if (/^(app|empresas)[\\/]index\.html$/.test(arquivo)) {
+            await p.evaluate(() => document.querySelectorAll('main details').forEach((d) => { d.open = true; }));
+            const a = await p.evaluate(varrerPagina);
+            for (const x of a.achados) encostados.push(`${arquivo} (aberto) em ${largura} px: ${x}`);
+            if (a.largo) largos.push(`${arquivo} (aberto) em ${largura} px`);
+            for (const k of Object.keys(varredura)) for (const x of a[k]) varredura[k].push(`${arquivo} (aberto) em ${largura} px: ${x}`);
+          }
         }
       }
       ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nenhum cartão ou bloco encostado em outro ou por cima dele`, encostados.length === 0, `${encostados.length} casos: ${encostados.slice(0, 12).join(' | ')}`);
@@ -2058,6 +2277,40 @@ function varrerPagina() {
       regra('colados', 'nenhum texto colado numa caixa ou numa grade de cartões (menos de 8 px)');
       regra('margens', 'nenhuma caixa com o primeiro ou o último item somando margem ao respiro dela');
       regra('dobrados', 'duas seções seguidas com o mesmo fundo, sem linha entre elas, não somam os dois respiros');
+      await p.close();
+    }
+
+    // 8c. Mais tamanhos de tela (varredura de 27/11/2026, pergunta do Enzo "se tudo se adapta a qualquer tela"): o tablet em pé (768 e
+    // 834 px), o tablet deitado (1024 x 768), o celular deitado (844 x 390) e o monitor grande (1920 px), em todas as páginas: nada passa da
+    // largura da tela. No celular deitado, a capa do início põe o celular ao lado do texto (como no computador), e no monitor grande o texto
+    // das notas e dos parágrafos soltos fica na medida do texto longo (até 52 rem).
+    {
+      const paginas = [];
+      const andar = (d) => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const c = path.join(d, n.name); if (n.isDirectory()) andar(c); else if (n.name.endsWith('.html')) paginas.push(path.relative(saida, c)); } };
+      andar(saida);
+      const p = await pagina();
+      const largos = [];
+      const TAMANHOS = [[768, 1024], [834, 1112], [1024, 768], [844, 390], [1920, 1080]];
+      for (const [largura, altura] of TAMANHOS) {
+        await p.setViewportSize({ width: largura, height: altura });
+        for (const arquivo of paginas) {
+          await p.goto(`${origem}/${arquivo.replace(/\\/g, '/').replace(/index\.html$/, '').replace(/\.html$/, '')}`);
+          if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largos.push(`${arquivo} em ${largura} x ${altura}`);
+        }
+      }
+      ok(`tamanhos de tela: em ${paginas.length} páginas, a 768, 834, 1024 x 768, 844 x 390 e 1920 px, nada passa da largura da tela`, largos.length === 0, largos.slice(0, 6).join(' | '));
+      await p.setViewportSize({ width: 844, height: 390 });
+      await p.goto(`${origem}/`);
+      const deitado = await p.evaluate(() => { const t = document.querySelector('.capa-grade > div').getBoundingClientRect(); const c = document.querySelector('.capa-grade > figure').getBoundingClientRect(); return { lado: c.left >= t.right - 1, capa: Math.round(document.querySelector('.capa').getBoundingClientRect().height) }; });
+      ok('tamanhos de tela: no celular deitado (844 x 390), o celular da capa do início fica ao lado do texto', deitado.lado, JSON.stringify(deitado));
+      await p.setViewportSize({ width: 1920, height: 1080 });
+      const medidas = [];
+      for (const c of ['calculadoras/reserva', 'planos', 'empresas/', 'seguranca', 'aprender/agenda']) {
+        await p.goto(`${origem}/${c}`);
+        const maior = await p.evaluate(() => Math.max(0, ...[...document.querySelectorAll('main .nota, main .aviso-edu, main .bloco .miolo > p:not([class])')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getBoundingClientRect().width)));
+        medidas.push([c, Math.round(maior)]);
+      }
+      ok('tamanhos de tela: em 1920 px, as notas, o aviso educativo e os parágrafos soltos ficam em até 52 rem (832 px)', medidas.every(([, w]) => w <= 833), JSON.stringify(medidas));
       await p.close();
     }
 

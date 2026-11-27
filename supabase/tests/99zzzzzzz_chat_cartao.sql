@@ -96,7 +96,8 @@ begin
                         where p.oid = ('public.' || f)::regprocedure and a.grantee = 0), 'sem execute para public: ' || f;
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
-  foreach f in array array['clarevo_chat_add_card_purchase(text, text, text, timestamptz, bigint, integer, date, text, text, text)',
+  -- A 0049 acrescentou p_business no fim da interna (20261127000003_telegram_negocio.sql).
+  foreach f in array array['clarevo_chat_add_card_purchase(text, text, text, timestamptz, bigint, integer, date, text, text, text, boolean)',
                            'clarevo_chat_purchase(uuid)', 'clarevo_chat_fold(text)', 'clarevo_chat_log(text, text, text, uuid, text, uuid, uuid)'] loop
     assert not has_function_privilege('service_role', 'public.' || f, 'execute') and not has_function_privilege('authenticated', 'public.' || f, 'execute')
        and not has_function_privilege('anon', 'public.' || f, 'execute'), 'ninguém de fora executa ' || f;

@@ -24,6 +24,27 @@ export const afterLogin = {
 };
 
 /**
+ * O link de cadastro do site (27/11/2026; regra em `signupEntryFrom`, no núcleo): na web, a página aberta direto em `/criar-conta` (com ou
+ * sem `?plano=` e `?periodo=`) é lida uma vez, ao carregar o app (`readSignupEntry`, em app/_layout.tsx), antes de a navegação trocar o
+ * endereço pela tela de carregamento. Sem sessão, a tela de carregamento abre Criar conta no lugar das boas-vindas; com sessão, o destino
+ * sai da memória sem uso (quem já está na conta segue para o Resumo, como antes). No celular, nada é guardado: os links do site abrem a
+ * versão web. Só na memória.
+ */
+let signupEntry: string | null = null;
+
+export const signupEntryTarget = {
+  set(target: string | null) {
+    signupEntry = target;
+  },
+  /** Devolve o destino guardado uma única vez. */
+  take(): string | null {
+    const t = signupEntry;
+    signupEntry = null;
+    return t;
+  },
+};
+
+/**
  * O atalho escolhido em "Sua primeira conta" (estudo de 25/11/2026, Onda 1, item 8): "Importar extrato, fatura ou print" ou "Anotar pelo
  * Telegram" criam a conta e, com o espaço pronto, abrem a tela pedida por cima do Resumo (`app/_layout.tsx`). Só na memória do app.
  */

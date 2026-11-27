@@ -8,6 +8,7 @@ import { AuthShell } from '@/components/auth-shell';
 import { WelcomeArt } from '@/components/states';
 import { Button, LinkButton, TextField, Txt } from '@/components/ui';
 import { DemoAuth } from '@/lib/demo-auth';
+import { useShortLandscape } from '@/lib/layout';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -26,6 +27,8 @@ export default function BoasVindas() {
   const [invite, setInvite] = useState('');
   const [inviteError, setInviteError] = useState<string | undefined>();
   const demo = auth instanceof DemoAuth ? auth : null;
+  // Celular deitado (revisão dos tamanhos de tela, 27/11/2026): a arte menor, para o título e o teste grátis aparecerem sem rolar tanto.
+  const short = useShortLandscape();
   function seeInvite() {
     const found = entryInviteFromText(invite);
     if (!found) {
@@ -46,7 +49,7 @@ export default function BoasVindas() {
     await Linking.openURL(DEMO_URL).catch(() => {});
   };
   return (
-    <AuthShell art={<View style={{ alignItems: 'center' }}><WelcomeArt width={220} /></View>}>
+    <AuthShell art={<View style={{ alignItems: 'center' }}><WelcomeArt width={short ? 120 : 220} /></View>}>
       {/* D-128: o título é a frase da marca, sem frase pequena acima dele, e o benefício concreto fica logo abaixo, como no site. */}
       <Txt variant="hero" style={{ fontSize: 26, lineHeight: 34 }} accessibilityRole="header">
         {WELCOME_TEXT.title}

@@ -1,6 +1,6 @@
-import { LOAD_ERROR_TEXT, loadErrorText } from '@clarevo/core';
+import { LOAD_ERROR_TEXT, loadErrorText, signedOutScreen } from '@clarevo/core';
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { LogOut } from 'lucide-react-native';
 import { useEffect, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,7 +10,7 @@ import { FeedbackButton } from '@/components/feedback-button';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button } from '@/components/ui';
 import { pendingBenefit, pendingBusinessInvite, pendingInvite } from '@/lib/invite-target';
-import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
+import { afterLogin, restoreTarget, signOutIntent, signupEntryTarget } from '@/lib/nav';
 import { useSession } from '@/state/session';
 import { useSpaceStatus } from '@/state/space-status';
 import { colors, space } from '@/theme/tokens';
@@ -30,8 +30,12 @@ export default function Carregando() {
   const failed = status === 'erro' && !retrying;
 
   useEffect(() => {
+    // O link de cadastro do site (`signupEntryTarget`) vale só para quem abre a página sem sessão; com sessão, sai da memória sem uso.
+    if (user) signupEntryTarget.take();
     if (recovery && user) router.replace('/nova-senha');
-    else if (status === 'sem-sessao') router.replace(afterLogin.pending() ? '/entrar' : '/boas-vindas');
+    // Sem sessão: Entrar, para retomar o destino de quem teve a sessão encerrada; Criar conta, quando a página abriu pelo link de cadastro
+    // do site (com o plano escolhido no endereço); senão, as boas-vindas.
+    else if (status === 'sem-sessao') router.replace(signedOutScreen(afterLogin.pending(), signupEntryTarget.take()) as Href);
     else if (status === 'sem-conta') router.replace('/primeira-conta');
     else if (status === 'pronto' && user) {
       const target = afterLogin.take(user.id);

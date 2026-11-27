@@ -7,6 +7,11 @@
  * estado do acesso ("Como está o acesso hoje", com a fase de testes): o endereço continuou o mesmo, para a bio e os links que já circulam
  * continuarem funcionando, e a âncora `#acesso` deu lugar a `#passos`.
  *
+ * Desde 27/11/2026 (decisão do Enzo, jornada de compra de 27/11/2026, pergunta 1: quem vem das redes encontrava "em breve" no passo 1),
+ * antes do lançamento o primeiro passo é "Crie a sua conta", com o botão "Criar conta grátis" (a tela de criar conta do app web) e a linha
+ * "A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado." (`linhaDoConvite`), e os planos ficam no texto do
+ * passo, com o link. Lançado, como antes: "Escolha o plano", com o link dos planos.
+ *
  * Sem lista de espera, sem data de abertura, sem formulário e sem script. Os links não levam parâmetros de rastreamento: para saber quantas
  * pessoas chegam por aqui, a equipe lê as estatísticas de tráfego do painel da Cloudflare, medidas no servidor (`docs/24_REDES_SOCIAIS.md`,
  * seção 4). A demonstração não aparece aqui (D-128: só como link de texto em O app e em Use no navegador).
@@ -15,11 +20,11 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { chamadas, linhaDaCapa, noCelular, selosDasLojas } = require('../estado');
+const { botaoDoConvite, chamadas, linhaDaCapa, linhaDoConvite, noCelular, selosDasLojas } = require('../estado');
 const { pessoasNaFamilia } = require('./planos');
 
 const ARQUIVO = 'comece.html';
-const DESCRICAO = 'Como começar na Clarevo: escolha o plano, use no navegador ou no celular e dê os primeiros passos. E os caminhos para O app, o MEI, Aprender e a Ajuda.';
+const DESCRICAO = 'Como começar na Clarevo: crie a conta, use no navegador ou no celular e dê os primeiros passos. E os caminhos para O app, o MEI, Aprender e a Ajuda.';
 
 function paginaComece({ valores, estado }) {
   const u = (d) => rel(ARQUIVO, d);
@@ -31,14 +36,22 @@ ${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
 ${selosDasLojas(estado, { pequenos: true })}`;
 
-  // Os três passos, verdadeiros nos dois estados: os planos (que, antes do lançamento, mostram "Em breve"), onde usar (o celular pelo estado
-  // do produto) e o que fazer primeiro no app (o card Primeiros passos do Resumo, D-033, e os atalhos da conta nova, D-125).
+  // Os três passos, verdadeiros nos dois estados: criar a conta (antes do lançamento) ou escolher o plano (lançado), onde usar (o celular pelo
+  // estado do produto) e o que fazer primeiro no app (o card Primeiros passos do Resumo, D-033, e os atalhos da conta nova, D-125).
   const passos = [
-    {
-      titulo: 'Escolha o plano',
-      texto: `Individual, para uma pessoa, ou Família, para até ${pessoasNaFamilia()} pessoas. Os dois têm todos os recursos e começam com ${PLANOS.diasDeTeste} dias grátis, sem cartão.`,
-      link: { href: u('planos.html'), texto: 'Ver os planos' },
-    },
+    estado.lancado
+      ? {
+          titulo: 'Escolha o plano',
+          texto: `Individual, para uma pessoa, ou Família, para até ${pessoasNaFamilia()} pessoas. Os dois têm todos os recursos e começam com ${PLANOS.diasDeTeste} dias grátis, sem cartão.`,
+          link: { href: u('planos.html'), texto: 'Ver os planos' },
+        }
+      : {
+          // Antes do lançamento (desde 27/11/2026): o convite ao cadastro, com a linha honesta e o botão; os planos, só no texto, sem preço.
+          titulo: 'Crie a sua conta',
+          texto: `${linhaDoConvite(estado)} Os planos Individual, para uma pessoa, e Família, para até ${pessoasNaFamilia()} pessoas, têm todos os recursos.`,
+          link: { href: u('planos.html'), texto: 'Ver os planos' },
+          botao: botaoDoConvite(estado),
+        },
     {
       titulo: 'Use no navegador ou no celular',
       texto: `A mesma conta no computador e no celular, com os mesmos dados. No computador, é só abrir o navegador, sem instalar nada. ${noCelular(estado)}`,
@@ -67,7 +80,7 @@ ${selosDasLojas(estado, { pequenos: true })}`;
     bloco(
       `<h2 id="passos">Três passos para começar</h2>
 <ol class="passos">
-${passos.map((p) => `<li><h3>${esc(p.titulo)}</h3><p>${esc(p.texto)}</p><p class="passo-link"><a href="${esc(p.link.href)}">${esc(p.link.texto)}</a></p></li>`).join('\n')}
+${passos.map((p) => `<li><h3>${esc(p.titulo)}</h3><p>${esc(p.texto)}</p>${p.botao ? `<p class="acoes acoes-passo">${p.botao}</p>` : ''}<p class="passo-link"><a href="${esc(p.link.href)}">${esc(p.link.texto)}</a></p></li>`).join('\n')}
 </ol>`,
       { rotulo: 'passos' },
     ),
