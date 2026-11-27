@@ -132,7 +132,8 @@ function FamilyNextStep({ access, now }: { access: Access; now: Date }) {
  * ajustes da loja e a troca de plano. A trava da escrita é do banco.
  * Jornada de compra de 27/11/2026: para quem ainda escolhe um plano, os planos vêm logo depois da situação (com os botões dentro de cada
  * plano) e "O que a assinatura libera" depois deles; o plano e o período escolhidos no site (`lib/chosen-plan.ts`) abrem já marcados na
- * primeira vez e saem do aparelho; quem paga o plano Família ganha o próximo passo (criar a Família e convidar).
+ * primeira vez (sem período no endereço, o mensal, que desde 27/11/2026 vem primeiro e marcado) e saem do aparelho; quem paga o plano
+ * Família ganha o próximo passo (criar a Família e convidar).
  */
 export default function AssinaturaScreen() {
   const access = useAccess();

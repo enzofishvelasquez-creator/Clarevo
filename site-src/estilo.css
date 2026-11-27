@@ -171,6 +171,11 @@ main:focus{outline:none}
   .capa{padding:2.5rem 0 4.5rem}
   .capa-grade{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:3rem}
 }
+/* Celular deitado (varredura de tamanhos de 27/11/2026, 844 x 390): o celular da capa ficava embaixo do texto, e a capa passava de três
+   alturas de tela. Com a tela baixa e larga, o celular vai para o lado do texto, como no computador. */
+@media (min-width:40rem) and (max-width:55.99rem) and (max-height:32rem) and (orientation:landscape){
+  .capa-grade{grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:2rem}
+}
 .capa-simples{padding-bottom:2.5rem}
 .acoes{display:flex;flex-wrap:wrap;gap:.75rem;margin:1.25rem 0 .75rem}
 /* O texto logo embaixo dos botões (a linha do teste na capa, os links de texto da chamada final, o link da demonstração em O app): o mesmo
@@ -240,6 +245,11 @@ blockquote>:last-child{margin-bottom:0}
 .texto{max-width:46rem}
 .texto-largo{max-width:52rem}
 .nota{color:var(--texto-2)}
+/* Varredura de tamanhos de 27/11/2026 (de 320 a 1920 px): numa tela larga, as notas e os parágrafos e listas soltos de uma seção (sem
+   classe, fora de grades e cartões), o aviso educativo, a lista de Segurança e o texto dos cartões que ocupam a linha toda chegavam a
+   140-150 caracteres por linha na largura toda do conteúdo (72 rem). Ficam com a medida do texto longo (52 rem, cerca de 100 caracteres na
+   letra das notas), como as perguntas recolhidas e as ressalvas. */
+.nota,.bloco .miolo>p:not([class]),.bloco .miolo>ul:not([class]),.bloco .miolo>ol:not([class]),.aviso-edu,.nao-e,.posts .cartao>p,.grade>.cartao>p{max-width:52rem}
 /* Um parágrafo de texto logo depois do lead de uma seção, na mesma largura (D-115: no lugar de um cartão sozinho). */
 .texto-bloco{max-width:42rem}
 /* Dois parágrafos lado a lado a partir de 56 rem (D-115, revisão: a primeira seção da página inicial ocupava só a metade da esquerda). */
@@ -595,7 +605,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .descricao h3{margin-top:0}
 .marca-cartao h3{margin:.75rem 0 .35rem}
 .marca-amostra{display:flex;align-items:center;justify-content:center;min-height:9rem;padding:1.25rem;border-radius:14px;border:1px solid var(--linha)}
-.marca-amostra img{display:block;max-width:100%;height:auto;max-height:5.5rem}
+.marca-amostra img{display:block;width:auto;max-width:100%;height:auto;max-height:5.5rem}
 .marca-claro{background:#FFFFFF}
 .marca-azul{background:#2457F5;border-color:#2457F5}
 .baixar{font-size:.9375rem;color:var(--texto-2)}
@@ -654,6 +664,10 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
 .celular video[tabindex]{cursor:pointer}
 .celular video:focus-visible{outline-offset:4px;border-radius:30px}
+/* Os vídeos do computador (27/11/2026) na moldura larga das capturas, com o mesmo comportamento. */
+.larga video{display:block;width:100%;height:auto;border-radius:12px;background:#F7F9FD;object-fit:cover}
+.larga video[tabindex]{cursor:pointer}
+.larga video:focus-visible{outline-offset:4px;border-radius:12px}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}
@@ -847,6 +861,14 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 
 /* D-128: o link de cada passo de Comece aqui, embaixo do texto. */
 .passos .passo-link{margin-top:.6rem;font-weight:700}
+/* O convite ao cadastro antes do lançamento (decisão do Enzo de 27/11/2026): na seção Planos do início, a linha honesta e "Criar conta
+   grátis" num quadro calmo, com as cores de sempre (nada de vermelho nem de alerta); no primeiro passo de Comece aqui, o botão embaixo do
+   texto. */
+.convite-conta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem 1.5rem;max-width:52rem;margin:0 0 1.75rem;padding:1rem 1.25rem;border:1px solid var(--linha);border-radius:20px;background:var(--superficie)}
+.bloco-alt .convite-conta{background:var(--fundo)}
+.convite-conta .aviso-assinatura{flex:1 1 18rem;margin:0;font-weight:700}
+.convite-conta .acoes{margin:0}
+.passos .acoes-passo{margin:.9rem 0 0}
 /* "Use no navegador ou no celular" na página inicial (D-128): o texto com a lista e, a partir de 56 rem, a tela do computador ao lado. No
    celular a captura larga ficaria pequena demais para ler: fica escondida (e, com loading="lazy", nem é baixada). */
 .na-web{display:grid;gap:1.5rem 3rem;align-items:center}
@@ -854,10 +876,20 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .so-tela-larga{display:none}
 @media (min-width:56rem){.na-web{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.so-tela-larga{display:block}}
 .na-web .acoes{margin-bottom:0}
-/* Use no navegador (web.html, D-128): as telas do computador, uma embaixo da outra no celular e lado a lado a partir de 64 rem. */
-.telas-web{display:grid;gap:1.5rem 2rem}
-@media (min-width:64rem){.telas-web{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.telas-web .larga{margin:0}
+/* Use no navegador (web.html): desde 27/11/2026, os vídeos do computador (pedido do Enzo, "focar em demonstração por vídeos do app"). O
+   principal na largura do conteúdo; os outros três, cada um ao lado do título e da frase do que mostra (a partir de 56 rem, o texto de um
+   lado e o vídeo do outro, alternando), e um embaixo do outro no celular. */
+.video-principal{margin:0 0 2.5rem}
+.videos-web{display:grid;gap:2.5rem}
+.video-web{display:grid;gap:1rem 2.5rem;align-items:center;margin:0}
+.video-web .larga{margin:0}
+.video-web-texto h3{margin:0 0 .5rem;font-size:1.25rem}
+.video-web-texto p{margin:0;color:var(--texto-2);max-width:30rem}
+@media (min-width:56rem){
+  .video-web{grid-template-columns:minmax(0,.75fr) minmax(0,1.6fr)}
+  .video-web:nth-child(even){grid-template-columns:minmax(0,1.6fr) minmax(0,.75fr)}
+  .video-web:nth-child(even) .video-web-texto{order:2}
+}
 .pagar-web{max-width:46rem}
 .pagar-web h2 .etiqueta{vertical-align:middle;margin-left:.5rem;font-size:.875rem}
 

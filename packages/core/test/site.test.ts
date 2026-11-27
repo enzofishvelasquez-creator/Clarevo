@@ -53,6 +53,8 @@ interface GerarOpcoes {
   novidades?: string;
   retrato?: unknown;
   noticias?: string;
+  /** As chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO`), como no `--estado`. */
+  estado?: Record<string, unknown>;
 }
 interface Gerado {
   arquivos: Map<string, string | Buffer>;
@@ -319,7 +321,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     // D-117: a lista e a página de leitura das notícias têm o script delas, que pergunta uma vez ao próprio site (/api/noticias).
     const nasNoticias = /^noticias\/(index|materia)\.html$/.test(nome);
     // D-115: a página inicial e O app têm o script dos vídeos (js/videos.js), que toca e pausa os vídeos e não pede nada a ninguém.
-    const comVideos = ['index.html', 'app/index.html'].includes(nome);
+    // Desde 27/11/2026, também Use no navegador (web.html), com os vídeos do computador.
+    const comVideos = ['index.html', 'app/index.html', 'web.html'].includes(nome);
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
@@ -337,9 +340,10 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
     expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|audio)\b/i);
-    // Vídeos (D-114 e D-115): só na página inicial e em O app, do próprio site, sem controles de player e sem `autoplay` (quem toca e pausa
-    // é js/videos.js, só com o vídeo na tela), sem som, em repetição e sem baixar nada antes de aparecer.
-    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da página inicial e de O app`).not.toMatch(/<video\b/i);
+    // Vídeos (D-114 e D-115): só na página inicial, em O app e, desde 27/11/2026, em Use no navegador, do próprio site, sem controles de
+    // player e sem `autoplay` (quem toca e pausa é js/videos.js, só com o vídeo na tela), sem som, em repetição e sem baixar nada antes de
+    // aparecer.
+    if (!['index.html', 'app/index.html', 'web.html'].includes(nome)) expect(html, `${nome}: vídeo fora da página inicial, de O app e de Use no navegador`).not.toMatch(/<video\b/i);
     for (const v of html.matchAll(/<video\b[^>]*>/gi)) {
       expect(v[0], `${nome}: vídeo`).toMatch(/^<video muted loop playsinline preload="none" width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
       expect(v[0], `${nome}: vídeo com controles ou autoplay`).not.toMatch(/\s(controls|autoplay)\b/);
@@ -840,16 +844,17 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('class="frase-apoio"');
     // Os blocos, na ordem.
     expect([...h.matchAll(/<section class="bloco[^"]*" aria-labelledby="([^"]+)"/g)].map((m) => m[1])).toEqual(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'na-web', 'perguntas', 'comecar']);
-    // Antes do lançamento (o padrão em config.js): "Assine aqui" para a seção Planos e "Conheça o app"; nada de demonstração, de criar conta
-    // nem de fase de testes; a linha curta da assinatura em breve.
+    // Antes do lançamento (o padrão em config.js): "Assine aqui" para a seção Planos e "Conheça o app"; nada de demonstração nem de fase de
+    // testes; a linha curta da assinatura em breve. Desde 27/11/2026, o cadastro só pelo convite da seção Planos ("Criar conta grátis").
     const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
     expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="#planos">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
     expect(capa).toContain('<p class="estado-produto">Assinatura em breve, com 14 dias grátis, sem cartão. Cancele quando quiser.</p>');
     expect(h).toContain('<h2 id="planos">');
     expect(h).not.toMatch(/demo\.clarevo|Ver a demonstração|Como ter acesso|fase de testes|comece\.html#acesso/);
-    expect(h).not.toContain('/criar-conta');
+    expect(h.match(/\/criar-conta/g)?.length).toBe(1);
+    expect(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/.exec(h)![0]).toContain('<a class="botao botao-principal" href="https://app.clarevo.app.br/criar-conta" rel="noopener noreferrer">Criar conta grátis</a>');
     expect(h).not.toContain('class="selo-loja"');
-    // O botão do menu, antes do lançamento, é "Entrar", para a tela de entrar (D-128; D-064: a tela inicial do app web convida a criar conta).
+    // O botão do menu, antes do lançamento, é "Entrar", para a tela de entrar (D-128; a tela inicial do app web nunca, antes do lançamento).
     // Todas as páginas, nos dois estados, em site-estado.test.ts.
     expect(h).toContain('<a class="menu-cta" href="https://app.clarevo.app.br/entrar" rel="noopener noreferrer">Entrar</a>');
     expect(h).not.toContain('href="https://app.clarevo.app.br"');
@@ -881,10 +886,12 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
     expect(h).not.toContain('não é atendimento de saúde');
     expect(h).not.toContain('eficácia clínica');
-    // Os dois vídeos: o Resumo na capa e a fatura por print em "Como funciona"; nenhuma captura de celular parada. A tela do computador do
-    // bloco "Use no navegador ou no celular" é a terceira tela com a legenda da demonstração.
+    // Os dois vídeos de celular: o Resumo na capa e a fatura por print em "Como funciona"; nenhuma captura de celular parada. Desde
+    // 27/11/2026, o bloco "Use no navegador ou no celular" tem o vídeo do Resumo no computador (no lugar da captura parada), a terceira tela
+    // com a legenda da demonstração.
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(2);
-    expect(h).not.toMatch(/<figure class="celular">/);
+    expect(h.match(/<figure class="larga larga-video so-tela-larga" data-video /g)?.length).toBe(1);
+    expect(h).not.toMatch(/<figure class="celular">|<figure class="larga">/);
     expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(3);
     for (const alvo of ['app/index.html', 'web.html', 'empresas/index.html', 'mei.html', 'planos.html', 'seguranca.html', 'sobre.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. "R$" com número só na seção Planos; "grátis" só na
@@ -919,7 +926,8 @@ describe('site público: as páginas geradas', () => {
     expect(web).toContain('<h2 id="na-web">Use no navegador ou no celular</h2>');
     for (const t of ['A mesma conta na web e no celular, com os mesmos dados', 'nada para instalar', 'o menu ao lado', 'cartão ou Pix, pelo serviço de pagamento, com os mesmos preços das lojas', 'chega em breve à App Store e ao Google Play']) expect(web, t).toContain(t);
     expect(web).toContain('<a class="botao botao-suave" href="web.html">Ver como é usar no navegador</a>');
-    expect(web).toMatch(/<figure class="larga so-tela-larga"><div class="larga-moldura"><img src="imagens\/computador-resumo\.[0-9a-f]{10}\.png" alt="A Clarevo no navegador do computador[^"]+" width="960" height="\d+" loading="lazy"/);
+    // Desde 27/11/2026, o vídeo do Resumo no computador (no lugar da captura parada), só na tela larga.
+    expect(web).toMatch(/<figure class="larga larga-video so-tela-larga" data-video data-titulo="O Resumo no computador"><div class="larga-moldura"><video muted loop playsinline preload="none" width="1600" height="1000" poster="imagens\/video-computador-resumo\.[0-9a-f]{10}\.png"/);
     expect(web).not.toMatch(/desconto|mais barato|R\$\s?\d/i);
     const perguntas = /<section[^>]*aria-labelledby="perguntas"[\s\S]*?<\/section>/.exec(h)![0];
     const resumos = [...perguntas.matchAll(/<summary>([^<]+)<\/summary>/g)].map((m) => m[1]);
@@ -1245,10 +1253,17 @@ describe('site público: as páginas geradas', () => {
     // Os três passos, na ordem, cada um com o link dele; a âncora de antes (#acesso) deu lugar a #passos.
     expect(h).not.toContain('id="acesso"');
     const passos = /<h2 id="passos">Três passos para começar<\/h2>\n<ol class="passos">[\s\S]*?<\/ol>/.exec(h)![0];
-    expect([...passos.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1])).toEqual(['Escolha o plano', 'Use no navegador ou no celular', 'Dê os primeiros passos']);
+    // Antes do lançamento (27/11/2026), o primeiro passo convida a criar a conta, com a linha honesta e o botão; os planos, no link do passo.
+    expect([...passos.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1])).toEqual(['Crie a sua conta', 'Use no navegador ou no celular', 'Dê os primeiros passos']);
     expect([...passos.matchAll(/<p class="passo-link"><a href="([^"]+)">/g)].map((m) => m[1])).toEqual(['planos.html', 'web.html', 'ajuda/comecar.html']);
+    expect(passos).toContain('<li><h3>Crie a sua conta</h3><p>A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado. Os planos Individual, para uma pessoa, e Família, para até 6 pessoas, têm todos os recursos.</p><p class="acoes acoes-passo"><a class="botao botao-principal" href="https://app.clarevo.app.br/criar-conta" rel="noopener noreferrer">Criar conta grátis</a></p>');
+    const lancadoComece = texto(gerarSite({ referencia: REFERENCIA_DOS_POSTS, estado: { lancado: true, simularAssinaturaAberta: true } }).arquivos.get('comece.html'));
+    expect([...lancadoComece.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1]).slice(0, 1)).toEqual(['Escolha o plano']);
+    expect(lancadoComece).not.toContain('Criar conta grátis');
     expect(passos).toContain('No celular, use o navegador. O app para iPhone e Android chega em breve à App Store e ao Google Play.');
-    expect(principal).not.toMatch(/fase de testes|em testes|piloto|quem (?:já )?testa|lançamento|Até lá|lista de espera|cadastre-se|inscreva|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|teste gratuito|criar-conta|demo\.clarevo|Ver a demonstração/i);
+    expect(principal).not.toMatch(/fase de testes|em testes|piloto|quem (?:já )?testa|lançamento|Até lá|lista de espera|cadastre-se|inscreva|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|teste gratuito|demo\.clarevo|Ver a demonstração/i);
+    // O cadastro, só pelo convite do primeiro passo (o endereço sem parâmetro, como todo link desta página).
+    expect(principal.match(/criar-conta/g)?.length).toBe(1);
     // Os oito caminhos, nesta ordem, sem a demonstração (D-128), e nenhum link leva parâmetro de rastreamento.
     const links = [...h.matchAll(/<a class="cartao" href="([^"]+)"[^>]*><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
     expect(links).toEqual([
@@ -1372,23 +1387,36 @@ describe('site público: as páginas geradas', () => {
     expect(html('planos/individual.html')).not.toContain('planos Individuais separados');
   });
 
-  it('Use a Clarevo no navegador (web.html): sem instalar, a mesma conta, as telas do computador, cartão ou Pix pelo serviço de pagamento, os mesmos preços, "Assine aqui" e a demonstração como link de texto', () => {
+  it('Use a Clarevo no navegador (web.html): os vídeos do computador logo depois da capa, sem instalar, a mesma conta, cartão ou Pix pelo serviço de pagamento, os mesmos preços, "Assine aqui", o convite ao cadastro e a demonstração como link de texto', () => {
     const h = html('web.html');
     expect(h).toContain('<h1>Use a Clarevo no navegador</h1>');
     const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0];
     expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
     expect(capa).toContain('<p class="link-demo"><a href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>');
     expect(h.match(/demo\.clarevo\.app\.br/g)?.length).toBe(1);
-    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['no-navegador', 'no-computador', 'como-app', 'pagar', 'comecar']);
+    // Desde 27/11/2026 (pedido do Enzo, "focar em demonstração por vídeos do app"), os vídeos do computador vêm logo depois da capa.
+    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['no-computador', 'no-navegador', 'como-app', 'pagar', 'comecar']);
     // Use como app no celular (jornada de compra de 27/11/2026, S5): os passos do Safari e do Chrome, sem link para a tela inicial do app web.
     const comoApp = /<section class="bloco[^"]*" aria-labelledby="como-app">[\s\S]*?<\/section>/.exec(h)![0];
     for (const t of ['No iPhone, pelo Safari', 'Toque em Compartilhar, o quadrado com a seta para cima.', 'Escolha Adicionar à Tela de Início e confirme.', 'No Android, pelo Chrome', 'Toque no menu, os três pontos no canto de cima.', 'Escolha Instalar app ou Adicionar à tela inicial e confirme.', 'Os nomes dos menus podem mudar um pouco']) expect(comoApp, t).toContain(t);
     expect(comoApp).not.toMatch(/href=/);
     for (const t of ['Nada para instalar', 'A mesma conta do celular', 'A tela larga do computador', 'o menu fica ao lado']) expect(h, t).toContain(t);
-    // As telas de verdade do computador, gravadas da demonstração (docs/telas/630 e 631), com a legenda de sempre.
-    expect(h).toMatch(/<img src="imagens\/computador-resumo\.[0-9a-f]{10}\.png" alt="A Clarevo no navegador do computador[^"]+" width="960" height="\d+"/);
-    expect(h).toMatch(/<img src="imagens\/computador-movimentos\.[0-9a-f]{10}\.png" alt="Movimentos no navegador do computador[^"]+" width="960" height="\d+"/);
-    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(2);
+    // Os quatro vídeos do computador, gravados da demonstração (dados fictícios, sem o selo), cada um com a capa, o texto e a legenda de
+    // sempre: o principal (o Resumo e Movimentos) e os outros três ao lado de um título e de uma frase. Nenhuma captura parada.
+    const noComputador = /<section class="bloco[^"]*" aria-labelledby="no-computador">[\s\S]*?<\/section>/.exec(h)![0];
+    const ids = [...noComputador.matchAll(/<span id="video-([a-z-]+)-nome">/g)].map((m) => m[1]);
+    expect(ids).toEqual(['computador-resumo', 'computador-anotar', 'computador-importar', 'computador-contas']);
+    expect(noComputador).toMatch(/<figure class="larga larga-video video-principal" data-video data-titulo="O Resumo no computador"><div class="larga-moldura"><video muted loop playsinline preload="none" width="1600" height="1000" poster="imagens\/video-computador-resumo\.[0-9a-f]{10}\.png"/);
+    expect([...noComputador.matchAll(/<article class="video-web">\n<div class="video-web-texto">\n<h3>([^<]+)<\/h3>/g)].map((m) => m[1])).toEqual(['Anotar sem sair do Resumo', 'Importar o extrato', 'As contas do mês']);
+    expect(noComputador.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(4);
+    expect(h).not.toMatch(/<img src="imagens\/computador-/);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(4);
+    expect(h).toContain('<script src="js/videos.js" defer></script>');
+    // A chamada final, antes do lançamento (27/11/2026): o convite ao cadastro, com a linha honesta, no lugar de "Por enquanto, veja o app por dentro."
+    const final = /<div class="chamada-final">[\s\S]*?<\/div>\n<p class="ja-tem-conta">/.exec(h)![0];
+    expect(final).toContain('Crie a sua conta, anote os gastos de hoje e veja o mês tomar forma no computador. A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.');
+    expect(final).toContain('<div class="acoes">\n<a class="botao botao-principal" href="https://app.clarevo.app.br/criar-conta" rel="noopener noreferrer">Criar conta grátis</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
+    expect(h).not.toContain('Por enquanto, veja o app por dentro');
     // O pagamento na web: cartão (renova sozinho, mês ou ano, cancela na tela Assinatura) e Pix (um mês ou um ano por vez, com o aviso do
     // Resumo), pelo serviço de pagamento, sem dado do cartão na Clarevo, e os mesmos preços das lojas; antes do lançamento, "Em breve".
     const pagar = /<h2 id="pagar">[\s\S]*?<\/section>/.exec(h)![0];
@@ -1717,8 +1745,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const { IMAGENS } = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as { IMAGENS: { id: string; origem: string; alt: string }[] };
     const anotar = IMAGENS.find((i) => i.id === 'anotar')!;
     const nota = IMAGENS.find((i) => i.id === 'nota')!;
-    expect(anotar.origem).toMatch(/02_anotar_gasto\.png$/);
-    expect(nota.origem).toMatch(/09_comprovante_lido\.png$/);
+    // Desde 27/11/2026, as telas sem o selo "Demonstração", gravadas por scripts/gravar-videos-site.js --capturas.
+    expect(anotar.origem).toMatch(/site-src\/imagens\/telas\/app-anotar-gasto\.png$/);
+    expect(nota.origem).toMatch(/site-src\/imagens\/telas\/app-comprovante-lido\.png$/);
     expect(nota.alt).toBe('Tela Anotar gasto depois de ler um comprovante de Pix: o aviso do que foi lido e a descrição e o valor já preenchidos, para conferir antes de salvar.');
     expect(nota.alt).not.toBe(anotar.alt);
     expect(recurso('nota')).toContain(`alt="${esc(nota.alt)}"`);
@@ -1796,7 +1825,7 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(tituloDe('web.html')).toBe('Use a Clarevo no navegador: controle de gastos na web · Clarevo');
     expect(descricaoDe('index.html')).toBe('Controle de gastos sem planilha: contas, cartões e gastos do mês num app, com o pessoal, a família e o negócio separados. Você decide o que entra.');
     expect(descricaoDe('empresas/index.html')).toBe('Bem-estar financeiro também faz parte do cuidado com sua equipe. A Clarevo entra no programa de bem-estar, e a empresa nunca vê as finanças das pessoas.');
-    expect(descricaoDe('comece.html')).toMatch(/^Como começar na Clarevo: escolha o plano, use no navegador ou no celular/);
+    expect(descricaoDe('comece.html')).toMatch(/^Como começar na Clarevo: crie a conta, use no navegador ou no celular/);
     // Um resumo de post maior que 160 caracteres é cortado no fim de uma palavra, com reticências; o resumo inteiro continua na página.
     const conheca = 'novidades/2026-10-23-conheca-a-clarevo.html';
     expect(descricaoDe(conheca).length).toBeLessThanOrEqual(160);
@@ -1850,7 +1879,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const maisRecente = TEMAS_DO_SITE.map((t) => t.reviewedOn).sort().pop();
     expect(sitemap).toContain(`<url><loc>https://exemplo.test/aprender/</loc><lastmod>${maisRecente}</lastmod></url>`);
     // As páginas sem data própria ficam sem <lastmod> (nunca a data da geração).
-    for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/privacidade']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
+    for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/sobre']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
+    // As páginas com marcador pendente (Termos e Política em versão preliminar) ficam fora do sitemap e com noindex (D-131).
+    for (const pendente of ['/privacidade', '/termos']) expect(sitemap, pendente).not.toContain(`<loc>https://exemplo.test${pendente}</loc>`);
     // Nenhum <lastmod> depois do conteúdo mais novo: o post mais novo ou o tema revisado por último (os de investimentos, D-093, são
     // de 13/11/2026, um dia depois do post de novembro; a data de revisão de um tema nunca passa de hoje, R6).
     // As explicações de mercado (D-106) têm a data de revisão delas (17/11/2026).
@@ -1867,9 +1898,10 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
   }, 60_000);
 
   it('análise geral de 26/11/2026 (D-129): o Telegram na Família, a linguagem de quem visita, "No celular" sem "em breve" repetido e o rodapé com a marca', () => {
-    // O Telegram anota no Pessoal ou na Família em que a pessoa anota (o código de ligar escolhe o espaço; o banco recusa o negócio).
+    // O Telegram anota no Pessoal ou na Família em que a pessoa anota (o código de ligar escolhe o espaço) e, desde 27/11/2026, no negócio, com a palavra "negócio" no começo da mensagem.
     const familia = html('planos/familia.html');
-    expect(familia).toContain('<p class="recurso-onde">No seu Pessoal ou na Família em que você anota.</p>');
+    // Desde 27/11/2026, também no negócio, com a palavra "negócio" no começo da mensagem (a frente do app desta rodada).
+    expect(familia).toContain('<p class="recurso-onde">No seu Pessoal ou na Família em que você anota e, com a palavra negócio no começo da mensagem, no seu negócio.</p>');
     expect(familia).not.toContain('Só no seu Pessoal.</p>');
     // Nada de jargão interno nem de texto sobre a própria página.
     const proibidos: [string, string][] = [
@@ -2230,8 +2262,11 @@ describe('site público: Novidades, feed e dados estruturados', () => {
       expect(oficiais, s.url).toContain(`<li><strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a> <span class="fonte-data">consultada em ${s.consultedOn!.split('-').reverse().join('/')}</span></li>`);
     }
     expect(p).toContain('<p class="fontes-nota">Os temas também se apoiam em regras da própria Clarevo, que dizem como o app funciona e por isso não têm link.</p>');
-    // A regra vigente: nada de preço, "grátis", período de teste, data de lançamento, lojas nem convite a cadastrar, baixar ou assinar.
-    const principal = /<main[\s\S]*<\/main>/.exec(p)![0];
+    // A regra vigente: nada de preço, "grátis", período de teste, data de lançamento, lojas nem convite a cadastrar, baixar ou assinar no
+    // texto da matéria. A linha do fim das páginas de conteúdo (`ponteParaOProduto`, que antes do lançamento convida a criar a conta, com a
+    // linha do convite) fica de fora: ela tem o próprio teste, em site-estado.test.ts.
+    const principal = /<main[\s\S]*<\/main>/.exec(p)![0].replace(/<div class="bloco bloco-ponte">[\s\S]*?<\/div>\n<\/div>/, '');
+    expect(principal).not.toContain('class="ponte"');
     expect(principal).not.toMatch(/R\$\s?\d|gr[áa]tis|gratuit|14 dias|teste gr|assin(e|ar|atura)|cadastr|baix(e|ar)|crie (a )?sua conta|comece agora|em breve|App Store|Google Play|milh[õo]es|\bmelhor(es)?\b/i);
     // O resumo cabe no limite dos posts e aparece no índice.
     const post = gerado.posts.find((x) => x.arquivo === POST_DE_NOVEMBRO)!;
@@ -2445,7 +2480,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
   const gerado = gerarSite();
   const h = (nome: string) => texto(gerado.arquivos.get(nome));
   const videos = require(join(ROOT, 'scripts', 'site', 'videos.js')) as {
-    VIDEOS: { id: string; titulo: string; descricao: string }[];
+    VIDEOS: { id: string; titulo: string; descricao: string; aparelho?: string }[];
     LEGENDA_TELA: string;
   };
   const imagens = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as {
@@ -2453,15 +2488,22 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
     ILUSTRACOES: { id: string; origem: string; alt: string }[];
   };
 
-  it('os sete vídeos (anotar um gasto, Resumo, Metas, Investir, fatura por print, Calendário e o tema) saem em MP4 e WebM leves, do próprio site, com nome que muda com o conteúdo', () => {
-    expect(videos.VIDEOS.map((v) => v.id)).toEqual(['anotar-gasto', 'resumo-do-mes', 'metas', 'investir', 'importar-fatura-print', 'calendario-do-mes', 'tema-escuro-claro']);
+  it('os sete vídeos de celular (anotar um gasto, Resumo, Metas, Investir, fatura por print, Calendário e o tema) e os quatro do computador saem em MP4 e WebM leves, do próprio site, com nome que muda com o conteúdo', () => {
+    expect(videos.VIDEOS.map((v) => v.id)).toEqual([
+      'anotar-gasto', 'resumo-do-mes', 'metas', 'investir', 'importar-fatura-print', 'calendario-do-mes', 'tema-escuro-claro',
+      // Desde 27/11/2026, os vídeos da versão web no computador (web.html e o bloco "Use no navegador ou no celular" do início).
+      'computador-resumo', 'computador-anotar', 'computador-importar', 'computador-contas',
+    ]);
+    expect(videos.VIDEOS.filter((v) => v.aparelho === 'computador').map((v) => v.id)).toEqual(['computador-resumo', 'computador-anotar', 'computador-importar', 'computador-contas']);
     const manifesto = JSON.parse(readFileSync(join(ROOT, 'site-src', 'videos', 'videos.json'), 'utf8')) as { videos: Record<string, { duracao: number; largura: number; altura: number }> };
     for (const v of videos.VIDEOS) {
       const m = manifesto.videos[v.id]!;
       expect(m.duracao, v.id).toBeGreaterThanOrEqual(10);
       expect(m.duracao, v.id).toBeLessThanOrEqual(25);
-      // Retrato de celular.
-      expect(m.altura, v.id).toBeGreaterThan(m.largura * 1.5);
+      // Retrato de celular (720 x 1560) ou, no computador, a janela larga reduzida a 1600 x 1000.
+      const computador = v.aparelho === 'computador';
+      if (computador) expect([m.largura, m.altura], v.id).toEqual([1600, 1000]);
+      else expect([m.largura, m.altura], v.id).toEqual([720, 1560]);
       const mp4 = [...gerado.arquivos.keys()].filter((k) => new RegExp(`^videos/${v.id}\\.[0-9a-f]{10}\\.mp4$`).test(k));
       const webm = [...gerado.arquivos.keys()].filter((k) => new RegExp(`^videos/${v.id}\\.[0-9a-f]{10}\\.webm$`).test(k));
       expect(mp4.length, v.id).toBe(1);
@@ -2470,9 +2512,10 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       const bytesWebm = gerado.arquivos.get(webm[0]!) as Buffer;
       expect(bytesMp4.subarray(4, 8).toString('latin1'), `${v.id}: MP4`).toBe('ftyp');
       expect(bytesWebm.readUInt32BE(0), `${v.id}: WebM`).toBe(0x1a45dfa3);
-      // Leves: até 2 MB cada (o gravador baixa a qualidade até caber).
-      expect(bytesMp4.length, mp4[0]).toBeLessThanOrEqual(2 * 1000 * 1000);
-      expect(bytesWebm.length, webm[0]).toBeLessThanOrEqual(2 * 1000 * 1000);
+      // Leves: até 2 MB cada no celular e 750 KB no computador (o gravador baixa a qualidade até caber).
+      const limite = computador ? 750 * 1000 : 2 * 1000 * 1000;
+      expect(bytesMp4.length, mp4[0]).toBeLessThanOrEqual(limite);
+      expect(bytesWebm.length, webm[0]).toBeLessThanOrEqual(limite);
       // O arquivo de site-src/videos é o mesmo publicado.
       expect(bytesMp4.equals(readFileSync(join(ROOT, 'site-src', 'videos', `${v.id}.mp4`))), v.id).toBe(true);
       // O texto: título, frase e descrição, sem valores em reais (que só aparecem na seção Planos da página inicial).
@@ -2513,7 +2556,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       expect(item).not.toMatch(/\s(controls|autoplay)\b|<details/);
     }
     // Cada vídeo aparece uma vez em cada página onde fica; a seção "Veja o app em uso" saiu (D-115).
-    for (const pagina of ['index.html', 'app/index.html']) {
+    for (const pagina of ['index.html', 'app/index.html', 'web.html']) {
       const p = h(pagina);
       expect(p).not.toContain('Veja o app em uso');
       expect(p).not.toContain('id="em-uso"');
@@ -2522,7 +2565,9 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       expect(p).toMatch(/<script src="(\.\.\/)?js\/videos\.js" defer><\/script>/);
     }
     expect(h('app/index.html').match(/<video\b/g)?.length).toBe(7);
-    expect(h('index.html').match(/<video\b/g)?.length).toBe(2);
+    // Na página inicial, os dois de celular e, desde 27/11/2026, o do Resumo no computador (no bloco "Use no navegador ou no celular").
+    expect(h('index.html').match(/<video\b/g)?.length).toBe(3);
+    expect(h('web.html').match(/<video\b/g)?.length).toBe(4);
     // O cartão do tema leva à resposta da Ajuda sobre o tema.
     expect(h('app/index.html')).toMatch(/<h3>Tema claro ou escuro<\/h3>[\s\S]*?<a href="\.\.\/ajuda\/conta\.html#p-tema">Como usar<\/a>/);
     expect(h('ajuda/conta.html')).toContain('id="p-tema"');
@@ -2539,8 +2584,36 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
     expect(js).not.toMatch(/createElement\('button'\)|video-botao/);
     expect(h('estilo.css')).not.toContain('video-botao');
     expect(h('estilo.css')).toContain('.celular video:focus-visible{');
+    expect(h('estilo.css')).toContain('.larga video:focus-visible{');
     expect(js).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|innerHTML|eval\(/);
     expect(videos.LEGENDA_TELA).toBe('Tela da demonstração, com dados fictícios');
+  });
+
+  it('27/11/2026: os vídeos do computador ficam na moldura larga, em Use no navegador (os quatro) e no bloco "Use no navegador ou no celular" do início (o do Resumo, só na tela larga), com a capa, o nome, a descrição e a legenda', () => {
+    const lugares: [string, string, string][] = [
+      ['web.html', 'computador-resumo', 'larga larga-video video-principal'],
+      ['web.html', 'computador-anotar', 'larga larga-video'],
+      ['web.html', 'computador-importar', 'larga larga-video'],
+      ['web.html', 'computador-contas', 'larga larga-video'],
+      ['index.html', 'computador-resumo', 'larga larga-video so-tela-larga'],
+    ];
+    for (const [pagina, id, classe] of lugares) {
+      const v = videos.VIDEOS.find((x) => x.id === id)!;
+      const item = new RegExp(`<figure class="${classe}" data-video data-titulo="${esc(v.titulo)}">[\\s\\S]*?</figure>`).exec(h(pagina))?.[0] ?? '';
+      expect(item, `${pagina}: ${id}`).toMatch(new RegExp(`<div class="larga-moldura"><video muted loop playsinline preload="none" width="1600" height="1000" poster="imagens/video-${id}\\.[0-9a-f]{10}\\.png" aria-labelledby="video-${id}-nome" aria-describedby="video-${id}-descricao">`));
+      expect(item).toMatch(new RegExp(`<source src="videos/${id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="videos/${id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">`));
+      expect(item).toContain(`<span id="video-${id}-descricao">${esc(v.descricao)}</span>`);
+      expect(item).toContain(`<figcaption>${videos.LEGENDA_TELA}</figcaption>`);
+      expect(item).not.toMatch(/\s(controls|autoplay)\b/);
+    }
+    // A capa de cada vídeo do computador, na largura das telas largas.
+    const capa = [...gerado.arquivos.keys()].find((k) => /^imagens\/video-computador-resumo\.[0-9a-f]{10}\.png$/.test(k))!;
+    expect(png.dimensoes(gerado.arquivos.get(capa) as Buffer)).toMatchObject({ largura: 960, altura: 600 });
+    // O vídeo do computador não entra na moldura de celular, nem o de celular na larga.
+    const modulo = require(join(ROOT, 'scripts', 'site', 'videos.js')) as Record<string, (...a: unknown[]) => unknown>;
+    const info = { videos: (modulo.videosDoSite!() as { info: unknown }).info, img: (require(join(ROOT, 'scripts', 'site', 'imagens.js')).imagensDoSite() as { info: unknown }).info };
+    expect(() => modulo.celularComVideo!('computador-resumo', info, 'web.html')).toThrow(/use telaLargaComVideo/);
+    expect(() => modulo.telaLargaComVideo!('resumo-do-mes', info, 'web.html')).toThrow(/use celularComVideo/);
   });
 
   it('as matérias de Novidades têm imagem de capa (tela da demonstração ou, na do 13º, a ilustração da marca) e as telas ao lado das seções, nos temas claro e escuro', () => {

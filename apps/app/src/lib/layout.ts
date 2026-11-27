@@ -25,3 +25,20 @@ export function useWideLayout(): boolean {
   const { width } = useWindowDimensions();
   return Platform.OS === 'web' && width >= WIDE_MIN_WIDTH;
 }
+
+/**
+ * Altura abaixo da qual uma janela deitada conta como celular deitado (revisão dos tamanhos de tela, 27/11/2026): celular deitado tem de 320 a
+ * 430 px de altura; o menor tablet deitado, 600 ou mais.
+ */
+export const SHORT_MAX_HEIGHT = 500;
+
+/**
+ * Celular deitado (a versão web, no navegador ou instalada; o app das lojas fica sempre em pé): mais largo que alto e com menos de 500 px de
+ * altura. Com o cabeçalho de duas linhas e a barra de baixo fixos, sobrava pouco mais da metade da tela para o conteúdo (227 de 390 px):
+ * deitado, o cabeçalho das telas internas fica numa linha só, a barra de baixo fica mais baixa e a arte das boas-vindas, menor. Em pé, nada
+ * muda.
+ */
+export function useShortLandscape(): boolean {
+  const { width, height } = useWindowDimensions();
+  return width > height && height < SHORT_MAX_HEIGHT;
+}

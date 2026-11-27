@@ -1,7 +1,10 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import * as core from '../src';
+import { APP_DIR, loadApp } from './app-sandbox';
 import {
   ACCESS_TEXT,
   CHOSEN_PLAN_PARAMS,
@@ -9,6 +12,7 @@ import {
   CHOSEN_PLAN_TEXT,
   FAMILY_MAX_PEOPLE,
   FAMILY_PLAN_NEXT_TEXT,
+  PLAN_PERIOD_DEFAULT,
   SIGNUP_TEXT,
   STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
@@ -20,6 +24,8 @@ import {
   parseChosenPlan,
   parseStoredChosenPlan,
   serializeChosenPlan,
+  signedOutScreen,
+  signupEntryFrom,
   signupTrialLine,
   type Access,
   type FamilyOverview,
@@ -44,6 +50,10 @@ describe('o plano escolhido no site (item 15)', () => {
     expect(parseChosenPlan({ plano: 'familia', periodo: 'anual' })).toEqual({ plan: 'familiar', period: 'anual' });
     expect(parseChosenPlan({ plano: 'familia' })).toEqual({ plan: 'familiar', period: null });
     expect(parseChosenPlan({ plano: 'individual', periodo: undefined })).toEqual({ plan: 'individual', period: null });
+    // Sem período no endereço, a tela abre no mensal, o marcado de sempre desde 27/11/2026 (o anual só com periodo=anual).
+    expect(parseChosenPlan({ plano: 'familia' })?.period ?? PLAN_PERIOD_DEFAULT).toBe('mensal');
+    expect(chosenPlanFromSearch('?plano=individual')?.period ?? PLAN_PERIOD_DEFAULT).toBe('mensal');
+    expect(chosenPlanFromSearch('?plano=individual&periodo=anual')?.period ?? PLAN_PERIOD_DEFAULT).toBe('anual');
   });
 
   it('recusa a escolha inteira com qualquer valor fora da lista, lista repetida ou plano ausente', () => {
@@ -117,6 +127,51 @@ describe('o plano escolhido no site (item 15)', () => {
     expect(tela).toContain('peekChosenPlan()');
     expect(tela).toContain('clearChosenPlan()');
     expect(CHOSEN_PLAN_TEXT.badge).toBe('O plano que você escolheu');
+  });
+});
+
+describe('o link de cadastro do site abre Criar conta direto (27/11/2026)', () => {
+  it('só o endereço de Criar conta vira destino, com a escolha do plano só quando ela é válida', () => {
+    expect(signupEntryFrom('/criar-conta', '')).toBe('/criar-conta');
+    expect(signupEntryFrom('/criar-conta/', '')).toBe('/criar-conta');
+    expect(signupEntryFrom('/criar-conta', '?plano=familia&periodo=mensal')).toBe('/criar-conta?plano=familia&periodo=mensal');
+    expect(signupEntryFrom('/criar-conta', '?plano=individual&periodo=anual')).toBe('/criar-conta?plano=individual&periodo=anual');
+    expect(signupEntryFrom('/criar-conta', '?plano=individual')).toBe('/criar-conta?plano=individual');
+    // Outros parâmetros ficam de fora; uma escolha inválida não segue, mas Criar conta abre do mesmo jeito.
+    expect(signupEntryFrom('/criar-conta', '?plano=familia&periodo=anual&utm_source=site&email=ana%40exemplo.com')).toBe('/criar-conta?plano=familia&periodo=anual');
+    expect(signupEntryFrom('/criar-conta', '?plano=empresa&periodo=anual')).toBe('/criar-conta');
+    expect(signupEntryFrom('/criar-conta', '?plano=familia&plano=individual')).toBe('/criar-conta');
+    // A raiz, Entrar e as demais telas seguem como antes (nenhum destino de cadastro).
+    for (const path of ['/', '/entrar', '/boas-vindas', '/conta/assinatura', '/criar-conta/x', '/x/criar-conta', '/criar-contas', '/confirmar-email']) {
+      expect(signupEntryFrom(path, '?plano=familia&periodo=mensal'), path).toBeNull();
+    }
+  });
+
+  it('sem sessão: Entrar para retomar um destino; Criar conta pelo link do site; senão, as boas-vindas', () => {
+    expect(signedOutScreen(false, null)).toBe('/boas-vindas');
+    expect(signedOutScreen(false, '/criar-conta')).toBe('/criar-conta');
+    expect(signedOutScreen(false, '/criar-conta?plano=familia&periodo=mensal')).toBe('/criar-conta?plano=familia&periodo=mensal');
+    expect(signedOutScreen(true, null)).toBe('/entrar');
+    expect(signedOutScreen(true, '/criar-conta')).toBe('/entrar');
+  });
+
+  it('o app lê o endereço uma vez, só na web, e a tela de carregamento usa o destino só sem sessão (com sessão, ele sai sem uso)', () => {
+    const layout = ler('apps/app/src/app/_layout.tsx');
+    expect(layout).toContain('signupEntryTarget.set(readSignupEntry());');
+    expect(layout).toMatch(/function readSignupEntry\(\): string \| null \{\n  if \(Platform\.OS !== 'web'/);
+    expect(layout).toContain('signupEntryFrom(window.location.pathname, window.location.search)');
+    const carregando = ler('apps/app/src/app/carregando.tsx');
+    expect(carregando).toContain('if (user) signupEntryTarget.take();');
+    expect(carregando).toContain("status === 'sem-sessao') router.replace(signedOutScreen(afterLogin.pending(), signupEntryTarget.take())");
+    // O destino guardado vale uma vez (lib/nav.ts de verdade, com o roteador de mentira).
+    const { signupEntryTarget } = loadApp(path.join(APP_DIR, 'src', 'lib', 'nav.ts'), { platform: 'web', mocks: { '@clarevo/core': core, 'expo-router': { router: {} } } });
+    expect(signupEntryTarget.take()).toBeNull();
+    signupEntryTarget.set('/criar-conta?plano=familia&periodo=mensal');
+    expect(signupEntryTarget.take()).toBe('/criar-conta?plano=familia&periodo=mensal');
+    expect(signupEntryTarget.take()).toBeNull();
+    // De Criar conta, voltar leva às boas-vindas quando não há tela antes, e "Já tenho conta" a Entrar, como antes.
+    expect(ler('apps/app/src/components/auth-shell.tsx')).toContain("router.canGoBack() ? router.back() : router.replace('/boas-vindas')");
+    expect(ler('apps/app/src/app/criar-conta.tsx')).toContain("router.replace('/entrar')");
   });
 });
 

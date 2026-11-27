@@ -19,12 +19,12 @@
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, faixaDeConfianca, dominioDe, icone, telaLarga } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, faixaDeConfianca, dominioDe, icone } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
-const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
+const { celularComVideo, telaLargaComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 const { PAGINA_DO_PLANO, dadosDoApp, linhaDoAnual, linhaDosPlanos, pessoasNaFamilia } = require('./planos');
-const { assinaturaEmBreve, chamadas, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, linhaDaCapa, noCelular, selosDasLojas, textoDoAcesso } = require('../estado');
+const { chamadas, conviteAoCadastro, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, linhaDaCapa, noCelular, selosDasLojas, textoDoAcesso } = require('../estado');
 
 const ARQUIVO = 'index.html';
 /**
@@ -54,12 +54,13 @@ const DESCRICAO_CURTA = 'Controle de gastos sem planilha: contas, cartões e gas
  * do lançamento cada cartão leva a fita "Em breve" no canto de cima (`fitaEmBreve`, só desenho, com o mesmo "em breve" no título para o
  * leitor de tela), no lugar da etiqueta "Preços no lançamento" e da frase "A assinatura pelo app abre no lançamento. Até lá, nada é
  * cobrado."; embaixo dos cartões, uma linha só (`linhaDosPlanos`). Desde a D-129, antes do lançamento, logo abaixo do título (é aqui que
- * "Assine aqui" da capa chega), à vista: "A assinatura abre em breve, na web e nas lojas." (`assinaturaEmBreve`). `u` monta o caminho
- * relativo.
+ * "Assine aqui" da capa chega), à vista, a linha de que a assinatura abre em breve; desde 27/11/2026 (decisão do Enzo, jornada de compra,
+ * pergunta 1), com uma ação de verdade ao lado: "Criar conta grátis" e "A assinatura abre em breve. Por enquanto, o acesso é completo e
+ * nada é cobrado." (`conviteAoCadastro`; até então, só a linha, e a seção era um beco sem saída). `u` monta o caminho relativo.
  */
 function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
   const fita = fitaEmBreve(estado);
-  const aviso = assinaturaEmBreve(estado);
+  const convite = conviteAoCadastro(estado);
   const cartoes = PLANOS.texto.plans
     .map(
       (p) => `<article class="cartao plano plano-link${fita ? ' com-fita' : ''}">
@@ -73,7 +74,7 @@ ${linhaDoAnual(p.plan)}
     .join('\n');
   return `<h2 id="planos">${esc(PLANOS.texto.plansTitle)}</h2>
 <p class="lead-bloco">${esc(PLANOS.texto.plansNote.split('. ')[0])}. O que muda é para quem é a assinatura.</p>
-${aviso ? `<p class="aviso-assinatura">${esc(aviso)}</p>\n` : ''}<div class="grade">
+${convite ? `${convite}\n` : ''}<div class="grade">
 ${cartoes}
 </div>
 ${linhaDosPlanos(u)}
@@ -91,10 +92,11 @@ const porta = (u, { icone: ic, titulo, texto, href, link }) => `<li class="porta
 /**
  * "Use no navegador ou no celular" (D-128): a mesma conta e os mesmos dados na web e no celular, sem instalar nada no computador, a tela larga
  * com o menu ao lado e o pagamento na web com cartão ou Pix, pelo serviço de pagamento. O celular segue o estado do produto (`noCelular`).
- * A tela do computador (a demonstração, `docs/telas/630_computador_resumo.png`) só aparece a partir de 56 rem: no celular, a captura larga
- * ficaria pequena demais para ler. O detalhe está em `web.html`.
+ * A tela do computador só aparece a partir de 56 rem: no celular, a tela larga ficaria pequena demais para ler. Desde 27/11/2026 (pedido do
+ * Enzo, "deixar como vídeo de demonstração como os outros"), é o vídeo do Resumo no computador (`computador-resumo`, o mesmo de `web.html`,
+ * sem o selo), no lugar da captura parada `docs/telas/630_computador_resumo.png`. O detalhe está em `web.html`.
  */
-function blocoNaWeb(u, img, estado) {
+function blocoNaWeb(u, img, videos, estado) {
   const itens = [
     'A mesma conta na web e no celular, com os mesmos dados: o que você anota num aparece no outro.',
     'No computador, nada para instalar: é só abrir o navegador. A tela larga mostra o menu ao lado e o mês inteiro.',
@@ -109,7 +111,7 @@ ${itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}
 </ul>
 <p class="acoes"><a class="botao botao-suave" href="${u('web.html')}">Ver como é usar no navegador</a></p>
 </div>
-${telaLarga(img['computador-resumo'], ARQUIVO, { classe: 'so-tela-larga' })}
+${telaLargaComVideo('computador-resumo', { videos, img }, ARQUIVO, { classe: 'so-tela-larga' })}
 </div>`;
 }
 
@@ -224,7 +226,7 @@ ${celularComVideo('importar-fatura-print', { videos, img }, ARQUIVO)}
       'voce-decide',
     ),
     secao(conteudoPlanos(PLANOS, u, estado), 'planos'),
-    secao(blocoNaWeb(u, img, estado), 'na-web'),
+    secao(blocoNaWeb(u, img, videos, estado), 'na-web'),
     secao(blocoDasPerguntas(), 'perguntas'),
     secao(
       `<div class="chamada-final">

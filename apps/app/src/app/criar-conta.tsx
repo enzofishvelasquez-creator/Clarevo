@@ -16,9 +16,11 @@ import { colors } from '@/theme/tokens';
 type Errors = Partial<Record<'name' | 'email' | 'password', string>>;
 
 /**
- * Criar conta. Com a assinatura aberta, o "Assine aqui" do site chega aqui direto (jornada de compra de 27/11/2026): no alto, a linha do
- * teste grátis (`SIGNUP_TEXT.trial`, verdadeira antes e depois do início da cobrança); o plano e o período escolhidos no site
- * (`?plano=individual|familia&periodo=mensal|anual`) ficam só neste aparelho, para a tela Assinatura abrir com eles.
+ * Criar conta. O link de cadastro do site (`/criar-conta`) chega aqui direto, sem passar pelas boas-vindas, para quem está sem sessão (a
+ * tela de carregamento decide, `signupEntryTarget` em lib/nav.ts; jornada de compra de 27/11/2026): no alto, a linha do teste grátis
+ * (`SIGNUP_TEXT.trial`, verdadeira antes e depois do início da cobrança); o plano e o período escolhidos no site
+ * (`?plano=individual|familia&periodo=mensal|anual`) ficam só neste aparelho, para a tela Assinatura abrir com eles. Voltar leva às
+ * boas-vindas (aberta direto, sem tela antes na pilha) e "Já tenho conta · Entrar" a Entrar, como antes.
  */
 export default function CriarConta() {
   const { auth } = useSession();

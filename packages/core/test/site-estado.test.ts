@@ -12,15 +12,19 @@ import { ACCESS_TEXT, BILLING_PERIODS, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSC
  *   - nos DOIS estados, nenhum texto de fase de testes (D-128, pedido do Enzo, 26/11/2026): "fase de testes", "em testes", "piloto", "quem
  *     testa", "Preços no lançamento", "abre no lançamento" e as outras formas do lançamento do produto, a frase da assinatura fechada, "Como
  *     ter acesso", "Ver a demonstração" e "Testar grátis"; a demonstração só como link de texto em O app e em Use no navegador;
- *   - antes do lançamento, só antes: a fita "Em breve" nos planos, "Assine aqui" levando aos planos e o "Entrar" do menu para a tela de entrar;
+ *   - antes do lançamento, só antes: a fita "Em breve" nos planos, "Assine aqui" levando aos planos, o "Entrar" do menu para a tela de entrar
+ *     e, desde 27/11/2026 (decisão do Enzo; o cadastro está aberto, D-129 A), o convite "Criar conta grátis" com a linha "A assinatura abre em
+ *     breve. Por enquanto, o acesso é completo e nada é cobrado.", só nos planos (a seção do início, `planos.html` e cada plano, com o plano
+ *     no endereço), em Comece aqui, em Use no navegador e na linha do fim das páginas de conteúdo; nunca no menu, nunca uma compra, nunca um
+ *     preço junto do convite;
  *   - lançado, só lançado: "Assine aqui" e o menu levando à tela de criar conta, selos e links das lojas, a tela inicial do app web, "aberta
- *     para todas as pessoas" e oferta com preço nos dados estruturados (D-064: nada disso antes, nenhum convite a criar conta);
+ *     para todas as pessoas" e oferta com preço nos dados estruturados (nada disso antes);
  *   - "Assine aqui" é a chamada principal de todas as capas e chamadas finais, com no máximo dois botões por bloco; os dados estruturados são
  *     JSON válido (com a FAQPage do início); `robots.txt` e `_headers` (a política de segurança) não mudam com o estado;
  *   - `lancado: true` é recusado enquanto a assinatura pelo app estiver fechada (`SUBSCRIBE_OPEN`). O site lançado deste teste usa
  *     `simularAssinaturaAberta`, que só o `--estado` aceita e que o `--final` recusa;
  *   - desde a análise geral de 26/11/2026 (D-129): os planos (`planos.html` e a página de cada plano) têm, lançado, "Assine aqui" e "Conheça
- *     o app" na capa e, antes, a linha "A assinatura abre em breve, na web e nas lojas." (também na seção Planos do início) e "Conheça o app";
+ *     o app" na capa e, antes, "Criar conta grátis" e "Conheça o app", com a linha do convite (na seção Planos do início, o convite num quadro);
  *     lançado, o menu tem "Entrar" ao lado de "Assine aqui", e Use no navegador diz "Já tem conta? Entrar no navegador" nos dois estados;
  *     "Segurança" saiu do menu; e o endereço do Google Play é aceito só como a página oficial do app (`details?id=`).
  */
@@ -58,8 +62,10 @@ const REFERENCIA = '2026-11-12';
 const APP_STORE = 'https://apps.apple.com/br/app/clarevo/id0000000000';
 /** A página oficial do app no Google Play: sempre com o identificador do pacote no parâmetro `id` (D-129). */
 const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=app.clarevo';
-/** A linha dos planos antes do lançamento (D-129). */
-const AVISO_DOS_PLANOS = 'A assinatura abre em breve, na web e nas lojas.';
+/** A linha dos planos e do convite ao cadastro antes do lançamento (desde 27/11/2026; até então, "A assinatura abre em breve, na web e nas lojas."). */
+const AVISO_DOS_PLANOS = 'A assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado.';
+/** O botão do convite ao cadastro, só antes do lançamento (27/11/2026). */
+const CONVITE = 'Criar conta grátis';
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** O texto de um arquivo, com as entidades que o site usa trocadas pelo caractere e o espaço sem quebra virando espaço comum. */
@@ -142,13 +148,18 @@ const SO_ANTES: [string, RegExp][] = [
   ['a assinatura abre em breve', new RegExp(escRe(AVISO_DOS_PLANOS))],
   ['"Assine aqui" para os planos', /<a class="botao botao-principal" href="(?:#planos|(?:\.\.\/)*planos\.html)">Assine aqui<\/a>/],
   ['"Entrar" como botão do menu', new RegExp(`<a class="menu-cta" href="${escRe(URL_ENTRAR)}"`)],
+  ['o convite "Criar conta grátis"', new RegExp(escRe(CONVITE))],
 ];
-/** O que só vale lançado: nunca antes do lançamento (D-064: nenhum convite a criar conta, nem a tela inicial do app web). */
+/**
+ * O que só vale lançado: nunca antes do lançamento ("Assine aqui" para o cadastro, as lojas, a tela inicial do app web, a oferta). Desde
+ * 27/11/2026, a tela de criar conta em si vale nos dois estados: antes do lançamento, só pelo convite "Criar conta grátis" (o teste do
+ * convite, abaixo, confere onde e como).
+ */
 const SO_DEPOIS: [string, RegExp][] = [
   ['"Assine aqui" para criar conta', new RegExp(`<a class="botao botao-principal" href="${escRe(URL_CRIAR_CONTA)}" rel="noopener noreferrer">Assine aqui</a>`)],
   ['selo de loja', /class="selo-loja"|Baixar na App Store|Disponível no Google Play/],
   ['link para uma loja', /href="https:\/\/(?:apps\.apple\.com|play\.google\.com)\//],
-  ['link para criar conta', new RegExp(escRe(URL_CRIAR_CONTA))],
+  ['"Assine aqui" no menu', new RegExp(`<a class="menu-cta" href="${escRe(URL_CRIAR_CONTA)}"`)],
   ['link para a tela inicial do app web', new RegExp(`href="${escRe(URL_APP)}/?"`)],
   ['aberta para todas as pessoas', /aberta para todas as pessoas/i],
   ['oferta com preço nos dados estruturados', /"@type":\s*"Offer"/],
@@ -206,7 +217,7 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     expect(varrer(lancado, SO_ANTES)).toEqual([]);
   });
 
-  it('antes do lançamento: nenhuma página tem o que só vale lançado (criar conta, lojas, tela inicial do app web, oferta)', () => {
+  it('antes do lançamento: nenhuma página tem o que só vale lançado ("Assine aqui" para o cadastro, lojas, tela inicial do app web, oferta)', () => {
     expect(varrer(pre, SO_DEPOIS)).toEqual([]);
   });
 
@@ -227,8 +238,14 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       for (const [g, estado] of [[pre, 'antes'], [lancado, 'lançado']] as const) {
         const blocos = chamadasDe(g, nome);
         expect(blocos.length, `${nome} (${estado})`).toBeGreaterThanOrEqual(1);
-        for (const b of blocos) {
+        for (const [i, b] of blocos.entries()) {
           expect(b.length, `${nome} (${estado}): ${JSON.stringify(b)}`).toBeLessThanOrEqual(2);
+          // Antes do lançamento (27/11/2026), a chamada final de Use no navegador convida a criar a conta ("Criar conta grátis", para o
+          // cadastro), no lugar de "Assine aqui"; a capa continua com "Assine aqui", para os planos.
+          if (estado === 'antes' && nome === 'web.html' && i === blocos.length - 1) {
+            expect(b[0], `${nome} (${estado}), chamada final`).toEqual(['botao-principal', URL_CRIAR_CONTA, CONVITE]);
+            continue;
+          }
           const destino = estado === 'lançado' ? URL_CRIAR_CONTA : nome === 'index.html' ? '#planos' : nome.includes('/') ? '../planos.html' : 'planos.html';
           expect(b[0], `${nome} (${estado})`).toEqual(['botao-principal', destino, 'Assine aqui']);
           // A segunda, quando há: Conheça o app ou Use no navegador, nunca a demonstração.
@@ -282,7 +299,7 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     }
   });
 
-  it('os planos nunca são um beco sem saída (D-129): lançado, "Assine aqui" e "Conheça o app" na capa; antes, à vista, a assinatura em breve e "Conheça o app"', () => {
+  it('os planos nunca são um beco sem saída (D-129): lançado, "Assine aqui" e "Conheça o app" na capa; antes, "Criar conta grátis" e "Conheça o app", com a linha do convite (27/11/2026)', () => {
     // Desde 27/11/2026 (jornada de compra, item S3), a capa de cada plano leva o plano no endereço do cadastro; o resumo, não.
     const PLANOS = { 'planos.html': ['', ''], 'planos/individual.html': ['../', '?plano=individual'], 'planos/familia.html': ['../', '?plano=familia'] } as const;
     for (const [nome, [sobe, doPlano]] of Object.entries(PLANOS)) {
@@ -290,18 +307,70 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       expect(capaDe(lancado), nome).toContain(
         `<div class="acoes">\n<a class="botao botao-principal" href="${URL_CRIAR_CONTA}${doPlano}" rel="noopener noreferrer">Assine aqui</a>\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>\n<p class="estado-produto">${TRIAL_DAYS} dias grátis, sem cartão. Cancele quando quiser.</p>`,
       );
+      // Antes do lançamento, desde 27/11/2026: "Criar conta grátis" (o cadastro, com o plano da página) e "Conheça o app", com a linha do
+      // convite embaixo; nenhum "Assine aqui" na capa (os planos são aonde ele leva).
       expect(capaDe(pre), nome).toContain(
-        `<p class="estado-produto">${AVISO_DOS_PLANOS}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>`,
+        `<div class="acoes">\n<a class="botao botao-principal" href="${URL_CRIAR_CONTA}${doPlano}" rel="noopener noreferrer">${CONVITE}</a>\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>\n<p class="estado-produto">${AVISO_DOS_PLANOS}</p>`,
       );
-      expect(capaDe(pre), nome).not.toContain('botao-principal');
+      expect(capaDe(pre), nome).not.toContain('Assine aqui');
       expect(capaDe(lancado), nome).not.toContain(AVISO_DOS_PLANOS);
+      expect(capaDe(lancado), nome).not.toContain(CONVITE);
     }
-    // A seção Planos do início, aonde "Assine aqui" da capa leva antes do lançamento: a mesma linha, logo abaixo do título.
-    expect(texto(pre, 'index.html')).toMatch(new RegExp(`<h2 id="planos">Planos</h2>\n<p class="lead-bloco">[^<]+</p>\n<p class="aviso-assinatura">${escRe(AVISO_DOS_PLANOS)}</p>`));
+    // A seção Planos do início, aonde "Assine aqui" da capa leva antes do lançamento: o convite, logo abaixo do título, num quadro.
+    expect(texto(pre, 'index.html')).toMatch(
+      new RegExp(
+        `<h2 id="planos">Planos</h2>\n<p class="lead-bloco">[^<]+</p>\n<div class="convite-conta">\n<p class="aviso-assinatura">${escRe(AVISO_DOS_PLANOS)}</p>\n<p class="acoes acoes-convite"><a class="botao botao-principal" href="${escRe(URL_CRIAR_CONTA)}" rel="noopener noreferrer">${CONVITE}</a></p>\n</div>`,
+      ),
+    );
     expect(texto(lancado, 'index.html')).not.toContain('aviso-assinatura');
+    expect(texto(lancado, 'index.html')).not.toContain('convite-conta');
   });
 
-  it('as páginas de conteúdo terminam com uma linha calma para o app (jornada de compra de 27/11/2026, S2): antes do lançamento, O app; lançado, o cadastro com o teste grátis', () => {
+  it('antes do lançamento, o convite ao cadastro (decisão do Enzo de 27/11/2026): só nos lugares combinados, sempre com a linha honesta, nunca no menu, nunca uma compra, nunca com preço', () => {
+    const conteudo = (n: string) => /^(aprender|calculadoras|ajuda)\/[^/]+\.html$/.test(n) || /^novidades\/(index|\d{4}-\d{2}-\d{2}-[^/]+)\.html$/.test(n);
+    const links = new Map<string, string[]>();
+    for (const nome of lidos(pre).filter((n) => n.endsWith('.html'))) {
+      const achados = [...texto(pre, nome).matchAll(new RegExp(`<a(?: class="[^"]+")? href="(${escRe(URL_CRIAR_CONTA)}[^"]*)" rel="noopener noreferrer">([^<]+)</a>`, 'g'))].map((m) => `${m[2]} -> ${m[1]!.replace(/&amp;/g, '&')}`);
+      // Todo endereço do cadastro está num desses links (nenhum outro jeito de chegar lá).
+      expect((texto(pre, nome).match(/criar-conta/g) ?? []).length, nome).toBe(achados.length);
+      if (achados.length && !conteudo(nome)) links.set(nome, achados);
+      if (conteudo(nome)) expect(achados, nome).toEqual([`crie a sua conta na Clarevo -> ${URL_CRIAR_CONTA}`]);
+    }
+    const botao = (q = '') => `${CONVITE} -> ${URL_CRIAR_CONTA}${q}`;
+    expect(Object.fromEntries(links)).toEqual({
+      'index.html': [botao()],
+      'comece.html': [botao()],
+      'planos.html': [botao()],
+      'planos/individual.html': [botao('?plano=individual')],
+      'planos/familia.html': [botao('?plano=familia')],
+      'web.html': [botao()],
+    });
+    // Sempre com a linha honesta ao lado, e nunca no menu (o menu continua só com "Entrar").
+    for (const nome of [...links.keys(), ...lidos(pre).filter(conteudo)]) {
+      const h = texto(pre, nome);
+      expect(h, nome).toContain(AVISO_DOS_PLANOS);
+      expect(/<header[\s\S]*?<\/header>/.exec(h)?.[0] ?? '', nome).not.toContain('criar-conta');
+    }
+    // A ponte e o convite: nada de preço nem de prazo junto ("R$" com número, dias, datas), e nenhum link de compra em página nenhuma.
+    const blocosDoConvite = [
+      /<div class="convite-conta">[\s\S]*?<\/div>/.exec(texto(pre, 'index.html'))![0],
+      /<li><h3>Crie a sua conta<\/h3>[\s\S]*?<\/li>/.exec(texto(pre, 'comece.html'))![0],
+      /<div class="chamada-final">[\s\S]*?<\/div>\n<p class="ja-tem-conta">/.exec(texto(pre, 'web.html'))![0],
+      ...['planos.html', 'planos/individual.html', 'planos/familia.html'].map((n) => /<div class="acoes">\n<a class="botao botao-principal"[\s\S]*?<p class="estado-produto">[^<]+<\/p>/.exec(texto(pre, n))![0]),
+      /<p class="ponte">[\s\S]*?<\/p>/.exec(texto(pre, 'aprender/index.html'))![0],
+    ];
+    for (const b of blocosDoConvite) {
+      expect(b).toMatch(/Criar conta grátis|crie a sua conta na Clarevo/);
+      expect(b).toContain(AVISO_DOS_PLANOS);
+      expect(b).not.toMatch(/R\$\s?\d|\d+ dias|\d{2}\/\d{2}/);
+    }
+    for (const nome of lidos(pre)) expect(texto(pre, nome), nome).not.toMatch(/href="[^"]*(?:\/conta\/assinatura|assinar=|checkout|asaas|\/pagar)/i);
+    // A linha é a do app com a compra fechada (ACCESS_TEXT.notOpenYet), sem o "Assinatura em breve." do começo.
+    expect(AVISO_DOS_PLANOS).toBe(`A assinatura abre em breve. ${ACCESS_TEXT.notOpenYet.replace(/^Assinatura em breve\. /, '')}`);
+    expect(SUBSCRIBE_OPEN).toBe(false);
+  });
+
+  it('as páginas de conteúdo terminam com uma linha calma para o app (jornada de compra de 27/11/2026, S2): o cadastro, antes do lançamento com a linha do convite, lançado com o teste grátis', () => {
     const conteudo = (g: Gerado) => lidos(g).filter((n) => /^(aprender|calculadoras|ajuda)\/[^/]+\.html$/.test(n) || /^novidades\/(index|\d{4}-\d{2}-\d{2}-[^/]+)\.html$/.test(n));
     const nomes = conteudo(pre);
     // Todas: os temas de Aprender, a agenda, as calculadoras, a Ajuda e as Novidades, com os índices.
@@ -310,8 +379,7 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     const ponte = /<div class="bloco bloco-ponte">\n<div class="miolo">\n(<p class="ponte">[\s\S]*?<\/p>)\n<\/div>\n<\/div>\n<\/main>/;
     const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
     for (const nome of nomes) {
-      const sobe = '../'.repeat(nome.split('/').length - 1);
-      expect(ponte.exec(texto(pre, nome))?.[1], `${nome} (antes)`).toBe(`<p class="ponte">${inicio} <a href="${sobe}app/index.html">conheça o app da Clarevo</a>.</p>`);
+      expect(ponte.exec(texto(pre, nome))?.[1], `${nome} (antes)`).toBe(`<p class="ponte">${inicio} <a href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. ${AVISO_DOS_PLANOS}</p>`);
       expect(ponte.exec(texto(lancado, nome))?.[1], `${nome} (lançado)`).toBe(`<p class="ponte">${inicio} <a href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão.</p>`);
     }
     // Só nas páginas de conteúdo: nem as páginas de venda (que já têm as chamadas) nem a 404 e as legais.
@@ -337,9 +405,9 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       if (achados.length) comParametro.set(nome, achados);
     }
     expect(Object.fromEntries(comParametro)).toEqual({ 'planos/individual.html': ['plano=individual'], 'planos/familia.html': ['plano=familia'] });
-    // O cabeçalho dessas páginas continua sem parâmetro, e antes do lançamento nenhuma página leva ao cadastro.
+    // O cabeçalho dessas páginas continua sem parâmetro. Antes do lançamento, o convite das mesmas páginas leva o mesmo plano (o teste do
+    // convite, acima).
     for (const nome of ['planos/individual.html', 'planos/familia.html']) expect(texto(lancado, nome)).toContain(`<a class="menu-cta" href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">Assine aqui</a>`);
-    for (const nome of lidos(pre)) expect(texto(pre, nome), nome).not.toContain('criar-conta');
   });
 
   it('Use no navegador: "Já tem conta? Entrar no navegador" embaixo das chamadas da capa e da chamada final, nos dois estados (D-129)', () => {
@@ -501,10 +569,22 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     expect(dadosEstruturados(texto(pre, 'index.html')).find((d) => d['@type'] === 'FAQPage')).toEqual(dadosEstruturados(texto(lancado, 'index.html')).find((d) => d['@type'] === 'FAQPage'));
   });
 
-  it('robots.txt e a política de segurança (_headers) não mudam com o estado; com marcador pendente, nada é indexado', () => {
+  it('robots.txt e a política de segurança (_headers) não mudam com o estado; com indexar (D-131), o site entra na busca e as páginas com marcador pendente ficam de fora', () => {
     expect(texto(lancado, 'robots.txt')).toBe(texto(pre, 'robots.txt'));
     expect(texto(lancado, '_headers')).toBe(texto(pre, '_headers'));
-    if (pre.pendencias.size > 0) expect(texto(pre, 'robots.txt')).toContain('Disallow: /');
+    const robots = texto(pre, 'robots.txt');
+    expect(robots).toContain('Allow: /');
+    expect(robots).not.toContain('Disallow');
+    expect(robots).toMatch(/^Sitemap: https:\/\/[a-z0-9.-]+\/sitemap\.xml$/m);
+    const mapa = texto(pre, 'sitemap.xml');
+    const comPendencia = [...pre.pendencias.entries()].filter(([, l]) => l.length > 0).map(([nome]) => nome);
+    for (const nome of comPendencia) {
+      expect(texto(pre, nome), nome).toContain('<meta name="robots" content="noindex">');
+      expect(mapa.split('\n').some((l) => l.includes(`<loc>`) && new RegExp(`<loc>https://[^/<]+/${nome.replace(/(index)?\.html$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</loc>`).test(l)), nome).toBe(false);
+    }
+    for (const nome of ['index.html', 'planos.html', 'web.html', 'mei.html']) expect(texto(pre, nome), nome).not.toContain('content="noindex"');
+    const fechado = gerarSite({ referencia: REFERENCIA, estado: { indexar: false } });
+    if (fechado.pendencias.size > 0 && [...fechado.pendencias.values()].some((l) => l.length > 0)) expect(texto(fechado, 'robots.txt')).toContain('Disallow: /');
     expect(texto(pre, '_headers')).toContain("Content-Security-Policy: default-src 'none'; img-src 'self'; media-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
   });
 

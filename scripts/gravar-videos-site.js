@@ -1,21 +1,29 @@
 #!/usr/bin/env node
 /**
- * Vídeos de uso e capturas das Novidades do site (D-114, `docs/22_SITE.md`, seção 17), gravados da DEMONSTRAÇÃO do app (dados fictícios e
- * identificados, a etiqueta "Demonstração" no alto de cada tela, nenhuma rede), na versão web de `npm --workspace apps/app run export:demo`,
- * a mesma de `scripts/video-demonstracao.js` e `scripts/gravar-redes.js`.
+ * Vídeos de uso, capturas das Novidades e telas de O app do site (D-114, `docs/22_SITE.md`, seções 17 e 23), gravados da DEMONSTRAÇÃO do
+ * app (dados fictícios, nenhuma rede), na versão web de `npm --workspace apps/app run export:demo`, a mesma de
+ * `scripts/video-demonstracao.js` e `scripts/gravar-redes.js`.
+ *
+ * Desde 27/11/2026 (pedido do Enzo), sem o selo "Demonstração": a página leva a marca das capturas (`window.__clarevoCaptura = true`, lida
+ * por `apps/app/src/lib/capture.ts`, a mesma de `scripts/capturas-lojas.js`), que esconde o selo e a linha "Fica só nesta demonstração". O
+ * gravador recusa a gravação em que o selo (ou, nos vídeos, qualquer texto que comece por "Demonstração") aparece; a legenda do site diz,
+ * em toda tela e todo vídeo, "Tela da demonstração, com dados fictícios". Até então, o gravador exigia o selo à vista.
  *
  * Vídeos (os textos que o site mostra, o título e a descrição de cada um, ficam em `scripts/site/videos.js`; aqui ficam os roteiros):
- *   anotar-gasto, resumo-do-mes, metas, investir, importar-fatura-print, calendario-do-mes e tema-escuro-claro.
- * Cada um sai em retrato de celular, 720 x 1560 (o app vê 360 x 780 pontos, ampliados 2 vezes), de 10 a 25 segundos, sem som (sem trilha),
- * em MP4 (H.264, yuv420p, +faststart) e WebM (VP9), com até 2 MB por arquivo (a qualidade baixa até caber; nunca passa de 25 MB, o limite
- * do Cloudflare Pages), e com a capa (PNG do momento que melhor resume o vídeo). Tudo vai para `site-src/videos/`, com `videos.json`
- * (duração, tamanho e dimensões de cada arquivo), e o gerador do site copia para `site/videos/`.
+ *   - de celular: anotar-gasto, resumo-do-mes, metas, investir, importar-fatura-print, calendario-do-mes e tema-escuro-claro, em retrato,
+ *     720 x 1560 (o app vê 360 x 780 pontos, ampliados 2 vezes), com até 2 MB por arquivo;
+ *   - do computador (27/11/2026, `web.html` e o início): computador-resumo, computador-anotar, computador-importar e computador-contas, a
+ *     versão web numa janela de 1280 x 800 pontos com o menu ao lado, desenhada a 2x e reduzida a 1600 x 1000, com até 750 KB por arquivo.
+ * Cada um de 10 a 25 segundos, sem som (sem trilha), em MP4 (H.264, yuv420p, +faststart) e WebM (VP9) (a qualidade baixa até caber; nunca
+ * passa de 25 MB, o limite do Cloudflare Pages), e com a capa (PNG do momento que melhor resume o vídeo). Tudo vai para `site-src/videos/`,
+ * com `videos.json` (duração, tamanho e dimensões de cada arquivo), e o gerador do site copia para `site/videos/`.
  *
  * Capturas (`--capturas`): as telas que as matérias de Novidades mostram ao lado das seções e na capa (Resumo, Investir, Desempenho, Nova
  * meta com os atalhos de prazo, a calculadora Multa e juros no modo da fatura do cartão, Quem vê estes dados? e o painel da empresa) e a
  * tela Seu negócio do Espaço Negócio (cenário "negocio"), que O app mostra (D-115), cada
- * uma no tema claro e no escuro (o app segue o tema do aparelho), em `site-src/imagens/telas/<nome>.png` e `<nome>-escuro.png`. O gerador
- * do site as reduz (`scripts/site/imagens.js`).
+ * uma no tema claro e no escuro (o app segue o tema do aparelho), em `site-src/imagens/telas/<nome>.png` e `<nome>-escuro.png`; e, desde
+ * 27/11/2026, as telas de O app e do kit de imprensa (`app-*.png`, só no claro, 1206 x 2622), no lugar das telas cruas com o selo de
+ * `docs/lojas/capturas/`. O gerador do site as reduz (`scripts/site/imagens.js`).
  *
  * Como o vídeo sai nítido e no tempo certo (o mesmo método de `gravar-redes.js`): a página é ampliada 2 vezes (`<meta name="viewport">` com
  * `width=360, initial-scale=2` só na cópia que o servidor local entrega) numa janela de 720 x 1560, e o navegador desenha de novo em vez de
@@ -26,13 +34,14 @@
  * (`xfade` do ffmpeg) no lugar da recarga que "Aplicar agora" faz no app.
  *
  * Uso:
- *   node scripts/gravar-videos-site.js                 grava os sete vídeos e as capturas
+ *   node scripts/gravar-videos-site.js                 grava os onze vídeos e as capturas
  *   node scripts/gravar-videos-site.js --so metas,investir   só estes vídeos (ids de scripts/site/videos.js)
  *   node scripts/gravar-videos-site.js --capturas      só as capturas das Novidades (com --telas resumo,investir, só estas)
  *   node scripts/gravar-videos-site.js --videos        só os vídeos
  *   node scripts/gravar-videos-site.js --build         refaz o build de demonstração antes (sem ele, usa apps/app/dist se existir)
  * Depois: `node scripts/gerar-site.js` e `npm run test:site`.
- * Ambiente: VIDEO_SITE_PORT (padrão 8699; ocupada, usa outra livre), FFMPEG e FFPROBE (padrão /usr/bin/ffmpeg e /usr/bin/ffprobe, ou os do
+ * Ambiente: VIDEO_SITE_DIST (outra pasta com o build de demonstração, por exemplo uma cópia parada de apps/app/dist enquanto outra frente
+ * refaz o app; com ela, --build não vale), VIDEO_SITE_PORT (padrão 8699; ocupada, usa outra livre), FFMPEG e FFPROBE (padrão /usr/bin/ffmpeg e /usr/bin/ffprobe, ou os do
  * PATH), CHROMIUM_PATH (outro Chromium) e PLAYWRIGHT_BROWSERS_PATH (padrão /opt/pw-browsers, se existir).
  */
 'use strict';
@@ -47,7 +56,11 @@ const png = require('./site/png');
 const { VIDEOS: TEXTOS_DOS_VIDEOS, PASTA_VIDEOS, ARQUIVO_MANIFESTO } = require('./site/videos');
 
 const RAIZ = path.join(__dirname, '..');
-const DIST = path.join(RAIZ, 'apps', 'app', 'dist');
+/**
+ * O build de demonstração que o script serve: `apps/app/dist` (de `npm --workspace apps/app run export:demo`) ou, com VIDEO_SITE_DIST, uma
+ * cópia dele em outra pasta (para gravar com um build parado enquanto outra frente mexe no app e refaz `apps/app/dist`).
+ */
+const DIST = process.env.VIDEO_SITE_DIST ? path.resolve(process.env.VIDEO_SITE_DIST) : path.join(RAIZ, 'apps', 'app', 'dist');
 const PASTA_TELAS = path.join(RAIZ, 'site-src', 'imagens', 'telas');
 const argv = process.argv.slice(2);
 const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i + 1] : null; };
@@ -59,21 +72,36 @@ const SO_VIDEOS = argv.includes('--videos') || SO.length > 0;
 const FFMPEG = process.env.FFMPEG || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const FFPROBE = process.env.FFPROBE || (fs.existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe');
 
-/** O aparelho dos vídeos: 360 x 780 pontos, ampliados 2 vezes = 720 x 1560. */
+/** O aparelho dos vídeos de celular: 360 x 780 pontos, ampliados 2 vezes = 720 x 1560. */
 const LARGURA = 360;
 const ALTURA = 780;
 const ESCALA = 2;
 const W = LARGURA * ESCALA;
 const H = ALTURA * ESCALA;
 const FPS = 25;
-/** Duração aceita e tamanho: até 2 MB por arquivo (a qualidade baixa até caber) e, em qualquer caso, nunca acima de 25 MB (Cloudflare Pages). */
+/**
+ * Os aparelhos dos vídeos. `celular`: o de sempre (D-114), 360 x 780 pontos ampliados 2 vezes pelo viewport (`zoom`), 720 x 1560 no vídeo,
+ * até 2 MB por arquivo. `computador` (27/11/2026, pedido do Enzo para `web.html`, "focar em demonstração por vídeos do app"): a versão web
+ * numa janela de 1280 x 800 pontos, com o menu ao lado (o app vira o desenho largo a partir de 1024, `WIDE_MIN_WIDTH`), desenhada a 2x
+ * (`deviceScaleFactor`, sem mexer no viewport) e reduzida a 1600 x 1000 no vídeo, até 750 KB por arquivo: o site mostra o vídeo com até
+ * 1.100 px de largura, e o peso fica perto do de um vídeo de celular.
+ */
+const APARELHOS = {
+  celular: { largura: LARGURA, altura: ALTURA, escala: ESCALA, zoom: true, toque: true, w: W, h: H, alvo: 2 * 1000 * 1000, crfMp4: [26, 28, 30, 32, 34], crfWebm: [36, 39, 42, 45, 48] },
+  computador: { largura: 1280, altura: 800, escala: 2, zoom: false, toque: true, w: 1600, h: 1000, alvo: 750 * 1000, crfMp4: [27, 29, 31, 33, 35, 37], crfWebm: [38, 41, 44, 47, 50, 53] },
+};
+/** Duração aceita e tamanho: o alvo do aparelho por arquivo (a qualidade baixa até caber) e, em qualquer caso, nunca acima de 25 MB (Cloudflare Pages). */
 const DURACAO_MIN = 10;
 const DURACAO_MAX = 25;
-const ALVO_BYTES = 2 * 1000 * 1000;
 const LIMITE_PAGES = 25 * 1024 * 1024;
 /** As capturas das Novidades: 390 x 844 pontos (o aparelho das telas do teste) na escala 2; o painel da empresa, 960 x 680 na escala 1,5 (o painel ocupa a largura toda e o texto fica legível no site). */
 const CELULAR_CAPTURA = { largura: 390, altura: 844, escala: 2 };
 const PAINEL_CAPTURA = { largura: 960, altura: 680, escala: 1.5 };
+/**
+ * As telas de O app e do kit de imprensa (27/11/2026, no lugar das telas cruas de `docs/lojas/capturas/`, que têm o selo): o tamanho da
+ * captura da App Store de 6,3 pol., 402 x 874 pontos a 3x = 1206 x 2622, o mesmo de antes, porque o kit oferece o arquivo original.
+ */
+const LOJA_CAPTURA = { largura: 402, altura: 874, escala: 3 };
 const AGORA = '2026-10-07T10:42:00-03:00'; // o "hoje" da demonstração (DEMO_TODAY)
 const TIPOS = { '.js': 'text/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
@@ -110,6 +138,12 @@ async function servir(zoom) {
  * rolagem suave. Vive no navegador, por isso não usa nada de fora. `cfg.tema`: a escolha de Conta › Tema guardada antes de o app abrir.
  */
 function prepararPagina(cfg) {
+  // A marca das capturas (apps/app/src/lib/capture.ts, a mesma de scripts/capturas-lojas.js): a demonstração esconde o selo
+  // "Demonstração" e a linha "Fica só nesta demonstração". Desde 27/11/2026 (pedido do Enzo), os vídeos e as telas do site saem sem o selo:
+  // a legenda do site ("Tela da demonstração, com dados fictícios") diz de onde vem cada tela.
+  window.__clarevoCaptura = true;
+  // Quem confere o selo durante a gravação inteira (`__demo.seloVisto`): um texto de selo dentro da tela, em qualquer momento.
+  window.__seloVisto = null;
   if (cfg.tema) { try { localStorage.setItem('clarevo.tema.v1', cfg.tema); } catch { /* sem armazenamento: o app segue o aparelho */ } }
   const Real = Date;
   const desloc = Real.parse(cfg.agora) - Real.now();
@@ -145,6 +179,34 @@ function prepararPagina(cfg) {
     st.textContent = css;
     raiz.appendChild(st);
     if (cfg.toque) document.addEventListener('pointerdown', (e) => circulo(e.clientX, e.clientY), true);
+    // Nos vídeos, nenhum texto que comece por "Demonstração" pode aparecer: a cada 400 ms, procura dentro da tela o selo ("Demonstração" ou
+    // "Demonstração · Pessoal"), a linha "Fica só nesta demonstração" e as frases que começam por "Demonstração" (a de Conta, "Demonstração:
+    // acesso simulado e dados fictícios..."). A legenda do site já diz que a tela é da demonstração, com dados fictícios.
+    const SELO = /^(?:Demonstração\b|Fica só nesta demonstração)/;
+    // Só conta o que aparece enquanto o vídeo grava (`__gravando`, ligado ao começar a captura de tela): a preparação, fora do vídeo, pode
+    // passar por uma tela com a frase da demonstração.
+    setInterval(() => {
+      if (!window.__gravando || window.__seloVisto || !document.body) return;
+      const andar = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = andar.nextNode(); n; n = andar.nextNode()) {
+        const t = (n.data || '').trim();
+        if (!t || !SELO.test(t) || !n.parentElement) continue;
+        // O retângulo do texto, recortado pela tela e por toda caixa com rolagem ou recorte em volta dele (o que rolou para baixo do
+        // cabeçalho não aparece).
+        const r0 = n.parentElement.getBoundingClientRect();
+        const r = { top: Math.max(r0.top, 0), bottom: Math.min(r0.bottom, innerHeight), left: Math.max(r0.left, 0), right: Math.min(r0.right, innerWidth) };
+        for (let e = n.parentElement.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+          const cs = getComputedStyle(e);
+          if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+          const c = e.getBoundingClientRect();
+          r.top = Math.max(r.top, c.top); r.bottom = Math.min(r.bottom, c.bottom); r.left = Math.max(r.left, c.left); r.right = Math.min(r.right, c.right);
+        }
+        if (r.bottom - r.top > 1 && r.right - r.left > 1 && getComputedStyle(n.parentElement).visibility !== 'hidden') {
+          window.__seloVisto = t;
+          return;
+        }
+      }
+    }, 400);
     return true;
   };
   if (!montar()) {
@@ -193,7 +255,7 @@ function prepararPagina(cfg) {
 }
 
 /** O que a página oferece ao roteiro: localizadores e gestos (os mesmos de `gravar-redes.js`). */
-function ferramentas(p, { altura, largura }) {
+function ferramentas(p, { altura, largura, topo = 90, base = 80 }) {
   const pausa = (ms) => p.waitForTimeout(ms);
   const botao = (name, exact = true) => p.getByRole('button', { name, exact }).filter({ visible: true }).first();
   const aba = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
@@ -206,10 +268,10 @@ function ferramentas(p, { altura, largura }) {
     await loc.evaluate((el, a) => window.__demo.rolarAte(el, a.ms, a.margem), { ms, margem });
   };
   const rolarPara = (y, ms = 1300) => p.evaluate((a) => window.__demo.rolarPara(a.y, a.ms), { y, ms });
-  /** Toca: se o alvo está fora da área livre (entre o cabeçalho e a barra de baixo), rola até ele primeiro. */
+  /** Toca: se o alvo está fora da área livre (entre o cabeçalho e a barra de baixo, no celular), rola até ele primeiro. */
   const tocar = async (loc, { antes = 300 } = {}) => {
     await loc.waitFor({ timeout: 15000 });
-    const dentro = await loc.evaluate((e, h) => { const r = e.getBoundingClientRect(); return r.top >= 90 && r.bottom <= h - 80; }, altura);
+    const dentro = await loc.evaluate((e, a) => { const r = e.getBoundingClientRect(); return r.top >= a.topo && r.bottom <= a.h - a.base; }, { h: altura, topo, base });
     if (!dentro) await rolarAte(loc, 900, 200);
     await pausa(antes);
     await loc.click();
@@ -217,13 +279,20 @@ function ferramentas(p, { altura, largura }) {
   const digitar = async (loc, t, atraso = 75) => { await loc.click(); await loc.pressSequentially(t, { delay: atraso }); };
   /** O círculo do toque sobre um elemento, sem tocar nele (o vídeo do tema mostra o toque em "Aplicar agora" sem recarregar a página). */
   const mostrarToque = (loc) => loc.evaluate((e) => { const r = e.getBoundingClientRect(); window.__demo.circulo(r.left + r.width / 2, r.top + r.height / 2); });
-  /** A etiqueta "Demonstração" do app está inteira dentro da tela neste instante? */
-  const etiquetaVisivel = () => p.evaluate((d) => [...document.querySelectorAll('div,span')].some((e) => {
-    if (e.children.length > 0 || !/^Demonstração/.test((e.textContent || '').trim())) return false;
-    const r = e.getBoundingClientRect();
-    return r.width > 0 && r.top >= 0 && r.bottom <= d.h && r.left >= 0 && r.right <= d.w;
-  }), { h: altura, w: largura });
-  return { pausa, botao, aba, radio, campo, texto, esperar, rolarAte, rolarPara, tocar, digitar, mostrarToque, etiquetaVisivel };
+  /**
+   * O selo "Demonstração" do app aparece em algum pedaço da tela neste instante (o texto do selo, "Demonstração" ou "Demonstração · Pessoal",
+   * a linha "Fica só nesta demonstração" ou o selo compacto, pelo nome)? Desde 27/11/2026 a resposta tem de ser não: a marca das capturas
+   * (`__clarevoCaptura`) esconde o selo. O aviso do painel da empresa ("Demonstração: empresa e pessoas fictícias...") não é o selo.
+   */
+  const seloVisivel = async () => {
+    if ((await p.locator('[aria-label="Demonstração: acesso simulado e dados fictícios"]').filter({ visible: true }).count()) > 0) return true;
+    return p.evaluate((d) => [...document.querySelectorAll('div,span')].some((e) => {
+      if (e.children.length > 0 || !/^(?:Demonstração(?: · .+)?|Fica só nesta demonstração\.?)$/.test((e.textContent || '').trim())) return false;
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < d.h && r.right > 0 && r.left < d.w;
+    }), { h: altura, w: largura });
+  };
+  return { pausa, botao, aba, radio, campo, texto, esperar, rolarAte, rolarPara, tocar, digitar, mostrarToque, seloVisivel };
 }
 
 /** Entra na demonstração e espera o Resumo de outubro. `cenario`: um cenário da demonstração (`?cenario=negocio`, D-113). */
@@ -235,7 +304,8 @@ async function entrarNaDemo(p, base, f, cenario = null) {
   await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('apps/app/dist não é o build de demonstração: o botão "Ver a demonstração" não tem a marca do build de demonstração (na versão publicada, ele abre a demonstração da web). Rode com --build'); });
   await entrar.click();
   await f.esperar('Diferença do mês');
-  await f.esperar('R$ 2.100,00');
+  // O Resumo de outubro do cenário de sempre (o do negócio tem o mesmo Pessoal); o cenário "evolucao" tem outros meses e outros valores.
+  if (cenario !== 'evolucao') await f.esperar('R$ 2.100,00');
   await p.waitForTimeout(700);
 }
 
@@ -290,22 +360,25 @@ async function prints(browser) {
  * da gravação e grava o roteiro. Devolve os quadros (arquivo e instante), o início e o fim da gravação, as marcas e os cortes.
  */
 async function gravarTomada(browser, servidor, def, tomada, problemas, extras) {
+  const a = APARELHOS[def.aparelho || 'celular'];
+  // No celular, a janela tem o tamanho do vídeo e o viewport amplia 2 vezes (`zoom`); no computador, a janela tem o tamanho em pontos e o
+  // navegador desenha a 2x (`deviceScaleFactor`).
   const ctx = await browser.newContext({
-    viewport: { width: W, height: H },
-    deviceScaleFactor: 1,
-    isMobile: true,
-    hasTouch: true,
+    viewport: a.zoom ? { width: a.largura * a.escala, height: a.altura * a.escala } : { width: a.largura, height: a.altura },
+    deviceScaleFactor: a.zoom ? 1 : a.escala,
+    isMobile: a.zoom,
+    hasTouch: a.zoom,
     colorScheme: tomada.esquema || 'light',
     locale: 'pt-BR',
     timezoneId: 'America/Sao_Paulo',
   });
-  await ctx.addInitScript(prepararPagina, { agora: AGORA, escala: ESCALA, zoom: true, toque: true, tema: tomada.tema || null });
+  await ctx.addInitScript(prepararPagina, { agora: AGORA, escala: a.escala, zoom: a.zoom, toque: a.toque, tema: tomada.tema || null });
   const fora = [];
   await bloquearRede(ctx, fora);
   const p = await ctx.newPage();
   const erros = [];
   p.on('pageerror', (e) => erros.push(e.message));
-  const f = ferramentas(p, { altura: ALTURA, largura: LARGURA });
+  const f = ferramentas(p, a.zoom ? { altura: a.altura, largura: a.largura } : { altura: a.altura, largura: a.largura, topo: 0, base: 0 });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `clarevo-video-site-${def.id}-`));
   const quadros = [];
   const cdp = await ctx.newCDPSession(p);
@@ -322,9 +395,9 @@ async function gravarTomada(browser, servidor, def, tomada, problemas, extras) {
     p, base: servidor.base, ...f, ...extras,
     /** Marca um instante do vídeo (a transição do vídeo do tema). */
     marcar: (nome) => { marcas[nome] = Date.now() / 1000; },
-    /** A capa: o PNG da tela agora (ela precisa estar parada), com a etiqueta "Demonstração" à vista. */
+    /** A capa: o PNG da tela agora (ela precisa estar parada), sem o selo "Demonstração" (desde 27/11/2026). */
     capa: async () => {
-      if (!(await f.etiquetaVisivel())) throw new Error(`${def.id}: a etiqueta "Demonstração" não está na tela no momento da capa`);
+      if (await f.seloVisivel()) throw new Error(`${def.id}: o selo "Demonstração" está na tela no momento da capa (a marca __clarevoCaptura não pegou?)`);
       capa = path.join(dir, 'capa.png');
       await p.screenshot({ path: capa });
     },
@@ -336,7 +409,8 @@ async function gravarTomada(browser, servidor, def, tomada, problemas, extras) {
   };
   await entrarNaDemo(p, servidor.base, f);
   if (tomada.preparar) await tomada.preparar(c);
-  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 94, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
+  await p.evaluate(() => { window.__gravando = true; window.__seloVisto = null; });
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 94, maxWidth: a.largura * a.escala, maxHeight: a.altura * a.escala, everyNthFrame: 1 });
   await p.waitForTimeout(500);
   const t0 = Date.now() / 1000;
   try {
@@ -351,7 +425,10 @@ async function gravarTomada(browser, servidor, def, tomada, problemas, extras) {
   const t1 = Date.now() / 1000;
   await cdp.send('Page.stopScreencast');
   await p.waitForTimeout(300);
+  // O selo de demonstração nunca pode aparecer no vídeo (o detector de `prepararPagina`, ligado na gravação inteira).
+  const selo = await p.evaluate(() => window.__seloVisto).catch(() => null);
   await ctx.close();
+  if (selo) throw new Error(`${def.id}: o selo de demonstração apareceu na gravação ("${selo}")`);
   if (fora.length) problemas.push(`${def.id}: requisições para fora de localhost bloqueadas: ${[...new Set(fora)].slice(0, 3).join(' | ')}`);
   if (erros.length) problemas.push(`${def.id}: erros na página: ${[...new Set(erros)].slice(0, 3).join(' | ')}`);
   if (quadros.length < 20) throw new Error(`${def.id}: só ${quadros.length} quadros capturados`);
@@ -385,47 +462,48 @@ function listaDoTrecho(tomada, ini, fim, nome) {
 }
 
 // JPEG é BT.601 de faixa cheia; o vídeo sai em BT.709 de faixa limitada, marcado, para o azul da marca não mudar de tom no celular.
-const CORES = `fps=${FPS},scale=in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709:flags=lanczos,format=yuv420p,settb=AVTB`;
+// No computador, a mesma conversão reduz os quadros de 2560 x 1600 ao tamanho do vídeo (`w` x `h` do aparelho).
+const cores = (a) => `fps=${FPS},scale=w=${a.w}:h=${a.h}:in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709:flags=lanczos,format=yuv420p,settb=AVTB`;
 const MARCAS_DE_COR = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv'];
 
 /**
  * O vídeo-mestre, quase sem perda (H.264, CRF 8), de onde saem o MP4 e o WebM: uma tomada, ou duas juntas por uma transição suave
  * (`transicao`: o fim da primeira e o começo da segunda, paradas na mesma tela, se misturam em `duracao` segundos).
  */
-function montarMestre(trechos, transicao, destino) {
+function montarMestre(trechos, transicao, destino, a) {
   const entradas = trechos.flatMap((t) => ['-f', 'concat', '-safe', '0', '-i', t.arquivo]);
   let filtro;
-  if (trechos.length === 1) filtro = `[0:v]${CORES}[v]`;
+  if (trechos.length === 1) filtro = `[0:v]${cores(a)}[v]`;
   else {
     const offset = (trechos[0].duracao - transicao).toFixed(3);
-    filtro = `[0:v]${CORES}[a];[1:v]${CORES}[b];[a][b]xfade=transition=fade:duration=${transicao}:offset=${offset},format=yuv420p[v]`;
+    filtro = `[0:v]${cores(a)}[a];[1:v]${cores(a)}[b];[a][b]xfade=transition=fade:duration=${transicao}:offset=${offset},format=yuv420p[v]`;
   }
   executar(FFMPEG, ['-y', '-v', 'error', ...entradas, '-filter_complex', filtro, '-map', '[v]', '-r', String(FPS), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '8', ...MARCAS_DE_COR, '-an', destino]);
 }
 
-/** MP4 (H.264) e WebM (VP9) a partir do mestre, cada um com até 2 MB: a qualidade baixa até caber. */
-function codificar(mestre, destinoBase, titulo) {
+/** MP4 (H.264) e WebM (VP9) a partir do mestre, cada um com até o alvo do aparelho (2 MB no celular): a qualidade baixa até caber. */
+function codificar(mestre, destinoBase, titulo, a) {
   const meta = ['-metadata', `title=Clarevo: ${titulo} (tela da demonstração, com dados fictícios)`];
   const tentar = (crfs, args, destino) => {
     let usado = null;
     for (const crf of crfs) {
       usado = crf;
       executar(FFMPEG, ['-y', '-v', 'error', '-i', mestre, ...args(crf), ...meta, destino]);
-      if (fs.statSync(destino).size <= ALVO_BYTES) break;
+      if (fs.statSync(destino).size <= a.alvo) break;
     }
     return usado;
   };
   const mp4 = `${destinoBase}.mp4`;
   const webm = `${destinoBase}.webm`;
-  const crfMp4 = tentar([26, 28, 30, 32, 34], (crf) => ['-c:v', 'libx264', '-preset', 'veryslow', '-tune', 'animation', '-crf', String(crf), '-profile:v', 'high', '-level', '4.1',
+  const crfMp4 = tentar(a.crfMp4, (crf) => ['-c:v', 'libx264', '-preset', 'veryslow', '-tune', 'animation', '-crf', String(crf), '-profile:v', 'high', '-level', '4.1',
     '-pix_fmt', 'yuv420p', '-g', String(FPS * 3), ...MARCAS_DE_COR, '-an', '-movflags', '+faststart'], mp4);
-  const crfWebm = tentar([36, 39, 42, 45, 48], (crf) => ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf), '-deadline', 'good', '-cpu-used', '1', '-row-mt', '1',
+  const crfWebm = tentar(a.crfWebm, (crf) => ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf), '-deadline', 'good', '-cpu-used', '1', '-row-mt', '1',
     '-pix_fmt', 'yuv420p', '-g', String(FPS * 3), ...MARCAS_DE_COR, '-an'], webm);
   return { mp4, webm, crfMp4, crfWebm };
 }
 
 /** Confere um arquivo: codec, tamanho da imagem, sem áudio, duração, peso e, no MP4, o índice no começo (+faststart). */
-function conferir(arquivo, codec, id) {
+function conferir(arquivo, codec, id, a) {
   const sonda = JSON.parse(executar(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', arquivo]));
   const v = sonda.streams.find((s) => s.codec_type === 'video');
   const audio = sonda.streams.some((s) => s.codec_type === 'audio');
@@ -433,7 +511,7 @@ function conferir(arquivo, codec, id) {
   const duracao = Number(sonda.format.duration);
   const problemas = [];
   if (!v || v.codec_name !== codec) problemas.push(`codec ${v && v.codec_name} (esperado ${codec})`);
-  if (v && (v.width !== W || v.height !== H)) problemas.push(`${v.width} x ${v.height} (esperado ${W} x ${H})`);
+  if (v && (v.width !== a.w || v.height !== a.h)) problemas.push(`${v.width} x ${v.height} (esperado ${a.w} x ${a.h})`);
   if (v && v.pix_fmt !== 'yuv420p') problemas.push(`pixel ${v.pix_fmt}`);
   if (audio) problemas.push('tem trilha de áudio');
   if (!(duracao >= DURACAO_MIN && duracao <= DURACAO_MAX)) problemas.push(`${duracao.toFixed(1)} s (de ${DURACAO_MIN} a ${DURACAO_MAX} s)`);
@@ -462,21 +540,24 @@ async function gravarVideo(browser, servidor, def, manifesto, problemas, extras)
   }
   const capa = tomadas.map((t) => t.capa).find(Boolean);
   if (!capa) throw new Error(`${def.id}: o roteiro não marcou a capa`);
+  const a = APARELHOS[def.aparelho || 'celular'];
   const mestre = path.join(tomadas[0].dir, 'mestre.mkv');
-  montarMestre(trechos, def.transicao || 0, mestre);
+  montarMestre(trechos, def.transicao || 0, mestre, a);
   const texto = TEXTOS_DOS_VIDEOS.find((v) => v.id === def.id);
+  if ((texto.aparelho || 'celular') !== (def.aparelho || 'celular')) throw new Error(`${def.id}: o aparelho do roteiro (${def.aparelho || 'celular'}) não é o de scripts/site/videos.js (${texto.aparelho || 'celular'})`);
   const base = path.join(PASTA_VIDEOS, def.id);
-  const { mp4, webm, crfMp4, crfWebm } = codificar(mestre, base, texto.titulo);
-  const infoMp4 = conferir(mp4, 'h264', def.id);
-  const infoWebm = conferir(webm, 'vp9', def.id);
+  const { mp4, webm, crfMp4, crfWebm } = codificar(mestre, base, texto.titulo, a);
+  const infoMp4 = conferir(mp4, 'h264', def.id, a);
+  const infoWebm = conferir(webm, 'vp9', def.id, a);
   const arqCapa = `${base}-capa.png`;
-  gravarPngReduzido(capa, arqCapa);
+  // A capa no tamanho do vídeo (no computador, o PNG de 2560 x 1600 é reduzido a 1600 x 1000).
+  gravarPngReduzido(capa, arqCapa, a.w);
   const d = dimensoesPng(arqCapa);
-  if (d.largura !== W || d.altura !== H) throw new Error(`${def.id}: a capa saiu ${d.largura} x ${d.altura}`);
+  if (d.largura !== a.w || d.altura !== a.h) throw new Error(`${def.id}: a capa saiu ${d.largura} x ${d.altura}`);
   for (const t of tomadas) fs.rmSync(t.dir, { recursive: true, force: true });
   manifesto.videos[def.id] = {
-    largura: W,
-    altura: H,
+    largura: a.w,
+    altura: a.h,
     duracao: infoMp4.duracao,
     mp4: { arquivo: path.basename(mp4), bytes: infoMp4.bytes, crf: crfMp4 },
     webm: { arquivo: path.basename(webm), bytes: infoWebm.bytes, crf: crfWebm },
@@ -680,11 +761,15 @@ const ROTEIROS = {
     tomadas: [
       {
         esquema: 'dark',
-        // Começa na própria tela (D-115, revisão): Conta, no tema escuro, com a etiqueta "Demonstração" à vista na capa; depois, o card Tema.
+        // Começa na própria tela (D-115, revisão): Conta, no tema escuro; depois, o card Tema. Desde 27/11/2026, sem o selo e já abaixo do
+        // cartão do perfil (que, na demonstração, diz "Demonstração: acesso simulado e dados fictícios..."): a legenda do site diz o mesmo.
         preparar: async (c) => {
           await c.tocar(c.botao('Conta: perfil, assinatura, lembretes, privacidade e segurança'), { antes: 0 });
           await c.esperar('Privacidade neste aparelho');
           await naCapa(c);
+          // O título "Sugestão ou problema" logo abaixo do cabeçalho: o cartão do perfil e o link "O que é a demonstração?" ficam acima.
+          await c.rolarAte(c.texto('Sugestão ou problema', true), 0, 56);
+          await c.pausa(400);
         },
         roteiro: async (c) => {
           const { p, botao, radio, pausa, rolarAte, tocar } = c;
@@ -729,7 +814,176 @@ const ROTEIROS = {
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Capturas das Novidades, no tema claro e no escuro.
+// Os vídeos do computador (27/11/2026, `web.html` e o bloco "Use no navegador ou no celular" do início): a versão web a 1280 x 800
+// pontos, com o menu ao lado. O mesmo método dos vídeos de celular, com o aparelho `computador`.
+// ---------------------------------------------------------------------------------------------------------------------
+/** O link do menu ao lado (Resumo, Movimentos, Metas, Investir, Aprender), pelo nome. */
+const menuAoLado = (c, nome) => c.p.getByRole('link', { name: nome, exact: true }).filter({ visible: true }).first();
+
+Object.assign(ROTEIROS, {
+  'computador-resumo': {
+    aparelho: 'computador',
+    tomadas: [{
+      preparar: naCapa,
+      roteiro: async (c) => {
+        const { esperar, pausa, rolarPara, tocar } = c;
+        await pausa(500);
+        await c.capa(); // o Resumo de outubro, com o menu ao lado
+        await pausa(2600); // a Diferença do mês, o Recebido e o Pago
+        await rolarPara(330, 1600);
+        await pausa(2400); // os pagamentos do mês, as metas e o orçamento
+        await rolarPara(0, 1100);
+        await pausa(600);
+        await tocar(menuAoLado(c, 'Movimentos do mês'), { antes: 400 });
+        await esperar('Organizar');
+        await pausa(2800); // os lançamentos de outubro numa tabela
+        await tocar(menuAoLado(c, 'Resumo'), { antes: 400 });
+        await esperar('Diferença do mês');
+        await pausa(1600);
+      },
+    }],
+  },
+  'computador-anotar': {
+    aparelho: 'computador',
+    tomadas: [{
+      // Começa na própria tela: o formulário Anotar gasto aberto ao lado do Resumo (a capa fica diferente da do vídeo do Resumo).
+      preparar: async (c) => {
+        await naCapa(c);
+        await c.tocar(c.botao('Anotar gasto'), { antes: 0 });
+        await c.esperar('Será salvo em');
+        await c.pausa(600);
+      },
+      roteiro: async (c) => {
+        const { botao, campo, radio, esperar, pausa, tocar, digitar, p } = c;
+        await pausa(400);
+        await c.capa(); // o formulário Anotar gasto, vazio, ao lado do Resumo
+        await pausa(1100);
+        await digitar(campo('Descrição'), 'Farmácia', 80);
+        await pausa(300);
+        await digitar(campo('Valor em reais'), '35', 120);
+        await pausa(400);
+        await tocar(radio('Saúde'), { antes: 300 });
+        await pausa(800);
+        await tocar(botao('Salvar gasto'), { antes: 300 });
+        await esperar('Gasto salvo');
+        await p.getByText('R$ 35,00').filter({ visible: true }).first().waitFor();
+        await pausa(2000); // o gasto salvo: Farmácia, R$ 35,00, Saúde
+        await tocar(botao('Ver resumo do mês'), { antes: 300 });
+        await esperar('R$ 3.935,00');
+        await pausa(2600); // o Pago e a Diferença do mês já com o gasto
+      },
+    }],
+  },
+  'computador-importar': {
+    aparelho: 'computador',
+    tomadas: [{
+      // Começa em Movimentos, com a lista de outubro e "Importar extrato ou fatura" em Organizar.
+      preparar: async (c) => {
+        await c.tocar(menuAoLado(c, 'Movimentos do mês'), { antes: 0 });
+        await c.esperar('Organizar');
+        await naCapa(c);
+      },
+      roteiro: async (c) => {
+        const { p, botao, esperar, pausa, rolarAte, rolarPara, tocar, texto } = c;
+        await pausa(400);
+        await c.capa(); // Movimentos de outubro
+        await pausa(1400);
+        await tocar(p.getByRole('button', { name: /^Importar extrato ou fatura/ }).filter({ visible: true }).first(), { antes: 300 });
+        await esperar('Escolha o arquivo');
+        await pausa(1200); // o arquivo é lido no aparelho
+        const [escolha] = await Promise.all([p.waitForEvent('filechooser'), tocar(botao('Escolher o arquivo'), { antes: 300 })]);
+        await escolha.setFiles(c.extrato);
+        await esperar('Arquivo lido: extrato-exemplo.csv', 15000);
+        await pausa(1200); // as linhas lidas
+        // A planilha não diz de onde é: a pessoa escolhe o banco ou carteira e a conta.
+        await tocar(c.radio('Banco ou carteira'), { antes: 300 });
+        await c.radio('Conta principal').waitFor({ timeout: 8000 });
+        await pausa(500);
+        if ((await c.radio('Conta principal').getAttribute('aria-checked')) !== 'true') await tocar(c.radio('Conta principal'), { antes: 200 });
+        await pausa(700);
+        await tocar(botao('Revisar as linhas'), { antes: 300 });
+        await esperar('Marque o que vira lançamento', 12000);
+        await pausa(2200); // cada linha com a data, a categoria sugerida e o valor
+        await rolarAte(texto('Cinema Centro', false), 1100, 260);
+        await pausa(900);
+        await tocar(p.getByRole('button', { name: /^Importar \d+ lançamentos?$/ }).filter({ visible: true }).first(), { antes: 300 });
+        await esperar('Importação concluída', 12000);
+        await rolarPara(0, 0);
+        await pausa(2400); // os lançamentos importados
+      },
+    }],
+  },
+  'computador-contas': {
+    aparelho: 'computador',
+    tomadas: [{
+      // Começa no Calendário de outubro, aberto pelo atalho do Resumo antes de gravar.
+      preparar: async (c) => {
+        await c.tocar(c.botao('Calendário do mês, Contas, faturas e datas de outubro de 2026'), { antes: 0 });
+        await c.esperar('Previsto em contas e faturas');
+        await naCapa(c);
+      },
+      roteiro: async (c) => {
+        const { botao, esperar, pausa, rolarAte, rolarPara, tocar, texto, p } = c;
+        await pausa(400);
+        await c.capa(); // o Calendário de outubro
+        await pausa(2200); // o previsto do mês, separado do que já foi pago
+        await rolarAte(texto('Quinta, 15 de outubro', true), 1500, 120);
+        await pausa(2000); // um título por dia, com as contas
+        await rolarPara(0, 900);
+        await tocar(botao('Próximo mês: novembro de 2026'), { antes: 300 });
+        await esperar('Pessoal · Novembro de 2026');
+        await pausa(1000);
+        await rolarAte(p.getByRole('button', { name: /^Fatura Cartão Exemplo, R\$ 550,00/ }).filter({ visible: true }).first(), 1400, 200);
+        await pausa(2600); // a fatura do cartão no dia do vencimento
+      },
+    }],
+  },
+});
+
+/**
+ * O extrato fictício do vídeo de importar no computador: uma planilha CSV como a dos bancos, com nomes inventados (nenhum dado de pessoa
+ * real), lida no próprio navegador. Grava numa pasta temporária e devolve o caminho.
+ */
+function extratoDeExemplo(dir) {
+  const arquivo = path.join(dir, 'extrato-exemplo.csv');
+  fs.writeFileSync(arquivo, Buffer.from([
+    'Data;Lançamento;Valor;Saldo',
+    '02/10/2026;PADARIA EXEMPLO;-18,40;1.981,60',
+    '03/10/2026;MERCADO DO BAIRRO;-126,90;1.854,70',
+    '04/10/2026;FARMÁCIA CENTRAL;-42,00;1.812,70',
+    '06/10/2026;CINEMA CENTRO;-56,00;1.756,70',
+    '',
+  ].join('\r\n'), 'latin1'));
+  return arquivo;
+}
+
+/** PDF mínimo de texto (Helvetica, uma linha por Tj), como o de `scripts/capturas-lojas.js`: um comprovante de Pix com dados fictícios. */
+function pdfDeTexto(linhas) {
+  const esc = (t) => t.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const conteudo = `BT /F1 10 Tf 40 800 Td 14 TL\n${linhas.map((l) => `(${esc(l)}) Tj T*`).join('\n')}\nET`;
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(conteudo, 'latin1')} >>\nstream\n${conteudo}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+/** O comprovante de Pix fictício da tela "Comprovante lido" (o mesmo de `scripts/capturas-lojas.js`). */
+const COMPROVANTE = [
+  'Pix enviado', '05 OUT 2026 - 12:41:08', 'Valor', 'R$ 58,90', 'Tipo de transferência', 'Pix',
+  'Destino', 'Nome', 'PADARIA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.',
+  'Origem', 'Nome', 'PESSOA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.', 'Descrição', 'Café da manhã',
+];
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Capturas das Novidades, no tema claro e no escuro, e as telas de O app e do kit de imprensa (só no claro).
 // ---------------------------------------------------------------------------------------------------------------------
 const CAPTURAS = [
   { nome: 'resumo', tela: CELULAR_CAPTURA, exigir: ['Diferença do mês'], ir: async () => {} },
@@ -757,8 +1011,8 @@ const CAPTURAS = [
     },
   },
   {
-    // As calculadoras não gravam nada e não têm a etiqueta "Demonstração" no app (como os temas de Aprender): a legenda do site diz de onde vem.
-    nome: 'multa-fatura', tela: CELULAR_CAPTURA, semEtiqueta: true, exigir: ['a fatura fica em R$ 1.186,26'],
+    // As calculadoras não gravam nada (como os temas de Aprender): a legenda do site diz de onde vem a tela.
+    nome: 'multa-fatura', tela: CELULAR_CAPTURA, exigir: ['a fatura fica em R$ 1.186,26'],
     ir: async (c) => {
       await c.aba(/^Movimentos/).click(); await c.esperar('Organizar');
       await c.botao('Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas').click(); await c.esperar('Decidir uma compra');
@@ -794,7 +1048,7 @@ const CAPTURAS = [
   },
   {
     // O painel abre pela Conta, que só existe no layout de celular: a captura começa em 390 pontos e alarga para 960 com o painel aberto.
-    nome: 'empresa-painel', tela: PAINEL_CAPTURA, telaInicial: { largura: 390, altura: 844 }, exigir: ['Empresa Exemplo (demonstração)'],
+    nome: 'empresa-painel', tela: PAINEL_CAPTURA, telaInicial: { largura: 390, altura: 844 }, avisoDaEmpresa: true, exigir: ['Empresa Exemplo (demonstração)'],
     ir: async (c) => {
       await c.botao('Conta: perfil, assinatura, lembretes, privacidade e segurança').click(); await c.esperar('Abrir painel da empresa');
       await c.botao('Abrir painel da empresa').click(); await c.esperar('Empresa Exemplo (demonstração)');
@@ -802,7 +1056,81 @@ const CAPTURAS = [
   },
 ];
 
+/**
+ * As telas de O app e do kit de imprensa (27/11/2026): as mesmas das telas cruas de `docs/lojas/capturas/apple-iphone-6-3pol-1206x2622/`
+ * (`01_resumo.png` a `09_comprovante_lido.png`, com os mesmos caminhos de `scripts/capturas-lojas.js`), agora sem o selo "Demonstração", no
+ * tamanho da captura da App Store de 6,3 pol. (1206 x 2622), só no tema claro (como as outras telas de O app). O site reduz cada uma para a
+ * página, e o kit de imprensa oferece o arquivo original para baixar.
+ */
+const irParaMovimentos = async (c) => {
+  await c.p.getByRole('tab', { name: /^Movimentos/ }).filter({ visible: true }).first().click();
+  await c.esperar('Registrar recebimento');
+  await c.pausa(400);
+};
+const TELAS_DE_O_APP = [
+  { nome: 'app-resumo', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Diferença do mês', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00'], ir: async (c) => { await c.esperar('Ainda a pagar neste mês'); } },
+  {
+    nome: 'app-anotar-gasto', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Será salvo em'],
+    ir: async (c) => {
+      await c.botao('Anotar gasto').click(); await c.esperar('Será salvo em');
+      await c.campo('Descrição').fill('Feira de sábado');
+      await c.campo('Valor em reais').fill('86,40');
+      await c.pausa(300);
+    },
+  },
+  {
+    nome: 'app-contas-a-pagar', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Contas em aberto com vencimento até o fim do mês'],
+    ir: async (c) => {
+      await c.p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$/ }).filter({ visible: true }).first().click();
+      await c.esperar('Contas em aberto com vencimento até o fim do mês');
+      await c.pausa(500);
+    },
+  },
+  {
+    nome: 'app-cartoes', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Cartão Exemplo', 'Fatura atual'],
+    ir: async (c) => {
+      await irParaMovimentos(c);
+      await c.p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await c.esperar('Adicionar outro cartão');
+      await c.p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await c.esperar('Fatura atual');
+      await c.pausa(500);
+    },
+  },
+  {
+    // O cenário fictício "evolucao" da demonstração (janeiro a junho de 2026, com um gasto grande em abril), na janela de 12 meses.
+    nome: 'app-evolucao', tela: LOJA_CAPTURA, soClaro: true, cenario: 'evolucao', exigir: ['Valores registrados, pela data do pagamento'],
+    ir: async (c) => {
+      await irParaMovimentos(c);
+      await c.p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click(); await c.esperar('Consulte o mês escolhido');
+      await c.p.getByRole('tab', { name: 'Evolução', exact: true }).filter({ visible: true }).first().click(); await c.esperar('Abrir Evolução');
+      await c.botao('Abrir Evolução').click(); await c.esperar('Valores registrados, pela data do pagamento');
+      const doze = c.p.getByRole('radio', { name: '12 meses' }).or(c.botao('12 meses')).filter({ visible: true }).first();
+      await doze.click();
+      await c.pausa(900);
+      if ((await doze.getAttribute('aria-checked')) !== 'true') throw new Error('a janela de 12 meses não ficou escolhida');
+    },
+  },
+  { nome: 'app-metas', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Reserva para imprevistos', 'Suas metas'], ir: async (c) => { await c.aba('Metas').click(); await c.esperar('Reserva para imprevistos'); await c.esperar('Seu plano de guardar'); await c.pausa(600); } },
+  { nome: 'app-aprender', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Comece por aqui'], ir: async (c) => { await c.aba('Aprender e dúvidas').click(); await c.esperar('Comece por aqui'); await c.pausa(600); } },
+  {
+    // O comprovante de Pix em PDF (fictício), lido no próprio navegador, preenche o gasto (D-078, D-088).
+    nome: 'app-comprovante-lido', tela: LOJA_CAPTURA, soClaro: true, exigir: ['Comprovante lido: Pix enviado', 'R$ 58,90', 'preencheu o que o comprovante informa'],
+    ir: async (c) => {
+      await c.botao('Anotar gasto').click(); await c.esperar('Será salvo em');
+      await c.p.getByRole('button', { name: /^Escanear nota fiscal/ }).filter({ visible: true }).first().click();
+      const [escolha] = await Promise.all([c.p.waitForEvent('filechooser'), c.botao('Ler comprovante ou boleto').click()]);
+      await escolha.setFiles(c.comprovante);
+      await c.esperar('Comprovante lido:', 20000);
+      await c.p.getByText('Comprovante lido:', { exact: false }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+      await c.pausa(600);
+    },
+  },
+];
+CAPTURAS.push(...TELAS_DE_O_APP);
+
 async function gravarCapturas(browser, servidor, problemas) {
+  const dirTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-capturas-site-'));
+  const comprovante = path.join(dirTemp, 'pix-enviado.pdf');
+  fs.writeFileSync(comprovante, pdfDeTexto(COMPROVANTE));
   fs.mkdirSync(PASTA_TELAS, { recursive: true });
   const feitas = [];
   for (const cap of CAPTURAS.filter((x) => !SO_TELAS.length || SO_TELAS.includes(x.nome))) {
@@ -818,10 +1146,26 @@ async function gravarCapturas(browser, servidor, problemas) {
       p.on('pageerror', (e) => erros.push(e.message));
       const f = ferramentas(p, { altura, largura });
       await entrarNaDemo(p, servidor.base, f, cap.cenario);
-      await cap.ir({ p, ...f });
+      await cap.ir({ p, ...f, comprovante });
       if (cap.telaInicial) await p.setViewportSize({ width: largura, height: altura });
       await p.waitForTimeout(700);
-      if (!cap.semEtiqueta && !(await f.etiquetaVisivel())) throw new Error(`captura ${cap.nome}: a etiqueta "Demonstração" não está na tela`);
+      // Desde 27/11/2026, nenhuma tela do site tem o selo "Demonstração" (a marca `__clarevoCaptura`); a legenda do site diz de onde vem.
+      if (await f.seloVisivel()) throw new Error(`captura ${cap.nome}: o selo "Demonstração" está na tela (a marca __clarevoCaptura não pegou?)`);
+      // Nenhum outro texto que comece por "Demonstração" (a frase de Conta, por exemplo), fora o aviso do painel da empresa fictícia, que diz
+      // que a empresa e as pessoas são fictícias (`avisoDaEmpresa`).
+      const textosDeDemo = await p.evaluate((alt) => {
+        const achados = [];
+        const andar = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = andar.nextNode(); n; n = andar.nextNode()) {
+          const t = (n.data || '').trim();
+          if (!/^Demonstração\b/.test(t) || !n.parentElement) continue;
+          const r = n.parentElement.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < alt) achados.push(t.slice(0, 60));
+        }
+        return achados;
+      }, altura);
+      const permitidos = cap.avisoDaEmpresa ? textosDeDemo.filter((t) => !/^Demonstração: empresa e pessoas fictícias/.test(t)) : textosDeDemo;
+      if (permitidos.length) throw new Error(`captura ${cap.nome}: texto de demonstração na tela: ${permitidos.join(' | ')}`);
       for (const t of cap.exigir) if ((await p.getByText(t).filter({ visible: true }).count()) === 0) throw new Error(`captura ${cap.nome}: não achei "${t}" na tela`);
       const bruto = path.join(os.tmpdir(), `clarevo-captura-${cap.nome}-${esquema}.png`);
       await p.screenshot({ path: bruto });
@@ -835,11 +1179,12 @@ async function gravarCapturas(browser, servidor, problemas) {
       feitas.push(`${path.relative(RAIZ, destino)} (${d.largura} x ${d.altura}, ${Math.round(fs.statSync(destino).size / 1024)} KB)`);
     }
   }
-  console.log(`capturas das Novidades:\n  ${feitas.join('\n  ')}`);
+  fs.rmSync(dirTemp, { recursive: true, force: true });
+  console.log(`capturas das Novidades e de O app:\n  ${feitas.join('\n  ')}`);
 }
 
 (async () => {
-  if (argv.includes('--build') || !fs.existsSync(path.join(DIST, 'index.html'))) {
+  if (!process.env.VIDEO_SITE_DIST && (argv.includes('--build') || !fs.existsSync(path.join(DIST, 'index.html')))) {
     console.log('gerando o build de demonstração (npm --workspace apps/app run export:demo)...');
     const r = spawnSync('npm', ['--workspace', 'apps/app', 'run', 'export:demo'], { cwd: RAIZ, stdio: 'inherit' });
     if (r.status !== 0) throw new Error('o build de demonstração falhou');
@@ -860,9 +1205,17 @@ async function gravarCapturas(browser, servidor, problemas) {
       const manifesto = fs.existsSync(ARQUIVO_MANIFESTO) ? JSON.parse(fs.readFileSync(ARQUIVO_MANIFESTO, 'utf8')) : { videos: {} };
       const servidor = await servir(true);
       const arquivosDePrint = await prints(browser);
+      const extrato = extratoDeExemplo(arquivosDePrint.dir);
       try {
+        // O manifesto é gravado depois de cada vídeo (na ordem de scripts/site/videos.js): se um roteiro falhar no meio, os vídeos já feitos
+        // continuam batendo com o videos.json.
+        const gravarManifesto = () => {
+          const ordenado = { videos: Object.fromEntries(ids.filter((id) => manifesto.videos[id]).map((id) => [id, manifesto.videos[id]])) };
+          fs.writeFileSync(ARQUIVO_MANIFESTO, `${JSON.stringify(ordenado, null, 2)}\n`);
+        };
         for (const id of SO.length ? SO : ids) {
-          await gravarVideo(browser, servidor, { id, ...ROTEIROS[id] }, manifesto, problemas, { prints: arquivosDePrint.arquivos });
+          await gravarVideo(browser, servidor, { id, ...ROTEIROS[id] }, manifesto, problemas, { prints: arquivosDePrint.arquivos, extrato });
+          gravarManifesto();
         }
       } finally {
         servidor.fechar();

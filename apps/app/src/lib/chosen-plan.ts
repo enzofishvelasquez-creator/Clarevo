@@ -12,7 +12,8 @@ import { Platform } from 'react-native';
  * O plano escolhido no site (jornada de compra de 27/11/2026, item 15; regras em `packages/core/src/plano-escolhido.ts`): lido do endereço
  * de Criar conta ou de Entrar, guardado só neste aparelho (na web, no localStorage; no celular, só na memória enquanto o app está aberto,
  * porque os links do site abrem a versão web) e usado uma vez, na primeira abertura da tela Assinatura. Nunca vai ao servidor. Ler ou gravar
- * pode falhar (navegação privada, armazenamento bloqueado): fica a cópia em memória, e nada quebra.
+ * pode falhar (navegação privada, armazenamento bloqueado): fica a cópia em memória, e nada quebra. Sem `periodo` no endereço, a tela abre
+ * no mensal, o período marcado de sempre (`PLAN_PERIOD_DEFAULT`).
  */
 let memory: ChosenPlan | null = null;
 

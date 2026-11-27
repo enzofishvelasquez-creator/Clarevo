@@ -272,8 +272,8 @@ function paginaDaCalculadora(info, { valores, estado = estadoEmVigor() }) {
   const grupo = c.CALC_GRUPOS.find((g) => g.id === info.group);
   const u = (d) => rel(arquivo, d);
   // O app que qualquer pessoa pode abrir agora, pelo estado do produto: depois do lançamento, a versão web; antes, nenhum (D-128: a
-  // demonstração só aparece em O app e em Use no navegador, e a tela inicial do app web convida a criar conta, o que o site não faz antes do
-  // lançamento enquanto o Enzo não decidir; o cadastro em si está aberto, D-129 A).
+  // demonstração só aparece em O app e em Use no navegador, e o site nunca leva à tela inicial do app web antes do lançamento; o convite
+  // a criar a conta, desde 27/11/2026, fica na linha do fim da página, `ponteParaOProduto`).
   const outroApp = appParaUsar(estado);
   const linkDoOutroApp = outroApp ? `<a href="${esc(outroApp.href)}" rel="noopener noreferrer">${esc(outroApp.texto)}</a>` : '';
   const tambemFaz = TAMBEM_FAZ[info.slug] ? `${TAMBEM_FAZ[info.slug]} ` : '';

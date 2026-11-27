@@ -2,6 +2,8 @@ import {
   ACCESS_TEXT,
   CHOSEN_PLAN_TEXT,
   PLAN_NAME,
+  PLAN_PERIOD_DEFAULT,
+  PLAN_PERIOD_ORDER,
   PLAN_PERIOD_TEXT,
   STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
@@ -622,11 +624,12 @@ export function StoreManageCard({ access }: { access: Access }) {
 }
 
 /**
- * A escolha entre o anual e o mensal (D-127): um grupo de dois rádios em forma de segmento, o anual primeiro, cada opção com o nome e "Uma
- * cobrança por ano" ou "por mês". Sem prazo, sem alarme e sem cor de alerta: muda só o preço em destaque e os botões de assinar.
+ * A escolha entre o mensal e o anual (D-127): um grupo de dois rádios em forma de segmento, o mensal primeiro (`PLAN_PERIOD_ORDER`, decisão de
+ * 27/11/2026, no lugar do anual primeiro), cada opção com o nome e "Uma cobrança por mês" ou "por ano". Sem prazo, sem alarme e sem cor de
+ * alerta: muda só o preço em destaque e os botões de assinar.
  */
 function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (period: BillingPeriod) => void }) {
-  const options: readonly BillingPeriod[] = ['anual', 'mensal'];
+  const options = PLAN_PERIOD_ORDER;
   return (
     <View style={styles.track} accessibilityRole="radiogroup" accessibilityLabel={PLAN_PERIOD_TEXT.choiceLabel}>
       {options.map((period) => {
@@ -658,9 +661,9 @@ function PeriodChoice({ value, onChange }: { value: BillingPeriod; onChange: (pe
 }
 
 /**
- * Os planos e os preços, para quem ainda não paga nem tem quem pague. Desde a D-127, com a escolha entre o anual (primeiro) e o mensal: o
- * preço do período escolhido em destaque, no anual o equivalente por mês (dito como equivalente: o anual é uma cobrança só) e a diferença
- * exata para 12 mensalidades, e o preço do outro período sempre à vista, em letra menor. Com a compra aberta (SUBSCRIBE_OPEN), os botões de
+ * Os planos e os preços, para quem ainda não paga nem tem quem pague. Desde a D-127, com a escolha entre o mensal (primeiro e marcado,
+ * desde 27/11/2026) e o anual: o preço do período escolhido em destaque, no anual o equivalente por mês (dito como equivalente: o anual é
+ * uma cobrança só) e a diferença exata para 12 mensalidades, e o preço do outro período sempre à vista, em letra menor. Com a compra aberta (SUBSCRIBE_OPEN), os botões de
  * assinar do período escolhido: na web, pelo Asaas (D-084), com cartão ou Pix; no iPhone e no Android, pela loja (D-090; também no build
  * de teste da equipe, STORE_TEST).
  * Ordem (jornada de compra de 27/11/2026: no celular, o primeiro botão ficava a 1.852 px do alto, depois de 7 blocos de texto): a escolha do
@@ -691,7 +694,8 @@ export function PlansCard({
   const { auth, user } = useSession();
   // O roteiro de telas (`PURCHASE_PREVIEW`, só com a marca dele na página) vê o que uma conta de verdade vê na web.
   const demo = auth.mode === 'demo' && !PURCHASE_PREVIEW;
-  const [period, setPeriod] = useState<BillingPeriod>(chosen?.period ?? 'anual');
+  // O mensal marcado (`PLAN_PERIOD_DEFAULT`), a não ser que o site tenha mandado o período; sem `periodo` no endereço, também o mensal.
+  const [period, setPeriod] = useState<BillingPeriod>(chosen?.period ?? PLAN_PERIOD_DEFAULT);
   const wide = useWideLayout();
   const web = Platform.OS === 'web';
   const webBuy = useWebPurchase(period);

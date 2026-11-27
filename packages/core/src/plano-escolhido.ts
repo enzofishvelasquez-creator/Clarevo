@@ -9,7 +9,10 @@ import { parseBillingPeriod, type BillingPeriod, type PlanKind } from './plano-p
  */
 export interface ChosenPlan {
   plan: PlanKind;
-  /** Nulo quando o endereço não traz o período: a tela abre no período de sempre. */
+  /**
+   * Nulo quando o endereço não traz o período: a tela abre no período de sempre, o mensal (`PLAN_PERIOD_DEFAULT`, em `plano.ts`; desde
+   * 27/11/2026, o mensal vem primeiro e marcado). Assim, um link sem `periodo` vale como mensal.
+   */
   period: BillingPeriod | null;
 }
 
@@ -67,6 +70,31 @@ export function parseStoredChosenPlan(raw: unknown): ChosenPlan | null {
   const [plan, period, extra] = raw.split(':');
   if (extra !== undefined) return null;
   return parseChosenPlan({ [CHOSEN_PLAN_PARAMS.plan]: plan, [CHOSEN_PLAN_PARAMS.period]: period });
+}
+
+/**
+ * O link de cadastro do site (27/11/2026): o site manda quem está sem sessão para `/criar-conta` (às vezes com `?plano=` e `?periodo=`).
+ * Sem sessão, esse endereço abre Criar conta direto, sem passar pelas boas-vindas; a raiz, Entrar e as demais telas seguem como antes.
+ * Recebe o endereço da primeira carga da web e devolve o destino de Criar conta, com a escolha do plano só quando ela é válida (as mesmas
+ * regras de `chosenPlanFromSearch`; qualquer outro parâmetro fica de fora), ou null quando o endereço não é o de Criar conta.
+ */
+export function signupEntryFrom(pathname: string, search: string): string | null {
+  if (!/^\/criar-conta\/?$/.test(pathname)) return null;
+  const choice = chosenPlanFromSearch(search);
+  if (!choice) return '/criar-conta';
+  const query = new URLSearchParams({ [CHOSEN_PLAN_PARAMS.plan]: PARAM_FROM_PLAN[choice.plan] });
+  if (choice.period) query.set(CHOSEN_PLAN_PARAMS.period, choice.period);
+  return `/criar-conta?${query.toString()}`;
+}
+
+/**
+ * Para onde vai quem está sem sessão, decidido pela tela de carregamento: Entrar, quando a sessão caiu e há um destino a retomar depois de
+ * entrar de novo (como antes); Criar conta, quando a página abriu pelo link de cadastro do site (`signupEntryFrom`, uma vez só); nos demais
+ * casos, as boas-vindas.
+ */
+export function signedOutScreen(resumeAfterLogin: boolean, signupEntry: string | null): string {
+  if (resumeAfterLogin) return '/entrar';
+  return signupEntry ?? '/boas-vindas';
 }
 
 /**

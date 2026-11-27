@@ -15115,24 +15115,22 @@ setInterval(async () => {
       !/cartão ou Pix|App Store|Google Play|abre no lançamento/.test(t) && t.includes('você vê tudo, exporta e pode excluir a conta'), t.slice(0, 900));
     ok('Assinatura na demonstração: nenhum botão de assinar, pagar ou restaurar compra', (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0);
     ok('Assinatura: os planos são lidos inteiros pelo leitor de tela, com os dois períodos',
-      (await p.locator('[aria-label="Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
-    // Plano anual (D-127): a escolha "Anual" ou "Mensal", o anual primeiro e marcado, sem prazo, sem alarme e sem promessa de economia; o preço
-    // do período escolhido em destaque, o equivalente por mês dito como equivalente, a diferença exata para 12 mensalidades e o outro período
-    // sempre à vista. Na demonstração, a escolha só muda o preço mostrado: nenhum botão de compra.
+      (await p.locator('[aria-label="Plano Individual mensal, R$ 29,90 por mês. No anual, R$ 269,90 por ano. Para você."]').filter({ visible: true }).count()) === 1);
+    // Plano anual (D-127), com o mensal primeiro desde 27/11/2026 (decisão do Enzo, no lugar do anual primeiro): a escolha "Mensal" ou "Anual",
+    // o mensal primeiro e marcado, sem prazo, sem alarme e sem promessa de economia; o preço do período escolhido em destaque, no anual o
+    // equivalente por mês dito como equivalente e a diferença exata para 12 mensalidades, e o outro período sempre à vista. Na demonstração, a
+    // escolha só muda o preço mostrado: nenhum botão de compra.
     const periodos = () => p.evaluate(() => {
       const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura' && e.getBoundingClientRect().width > 0);
       return g ? [...g.querySelectorAll('[role=radio]')].map((r) => [r.getAttribute('aria-label') || r.textContent, r.getAttribute('aria-checked')]) : null;
     });
-    ok('Assinatura (D-127): a escolha do período, com o anual primeiro e já marcado, e o mensal ao lado',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]), JSON.stringify(await periodos()));
-    ok('Assinatura (D-127): no anual, R$ 269,90 e R$ 629,90 por ano, "Equivale a R$ 22,49 por mês" e "R$ 88,90 a menos que 12 mensalidades" (Família: R$ 52,49 e R$ 208,90), com o mensal à vista e a nota do anual',
-      t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
-        t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
-        t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
-        // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
-        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.') &&
-        !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
-        !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t), t.slice(0, 1400));
+    ok('Assinatura (D-127, mensal primeiro desde 27/11/2026): a escolha do período, com o mensal primeiro e já marcado, e o anual ao lado',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]), JSON.stringify(await periodos()));
+    ok('Assinatura (D-127): no mensal, marcado ao abrir, o mensal em destaque e o anual à vista, com o equivalente por mês, sem botão de compra na demonstração',
+      t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && t.includes('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês') &&
+        !t.includes('a menos que 12 mensalidades') && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
+        (await p.locator('[aria-label="Plano Família mensal, R$ 69,90 por mês. No anual, R$ 629,90 por ano. Para você e as pessoas da sua Família na Clarevo, até 6 pessoas."]').filter({ visible: true }).count()) === 1,
+      t.slice(0, 1200));
     // Sem cor de alerta na escolha nem nos planos (o erro e o aviso da paleta ficam fora dela).
     const alarme = await p.evaluate(() => {
       const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura');
@@ -15143,15 +15141,20 @@ setInterval(async () => {
     ok('Assinatura (D-127): nenhuma cor de alerta (vermelho) na escolha do período nem nos planos', alarme.length === 0, alarme.slice(0, 4).join(' | '));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
-    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await p.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     t = await body();
-    ok('Assinatura (D-127): escolher "Mensal" põe o mensal em destaque e deixa o anual à vista, com o equivalente por mês, sem botão de compra na demonstração',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'false'], ['Mensal, uma cobrança por mês', 'true']]) &&
-        t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && t.includes('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês') &&
-        !t.includes('a menos que 12 mensalidades') && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
-        (await p.locator('[aria-label="Plano Família mensal, R$ 69,90 por mês. No anual, R$ 629,90 por ano. Para você e as pessoas da sua Família na Clarevo, até 6 pessoas."]').filter({ visible: true }).count()) === 1,
-      t.slice(0, 1200));
-    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração, mensal ${w}px`); if (w === 390) await shot('615b_assinatura_demonstracao_mensal'); });
+    ok('Assinatura (D-127): escolher "Anual" mostra R$ 269,90 e R$ 629,90 por ano, "Equivale a R$ 22,49 por mês" e "R$ 88,90 a menos que 12 mensalidades" (Família: R$ 52,49 e R$ 208,90), com o mensal à vista e a nota do anual',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'false'], ['Anual, uma cobrança por ano', 'true']]) &&
+        t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && t.includes('R$ 88,90 a menos que 12 mensalidades') &&
+        t.includes('R$ 629,90 por ano') && t.includes('Equivale a R$ 52,49 por mês') && t.includes('R$ 208,90 a menos que 12 mensalidades') &&
+        t.includes('No mensal: R$ 29,90 por mês') && t.includes('No mensal: R$ 69,90 por mês') &&
+        // D-129: a nota neutra do anual (a demonstração abre também no app das lojas): renova até cancelar, sem Pix nem web.
+        t.includes('No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.') &&
+        !t.includes('O anual é uma cobrança só') && !t.includes('mesmo teste grátis') &&
+        !/economi|aproveite|promoção|só hoje|últimos dias|não perca/i.test(t) && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 &&
+        (await p.locator('[aria-label="Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1,
+      t.slice(0, 1400));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração, anual ${w}px`); if (w === 390) await shot('615b_assinatura_demonstracao_anual'); });
     // O teste da equipe no sandbox (`?assinar=teste`, docs/39) mostra os botões do cartão e do Pix numa conta de verdade. Na demonstração,
     // nem com ele (revisão de 26/11/2026, diretriz 3.1.1): nenhum botão de compra, só a nota neutra.
     await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
@@ -15160,14 +15163,16 @@ setInterval(async () => {
     ok('Assinatura na demonstração, mesmo com "?assinar=teste": nenhum botão de assinar ou de pagar com cartão ou Pix, sem o texto do Pix, e a nota neutra',
       new URL(p.url()).pathname === '/conta/assinatura' && (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !t.includes('Ou pague um mês por vez, com Pix') &&
         !/cartão ou Pix/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
-    // D-127: com "?assinar=teste", a escolha do anual aparece (é só preço), e trocar de período continua sem botão de compra, nem do anual.
-    ok('Assinatura na demonstração com "?assinar=teste" (D-127): a escolha "Anual" ou "Mensal" com o anual marcado e os preços do ano, sem botão de compra',
-      JSON.stringify(await periodos()) === JSON.stringify([['Anual, uma cobrança por ano', 'true'], ['Mensal, uma cobrança por mês', 'false']]) &&
-        t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') && !/Assinar o plano|Pagar um (mês|ano)|Ou pague o ano de uma vez/.test(t), t.slice(0, 900));
-    await p.getByRole('radio', { name: 'Mensal, uma cobrança por mês' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    // D-127: com "?assinar=teste", a escolha do período aparece (é só preço), com o mensal primeiro e marcado (27/11/2026), e trocar de período
+    // continua sem botão de compra, nem do anual.
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): a escolha "Mensal" ou "Anual" com o mensal marcado e os preços do mês, com o anual à vista, sem botão de compra',
+      JSON.stringify(await periodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]) &&
+        t.includes('R$ 29,90 por mês') && t.includes('No anual: R$ 269,90 por ano, equivale a R$ 22,49 por mês') && !/Assinar o plano|Pagar um (mês|ano)|Ou pague um mês por vez/.test(t), t.slice(0, 900));
+    await p.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     t = await body();
-    ok('Assinatura na demonstração com "?assinar=teste" (D-127): no mensal, também nenhum botão de assinar, pagar ou restaurar',
-      (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && !/Assinar o plano|Pagar um (mês|ano)/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
+    ok('Assinatura na demonstração com "?assinar=teste" (D-127): no anual, os preços do ano e também nenhum botão de assinar, pagar ou restaurar',
+      (await visibleCount('button', /^(Assinar|Pagar|Restaurar)/)) === 0 && t.includes('R$ 269,90 por ano') && t.includes('Equivale a R$ 22,49 por mês') &&
+        !/Assinar o plano|Pagar um (mês|ano)|Ou pague o ano de uma vez/.test(t) && t.includes('Na demonstração não há assinatura nem pagamento.'), t.slice(0, 900));
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração com ?assinar=teste ${w}px`); if (w === 390) await shot('616_assinatura_demonstracao_sem_compra'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
@@ -15245,8 +15250,17 @@ setInterval(async () => {
         new URL(cp.url()).pathname === '/conta/assinatura' && t.includes(FECHADA) && !/lançamento|Até lá/.test(t) && t.includes(NOTA_WEB) &&
           (await cpCount('button', /^(Assinar|Pagar)/)) === 0 && !t.includes('A primeira cobrança é em'), t.slice(0, 1400));
       await cpShot('617_assinatura_compra_fechada');
-      // 2. Com "?assinar=teste" (o teste da equipe no sandbox): a área de compra, sem a frase da compra fechada.
-      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual anual');
+      // 2. Com "?assinar=teste" (o teste da equipe no sandbox): a área de compra, sem a frase da compra fechada. Desde 27/11/2026, a tela abre
+      // no mensal (o primeiro e marcado), com os botões do mensal; o anual, um toque depois.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      const cpPeriodos = () => cp.evaluate(() => [...document.querySelectorAll('[role=radiogroup] [role=radio]')].filter((r) => r.getBoundingClientRect().width > 0).map((r) => [r.getAttribute('aria-label'), r.getAttribute('aria-checked')]));
+      ok('Compra na web (27/11/2026): com a área de compra, a escolha abre no mensal, o primeiro e marcado, com os botões do cartão e do Pix do mensal',
+        JSON.stringify(await cpPeriodos()) === JSON.stringify([['Mensal, uma cobrança por mês', 'true'], ['Anual, uma cobrança por ano', 'false']]) &&
+          (await cpCount('button', 'Assinar o plano Individual mensal')) === 1 && (await cpCount('button', 'Assinar o plano Família mensal')) === 1 &&
+          (await cpCount('button', 'Pagar um mês do plano Individual com Pix')) === 1 && (await cpCount('button', /^Assinar o plano .* anual$/)) === 0,
+        JSON.stringify(await cpPeriodos()));
+      await cp.getByRole('radio', { name: 'Anual, uma cobrança por ano' }).filter({ visible: true }).first().click();
+      await cpWait('Assinar o plano Individual anual'); await cp.waitForTimeout(400);
       t = await cpBody();
       const fimDoTeste = /termina em \d+ dias, em (\d{2}\/\d{2}\/\d{4})/.exec(t)?.[1] ?? null;
       const ordem = (a, b2) => t.indexOf(a) >= 0 && t.indexOf(b2) > t.indexOf(a);
@@ -15325,32 +15339,63 @@ setInterval(async () => {
       // Jornada de compra de 27/11/2026 (item 15): o plano e o período escolhidos no site (`/criar-conta?plano=familia&periodo=mensal`) ficam
       // só no aparelho e marcam a tela Assinatura na primeira vez que ela abre, sem comprar nem marcar mais nada; depois disso saem do aparelho.
       const chave = () => cp.evaluate(() => { try { return localStorage.getItem('clarevo.plano-escolhido.v1'); } catch { return 'erro'; } });
-      // Sem sessão, o endereço de Criar conta aberto direto passa pelas boas-vindas (a tela de carregamento decide), e a escolha já ficou guardada
-      // na primeira carga (`rememberChosenPlanFromLocation`, em _layout.tsx).
-      await cp.goto(`http://localhost:${PORT}/criar-conta?plano=empresa&periodo=anual`); await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(400);
+      // O link de cadastro do site (27/11/2026): sem sessão, o endereço de Criar conta aberto direto abre Criar conta (a tela de carregamento
+      // decide), sem passar pelas boas-vindas, com a linha do teste grátis; a escolha já ficou guardada na primeira carga
+      // (`rememberChosenPlanFromLocation`, em _layout.tsx). Na demonstração, Criar conta tem o mesmo aviso de quando se chega pelas boas-vindas.
+      const CRIAR_TESTE = '14 dias grátis, sem cartão.';
+      const AVISO_DEMO = 'Esta é a demonstração: a conta criada aqui é só para testar e some ao fechar a página.';
+      const cpCriar = async (endereco) => {
+        await cp.goto(`http://localhost:${PORT}${endereco}`); await cpWait(CRIAR_TESTE); await cp.waitForTimeout(400);
+        const u = new URL(cp.url());
+        return { caminho: u.pathname, busca: u.search, texto: await cpBody(), botao: await cpCount('button', 'Criar conta'), boasVindas: await cp.getByText('Cuidar da vida financeira', { exact: false }).filter({ visible: true }).count() };
+      };
+      const criarInvalido = await cpCriar('/criar-conta?plano=empresa&periodo=anual');
       const invalido = await chave();
-      await cp.goto(`http://localhost:${PORT}/criar-conta?plano=familia&periodo=mensal`); await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(400);
+      ok('Link de cadastro do site (27/11/2026): sem sessão, "/criar-conta?plano=empresa" abre Criar conta direto (sem as boas-vindas), sem a escolha inválida no endereço',
+        criarInvalido.caminho === '/criar-conta' && criarInvalido.busca === '' && criarInvalido.botao === 1 && criarInvalido.boasVindas === 0 && criarInvalido.texto.includes(AVISO_DEMO), JSON.stringify({ ...criarInvalido, texto: criarInvalido.texto.slice(0, 500) }));
+      // Item 15: o período escolhido no site marca a tela mesmo quando não é o de sempre (o anual; o mensal já vem marcado).
+      const criar = await cpCriar('/criar-conta?plano=familia&periodo=anual');
       const guardado = await chave();
-      ok('Plano do site (item 15): "?plano=empresa" não guarda nada; "?plano=familia&periodo=mensal" fica só no aparelho, como "familia:mensal"', invalido === null && guardado === 'familia:mensal', JSON.stringify({ invalido, guardado }));
-      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Família mensal');
+      ok('Link de cadastro do site (27/11/2026): sem sessão, "/criar-conta?plano=familia&periodo=anual" abre Criar conta direto, com o título, a linha do teste grátis, o plano no endereço e o aviso da demonstração',
+        criar.caminho === '/criar-conta' && criar.busca === '?plano=familia&periodo=anual' && criar.botao === 1 && criar.boasVindas === 0 &&
+          (await cp.getByRole('heading', { name: 'Criar conta', exact: true }).filter({ visible: true }).count()) === 1 && criar.texto.includes(CRIAR_TESTE) && criar.texto.includes(AVISO_DEMO),
+        JSON.stringify({ ...criar, texto: criar.texto.slice(0, 500) }));
+      await cpShot('619e_criar_conta_pelo_link_do_site');
+      ok('Plano do site (item 15): "?plano=empresa" não guarda nada; "?plano=familia&periodo=anual" fica só no aparelho, como "familia:anual"', invalido === null && guardado === 'familia:anual', JSON.stringify({ invalido, guardado }));
+      // Voltar, de Criar conta aberta direto, leva às boas-vindas; "Já tenho conta · Entrar", a Entrar, como antes.
+      await cp.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).first().click();
+      await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(300);
+      const voltou = new URL(cp.url()).pathname;
+      await cpCriar('/criar-conta');
+      await cp.getByRole('button', { name: 'Já tenho conta · Entrar', exact: true }).filter({ visible: true }).first().click(); await cp.waitForTimeout(600);
+      const entrou = new URL(cp.url()).pathname;
+      ok('Link de cadastro do site (27/11/2026): de Criar conta aberta direto, "Voltar" leva às boas-vindas e "Já tenho conta · Entrar" a Entrar', voltou === '/boas-vindas' && entrou === '/entrar', JSON.stringify({ voltou, entrou }));
+      // A raiz e Entrar, sem sessão, continuam nas boas-vindas, como antes.
+      const inicio = {};
+      for (const endereco of ['/', '/entrar']) {
+        await cp.goto(`http://localhost:${PORT}${endereco}`); await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(300);
+        inicio[endereco] = new URL(cp.url()).pathname;
+      }
+      ok('Link de cadastro do site (27/11/2026): sem sessão, a raiz e Entrar continuam abrindo as boas-vindas', inicio['/'] === '/boas-vindas' && inicio['/entrar'] === '/boas-vindas', JSON.stringify(inicio));
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Família anual');
       t = await cpBody();
       const escolhido = await cp.evaluate(() => {
         const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Período da assinatura' && e.getBoundingClientRect().width > 0);
         const radios = g ? [...g.querySelectorAll('[role=radio]')].map((r) => [r.getAttribute('aria-label'), r.getAttribute('aria-checked')]) : null;
-        const fam = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Família mensal,') && e.getBoundingClientRect().width > 0);
-        const ind = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Individual mensal,') && e.getBoundingClientRect().width > 0);
+        const fam = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Família anual,') && e.getBoundingClientRect().width > 0);
+        const ind = [...document.querySelectorAll('[aria-label]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Plano Individual anual,') && e.getBoundingClientRect().width > 0);
         const bg = (name) => { const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || e.textContent || '').trim() === name && e.getBoundingClientRect().width > 0); return b ? getComputedStyle(b).backgroundColor : null; };
-        return { radios, fam: fam?.getAttribute('aria-label') ?? null, ind: ind?.getAttribute('aria-label') ?? null, famBg: bg('Assinar o plano Família mensal'), indBg: bg('Assinar o plano Individual mensal'), checks: document.querySelectorAll('[role=checkbox],[role=switch]').length };
+        return { radios, fam: fam?.getAttribute('aria-label') ?? null, ind: ind?.getAttribute('aria-label') ?? null, famBg: bg('Assinar o plano Família anual'), indBg: bg('Assinar o plano Individual anual'), checks: document.querySelectorAll('[role=checkbox],[role=switch]').length };
       });
       const usado = await chave();
-      ok('Plano do site (item 15): a tela Assinatura abre no mensal, o cartão do Família com o selo "O plano que você escolheu" (também para o leitor de tela) e o botão principal, sem nada mais marcado; a escolha sai do aparelho',
-        JSON.stringify(escolhido.radios) === JSON.stringify([['Anual, uma cobrança por ano', 'false'], ['Mensal, uma cobrança por mês', 'true']]) &&
+      ok('Plano do site (item 15): a tela Assinatura abre no anual escolhido no site (e não no mensal de sempre), o cartão do Família com o selo "O plano que você escolheu" (também para o leitor de tela) e o botão principal, sem nada mais marcado; a escolha sai do aparelho',
+        JSON.stringify(escolhido.radios) === JSON.stringify([['Mensal, uma cobrança por mês', 'false'], ['Anual, uma cobrança por ano', 'true']]) &&
           (t.match(/O plano que você escolheu/g) || []).length === 1 && (escolhido.fam || '').endsWith('É o plano que você escolheu.') && !(escolhido.ind || '').includes('escolheu') &&
           escolhido.famBg === 'rgb(36, 87, 245)' && escolhido.indBg !== escolhido.famBg && escolhido.checks === 0 && usado === null, JSON.stringify({ escolhido, usado }));
       await cpShot('619c_assinatura_plano_escolhido_no_site');
-      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual anual');
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
       t = await cpBody();
-      ok('Plano do site (item 15): na segunda abertura, a tela volta ao de sempre (o anual marcado e nenhum selo)',
+      ok('Plano do site (item 15): na segunda abertura, a tela volta ao de sempre (o mensal primeiro e marcado, e nenhum selo)',
         JSON.stringify(await cp.evaluate(() => [...document.querySelectorAll('[role=radiogroup] [role=radio]')].filter((r) => r.getBoundingClientRect().width > 0).map((r) => r.getAttribute('aria-checked')))) === JSON.stringify(['true', 'false']) &&
           !t.includes('O plano que você escolheu'), t.slice(0, 600));
       // Jornada de compra de 27/11/2026 (item 4): com o plano Família pago e sem Família, o próximo passo, "Crie a Família e convide até 5
@@ -15392,7 +15437,7 @@ setInterval(async () => {
       await cp.waitForTimeout(900);
       ok('Família pago (item 4): com outra pessoa na Família, nenhum próximo passo', (await cpCount('button', /^(Convidar para a Família|Criar a Família)$/)) === 0 && !(await cpBody()).includes('Convide até 5 pessoas'));
       // De volta à área de compra do teste grátis (a página nova traz a demonstração de novo, sem as simulações acima), para o passo seguinte.
-      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual anual');
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
       // 4. Quem assinou no cartão durante o teste (D-129, revisão): o próprio direito no banco tem a janela da primeira cobrança (o começo do
       // dia do fim do teste, em Brasília, até o fim do terceiro dia seguinte), e o Asaas diz que a assinatura está ativa. Simulado no
       // repositório da demonstração (em memória), sem rede. A situação continua "Teste grátis", com o selo "Assinatura feita", o dia da
@@ -19535,6 +19580,173 @@ setInterval(async () => {
     ok('Modo escuro: nada passa da largura em 390, 360 e 320 px', dkFound.largura.length === 0, dkFound.largura.slice(0, 4).join(' | '));
     ok('Modo escuro: sem erros de JavaScript e nada vai à rede', dkErrors.length === 0 && dkWrites.length === 0, [...dkErrors, ...dkWrites].slice(0, 3).join(' | '));
     await dkCtx.close();
+  }
+
+  // ==================================================================================================================
+  // Tamanhos de tela (revisão de 27/11/2026; pergunta do Enzo: o app, até a sessão logada, se adapta aos tipos e tamanhos de tela, do
+  // computador ao celular?). Num contexto à parte, na demonstração, as telas principais em tablet em pé (768 × 1024), celular deitado
+  // (844 × 390) e monitor grande (1920 × 1080): sem rolagem lateral, nada fora da largura, nenhum valor em reais cortado nem quebrado no
+  // meio e, no tablet e no celular deitado, alvos de toque de 44 px. Celular deitado (`useShortLandscape`, lib/layout.ts): o cabeçalho das
+  // telas internas numa linha só (o título e a pílula lado a lado), a barra de baixo com o ícone ao lado do rótulo e 44 px de alvo, pelo
+  // menos 65% da altura para o conteúdo e a folha "Como usar" inteira na tela. Em 1920 px, os cartões seguem limitados (até 1080 px) e nenhum
+  // texto longo vira uma linha de mais de 780 px. Numa janela baixa de computador (1280 × 560), a barra lateral rola por dentro e a Conta, no
+  // pé dela, fica alcançável. Capturas 890 a 893. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const szCtx = await b.newContext({ viewport: { width: 768, height: 1024 }, deviceScaleFactor: 1 });
+    await szCtx.addInitScript(() => {
+      window.__szRepo = async () => {
+        const root = document.getElementById('root');
+        const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+        const stack = key ? [root[key].stateNode.current] : [];
+        while (stack.length > 0) {
+          const f = stack.pop();
+          const v = f.memoizedProps?.value;
+          if (v && typeof v === 'object' && 'repo' in v && 'auth' in v && 'user' in v) return v.user.email === 'demo@clarevo.app' ? await v.auth.demoRepo : v.repo;
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
+        return null;
+      };
+    });
+    const sp = await szCtx.newPage();
+    const szErrors = [];
+    sp.on('pageerror', (e) => szErrors.push(e.message));
+    sp.on('console', (m) => m.type() === 'error' && szErrors.push(m.text().slice(0, 200)));
+    const szWrites = [];
+    sp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && szWrites.push(`${r.method()} ${r.url()}`));
+    const szNav = (route, params = {}) => sp.evaluate(({ route, params }) => {
+      const root = document.getElementById('root');
+      const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+      const stack = [root[key].stateNode.current];
+      while (stack.length > 0) {
+        const f = stack.pop();
+        const v = f.memoizedProps?.value;
+        if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      throw new Error('navegador de rotas não encontrado');
+    }, { route, params });
+    await sp.goto(`http://localhost:${PORT}/`); await sp.getByText('Cuidar da vida financeira').filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await sp.getByRole('button', { name: 'Ver a demonstração', exact: true }).filter({ visible: true }).first().click();
+    await sp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await sp.waitForTimeout(800);
+    const szIds = await sp.evaluate(async () => {
+      const repo = await window.__szRepo(); const space = await repo.getSpace(); const ctx = space.personalContextId;
+      return { card: (await repo.listCards(ctx))[0].id, goal: (await repo.listGoals(ctx))[0].id };
+    });
+    const SZ_SCREENS = [
+      ['Resumo', '(tabs)', { screen: 'index' }], ['Movimentos', '(tabs)', { screen: 'movimentacoes' }], ['Metas', '(tabs)', { screen: 'metas' }],
+      ['Investir', '(tabs)', { screen: 'investimentos' }], ['Aprender', '(tabs)', { screen: 'aprender' }], ['Conta', 'conta', {}], ['Assinatura', 'conta/assinatura', {}],
+      ['Cartões', 'cartoes/index', {}], ['fatura', 'cartoes/[id]/fatura/[mes]/index', { id: szIds.card, mes: '2026-10' }], ['Contas a pagar', 'a-pagar/index', {}],
+      ['Orçamento', 'orcamento/index', {}], ['Análises', 'analises', {}], ['Evolução', 'evolucao', {}], ['meta', 'meta/[id]/index', { id: szIds.goal }],
+      ['calculadora da reserva', 'calcular/[slug]', { slug: 'reserva', valor: '300000' }], ['Anotar gasto', 'registro/novo', { tipo: 'despesa' }],
+    ];
+    // O que se vê na tela: rolagem lateral, o que passa da largura, valor em reais cortado ou quebrado no meio, alvos abaixo de 44 px, o
+    // cartão mais largo e os textos longos numa linha larga demais. A tela de trás de um painel (inert) não conta.
+    const szScan = () => sp.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert],[aria-hidden="true"]'); };
+      const W = innerWidth;
+      const all = [...document.querySelectorAll('body *')].filter(shown);
+      const name = (e) => (e.getAttribute('aria-label') || e.textContent || e.tagName).replace(/\s+/g, ' ').trim().slice(0, 40);
+      const leaves = all.filter((e) => (e.tagName === 'DIV' || e.tagName === 'SPAN') && e.childElementCount === 0 && (e.textContent || '').trim() !== '');
+      const out = [];
+      if (document.documentElement.scrollWidth > W + 1) out.push('rolagem lateral');
+      for (const e of all) { const r = e.getBoundingClientRect(); if (r.right > W + 0.5 || r.left < -0.5) { out.push(`fora: ${name(e)}`); break; } }
+      for (const e of leaves) if (/R\$/.test(e.textContent) && e.scrollWidth > e.clientWidth + 1) out.push(`cortado: ${e.textContent}`);
+      for (const e of leaves) {
+        const t = e.firstChild; const m = t && t.nodeType === 3 ? /R\$\s?[\d.]+,\d\d/.exec(t.textContent) : null;
+        if (!m) continue;
+        const range = document.createRange(); range.setStart(t, m.index); range.setEnd(t, m.index + m[0].length);
+        if (new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size > 1) out.push(`quebrado: ${m[0]}`);
+      }
+      const small = all.filter((e) => e.matches('[role=button],[role=tab],[role=radio],[role=checkbox],[role=link],button') && e.getBoundingClientRect().height < 43.5).map(name);
+      const cards = [...document.querySelectorAll('[data-card]')].filter(shown);
+      const maxCard = cards.length ? Math.round(Math.max(...cards.map((e) => e.getBoundingClientRect().width))) : 0;
+      const longLines = leaves.filter((e) => (e.textContent || '').length > 90 && e.getBoundingClientRect().width > 780).map(name);
+      return { out, small, maxCard, longLines };
+    });
+    const szFound = { largura: [], alvos: [], cartoes: [], linhas: [] };
+    const szSweep = async (label, w, h, touch, shotName) => {
+      await sp.setViewportSize({ width: w, height: h }); await sp.waitForTimeout(600);
+      for (const [screen, route, params] of SZ_SCREENS) {
+        await szNav(route, params); await sp.waitForTimeout(1200);
+        const s = await szScan();
+        for (const x of s.out) szFound.largura.push(`${label} ${screen}: ${x}`);
+        if (touch) for (const x of s.small) szFound.alvos.push(`${label} ${screen}: ${x}`);
+        if (s.maxCard > 1080) szFound.cartoes.push(`${label} ${screen}: ${s.maxCard} px`);
+        for (const x of s.longLines) szFound.linhas.push(`${label} ${screen}: ${x}`);
+        if (shotName && screen === 'Cartões') await sp.screenshot({ path: `${OUT}/${shotName}.png` });
+        await szNav('(tabs)', { screen: 'index' }); await sp.waitForTimeout(400);
+      }
+    };
+    // 1. Tablet em pé: o app como no celular (abaixo de 1024 px), com a coluna de 560 px no meio.
+    await szSweep('768 × 1024', 768, 1024, true, '890_tamanho_tablet_em_pe');
+    // 2. Celular deitado.
+    await szSweep('844 × 390', 844, 390, true, null);
+    await szNav('cartoes/index'); await sp.waitForTimeout(1200);
+    const szLand = await sp.evaluate(() => {
+      const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert],[aria-hidden="true"]'); };
+      const band = [...document.querySelectorAll('[data-band]')].find(shown);
+      const h1 = band ? [...band.querySelectorAll('[role=heading][aria-level="1"]')].find(shown) : null;
+      const pill = band ? [...band.querySelectorAll('[aria-label^="Espaço:"]')].find(shown) : null;
+      const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'];
+      const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => shown(e) && names.includes(e.getAttribute('aria-label')));
+      const tr = tabs.map((e) => e.getBoundingClientRect());
+      const scrollers = [...document.querySelectorAll('body *')].filter((e) => { if (!shown(e)) return false; const cs = getComputedStyle(e); return (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && e.clientHeight > 80; });
+      const main = scrollers.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
+      const mr = main ? main.getBoundingClientRect() : null;
+      const top = band ? band.getBoundingClientRect().bottom : 0;
+      const bottom = tr.length ? Math.min(...tr.map((r) => r.top)) - 4 : innerHeight;
+      const mid = (r) => (r.top + r.bottom) / 2;
+      return {
+        bandH: band ? Math.round(band.getBoundingClientRect().height) : null,
+        sameRow: Boolean(h1 && pill) && Math.abs(mid(h1.getBoundingClientRect()) - mid(pill.getBoundingClientRect())) < 12,
+        tabs: tabs.length, tabMinH: tr.length ? Math.round(Math.min(...tr.map((r) => r.height))) : 0, tabMaxH: tr.length ? Math.round(Math.max(...tr.map((r) => r.height))) : 0,
+        // Ícone ao lado do rótulo: o desenho e o texto da aba na mesma altura.
+        side: tabs.every((e) => { const svg = e.querySelector('svg'); const txt = [...e.querySelectorAll('div,span')].find((x) => x.childElementCount === 0 && x.textContent); return svg && txt && Math.abs(mid(svg.getBoundingClientRect()) - mid(txt.getBoundingClientRect())) < 6; }),
+        free: mr ? Math.round(Math.min(bottom, mr.bottom) - Math.max(top, mr.top)) : 0, h: innerHeight,
+      };
+    });
+    ok('Tamanhos, celular deitado (844 × 390): o cabeçalho de Cartões numa linha só (título e pílula lado a lado, faixa de até 72 px), a barra de baixo com as cinco abas, o ícone ao lado do rótulo e 44 a 50 px de alvo, e pelo menos 65% da altura para o conteúdo',
+      szLand.bandH !== null && szLand.bandH <= 72 && szLand.sameRow && szLand.tabs === 5 && szLand.tabMinH >= 44 && szLand.tabMaxH <= 50 && szLand.side && szLand.free >= szLand.h * 0.65, JSON.stringify(szLand));
+    await sp.screenshot({ path: `${OUT}/891_tamanho_celular_deitado.png` });
+    await sp.getByRole('button', { name: /^Como usar/ }).filter({ visible: true }).first().click(); await sp.waitForTimeout(700);
+    const szSheet = await sp.evaluate(() => {
+      const d = [...document.querySelectorAll('[role=dialog],[aria-modal="true"]')].filter((e) => e.getBoundingClientRect().width > 0).pop();
+      if (!d) return null;
+      for (const s of d.querySelectorAll('*')) { const cs = getComputedStyle(s); if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && s.scrollHeight > s.clientHeight + 1) s.scrollTop = s.scrollHeight; }
+      const buttons = [...d.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0);
+      const last = buttons.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom)[0];
+      const r = last ? last.getBoundingClientRect() : null;
+      return { last: last ? last.getAttribute('aria-label') || last.textContent : null, top: r ? Math.round(r.top) : null, bottom: r ? Math.round(r.bottom) : null, h: innerHeight };
+    });
+    ok('Tamanhos, celular deitado: a folha "Como usar" de Cartões cabe na tela e o "Fechar" do fim fica à vista (o texto rola por dentro)',
+      szSheet !== null && szSheet.last === 'Fechar' && szSheet.top >= 0 && szSheet.bottom <= szSheet.h, JSON.stringify(szSheet));
+    await sp.keyboard.press('Escape'); await sp.waitForTimeout(500);
+    await szNav('(tabs)', { screen: 'index' }); await sp.waitForTimeout(500);
+    // 3. Monitor grande: a barra lateral e o conteúdo limitado, no meio da área à direita dela.
+    await szSweep('1920 × 1080', 1920, 1080, false, '892_tamanho_monitor_1920');
+    // 4. Janela baixa de computador: a barra lateral rola por dentro, e a Conta, no pé, fica alcançável.
+    await sp.setViewportSize({ width: 1280, height: 560 }); await sp.waitForTimeout(700);
+    const szNavBar = await sp.evaluate(() => {
+      const nav = [...document.querySelectorAll('[role=navigation]')].find((e) => e.getBoundingClientRect().width > 0);
+      const sc = nav ? [...nav.querySelectorAll('*')].find((e) => { const cs = getComputedStyle(e); return cs.overflowY === 'auto' || cs.overflowY === 'scroll'; }) : null;
+      if (!nav || !sc) return null;
+      const before = { scroll: sc.scrollHeight, client: sc.clientHeight };
+      sc.scrollTop = sc.scrollHeight;
+      const conta = [...nav.querySelectorAll('[role=link]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Conta:'));
+      const r = conta ? conta.getBoundingClientRect() : null;
+      return { ...before, contaBottom: r ? Math.round(r.bottom) : null, h: innerHeight, navBottom: Math.round(nav.getBoundingClientRect().bottom) };
+    });
+    ok('Tamanhos, janela baixa (1280 × 560): a barra lateral rola por dentro e a Conta, no pé dela, fica inteira à vista depois de rolar',
+      szNavBar !== null && szNavBar.scroll > szNavBar.client && szNavBar.contaBottom !== null && szNavBar.contaBottom <= szNavBar.h && szNavBar.navBottom <= szNavBar.h + 0.5, JSON.stringify(szNavBar));
+    await sp.screenshot({ path: `${OUT}/893_tamanho_janela_baixa_barra_lateral.png` });
+    ok(`Tamanhos: em 768 × 1024, 844 × 390 e 1920 × 1080, nas ${SZ_SCREENS.length} telas principais, sem rolagem lateral, nada fora da largura e nenhum valor em reais cortado ou quebrado no meio`, szFound.largura.length === 0, szFound.largura.slice(0, 4).join(' | '));
+    ok('Tamanhos: no tablet em pé e no celular deitado, alvos de toque com 44 px ou mais', szFound.alvos.length === 0, szFound.alvos.slice(0, 4).join(' | '));
+    ok('Tamanhos: em 1920 px, nenhum cartão passa de 1080 px e nenhum texto longo vira uma linha de mais de 780 px', szFound.cartoes.length === 0 && szFound.linhas.length === 0, [...szFound.cartoes, ...szFound.linhas].slice(0, 4).join(' | '));
+    ok('Tamanhos: sem erros de JavaScript e nada vai à rede', szErrors.length === 0 && szWrites.length === 0, [...szErrors, ...szWrites].slice(0, 3).join(' | '));
+    await szCtx.close();
   }
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

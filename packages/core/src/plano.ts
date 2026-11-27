@@ -189,15 +189,24 @@ export function annualSavingCents(plan: PlanKind): number {
 }
 
 /**
- * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O anual vem primeiro, sem pressa e sem alarme: só os números, com o
- * equivalente por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para 12 mensalidades.
+ * A ordem das opções e o período já marcado na escolha da tela Assinatura (na web, no app das lojas e na demonstração): o mensal primeiro e
+ * marcado (decisão do Enzo de 27/11/2026, no lugar do "anual primeiro" da D-127). Nenhum outro período vem marcado: o plano escolhido no
+ * site (`plano-escolhido.ts`) só troca o marcado quando o endereço traz `periodo`; sem ele, vale este.
+ */
+export const PLAN_PERIOD_ORDER: readonly BillingPeriod[] = ['mensal', 'anual'];
+export const PLAN_PERIOD_DEFAULT: BillingPeriod = 'mensal';
+
+/**
+ * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O mensal vem primeiro (27/11/2026, `PLAN_PERIOD_ORDER`), sem pressa e
+ * sem alarme: só os números, com o equivalente do anual por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para
+ * 12 mensalidades.
  */
 export const PLAN_PERIOD_TEXT = {
   /** O nome do grupo de opções, para o leitor de tela. */
   choiceLabel: 'Período da assinatura',
-  option: { anual: 'Anual', mensal: 'Mensal' } as Readonly<Record<BillingPeriod, string>>,
+  option: { mensal: 'Mensal', anual: 'Anual' } as Readonly<Record<BillingPeriod, string>>,
   /** Abaixo do nome de cada opção. */
-  optionHint: { anual: 'Uma cobrança por ano', mensal: 'Uma cobrança por mês' } as Readonly<Record<BillingPeriod, string>>,
+  optionHint: { mensal: 'Uma cobrança por mês', anual: 'Uma cobrança por ano' } as Readonly<Record<BillingPeriod, string>>,
   /** "Equivale a R$ 22,49 por mês". */
   equivalent: (plan: PlanKind) => `Equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês`,
   /** "R$ 88,90 a menos que 12 mensalidades". */

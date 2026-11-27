@@ -9,12 +9,17 @@
  * lançamento", e a chamada principal de todas as páginas é "Assine aqui":
  *   - pré-lançamento (`lancado: false`, o padrão): "Assine aqui" leva aos planos (a seção Planos da página inicial, ou `planos.html` das
  *     outras páginas), que mostram a fita "Em breve" em cada cartão; o botão do menu é "Entrar", para a tela de entrar do app web. O
- *     cadastro continua aberto em produção antes do lançamento (D-129 A, decisão do Enzo de 26/11/2026: quem chega à tela de entrar pode
- *     criar a conta, com o risco aceito do plano gratuito do banco de dados), mas o site ainda não convida a criar conta antes do lançamento:
- *     se deve convidar é uma pergunta em aberto para o Enzo (jornada de compra de 27/11/2026, pergunta 1). Até ele decidir, nenhum convite a
- *     criar conta e nenhum link para a tela inicial do app web, que convida a criar conta; e a venda continua fechada (`SUBSCRIBE_OPEN`);
+ *     cadastro está aberto em produção antes do lançamento (D-129 A, decisão do Enzo de 26/11/2026), e desde 27/11/2026 (decisão do Enzo,
+ *     jornada de compra de 27/11/2026, pergunta 1) o site CONVIDA a criar a conta antes do lançamento: "Criar conta grátis", para a tela de
+ *     criar conta do app web (`/criar-conta`, com `?plano=individual|familia` quando a página é de um plano), sempre com a linha honesta "A
+ *     assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado." (`linhaDoConvite`, a mesma frase do app,
+ *     `ACCESS_TEXT.notOpenYet`). O convite fica na seção Planos do início, em `planos.html` e na página de cada plano, em Comece aqui, em Use
+ *     no navegador e na linha do fim das páginas de conteúdo (`ponteParaOProduto`); o menu continua só com "Entrar". A regra: antes do
+ *     lançamento, o site pode levar a `/criar-conta`, mas nunca a uma compra (a venda continua fechada, `SUBSCRIBE_OPEN`) nem com uma
+ *     promessa de preço além do "Em breve" dos planos. Como antes, nenhum link para a tela inicial do app web: o convite leva direto à
+ *     tela de criar conta;
  *   - lançado (`lancado: true`): "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas
- *     aparecem só com o endereço de cada uma.
+ *     aparecem só com o endereço de cada uma; o convite "Criar conta grátis" sai (o próprio "Assine aqui" leva ao cadastro).
  * A demonstração (dados fictícios) não é mais chamada: fica só como um link de texto discreto em O app e em Use no navegador
  * (`linkDaDemonstracao`).
  *
@@ -73,6 +78,7 @@ function estadoDoProduto(sobrescrever = {}) {
       );
     }
   }
+  if (typeof estado.indexar !== 'boolean') throw new Error('estado do produto: "indexar" precisa ser true ou false (scripts/site/config.js)');
   if (typeof estado.prazoDeResposta !== 'string') throw new Error('estado do produto: "prazoDeResposta" é um texto (vazio, nenhuma página promete prazo)');
   if (simularAssinaturaAberta !== undefined && typeof simularAssinaturaAberta !== 'boolean') throw new Error('estado do produto: "simularAssinaturaAberta" precisa ser true ou false');
   const doNucleo = assinaturaAbertaNoNucleo();
@@ -222,38 +228,88 @@ function chamadas(arquivo, estado, { secundaria = null, plano = null, periodo = 
 }
 
 /**
- * A linha dos planos antes do lançamento (análise geral de 26/11/2026, D-129): "Assine aqui" leva aos planos (a seção Planos do início ou
- * `planos.html`), e os planos dizem, à vista, por que ainda não há botão de assinar. Depois do lançamento, nada.
+ * O convite ao cadastro antes do lançamento (decisão do Enzo de 27/11/2026, jornada de compra de 27/11/2026, pergunta 1, depois da D-129 A,
+ * que deixou o cadastro aberto): o texto do botão e a linha honesta que vai sempre ao lado dele. A segunda frase da linha é a do app com a
+ * compra fechada (`ACCESS_TEXT.notOpenYet`, "Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.", sem o começo), a
+ * mesma que a tela de criar conta mostra (`signupTrialLine`): o site nunca promete mais do que o app diz. Sem preço e sem prazo.
+ */
+const TEXTO_DO_CONVITE = 'Criar conta grátis';
+function linhaDoConvite() {
+  const doApp = require('./catalogo').catalogo().PLANOS.texto.notOpenYet;
+  const porEnquanto = doApp.replace(/^Assinatura em breve\. /, '');
+  if (porEnquanto === doApp || !/^Por enquanto, /.test(porEnquanto)) {
+    throw new Error(`a frase da compra fechada do app (ACCESS_TEXT.notOpenYet) mudou: "${doApp}". Confira a linha do convite ao cadastro em scripts/site/estado.js`);
+  }
+  return `A assinatura abre em breve. ${porEnquanto}`;
+}
+
+/**
+ * A linha dos planos antes do lançamento: "Assine aqui" leva aos planos (a seção Planos do início ou `planos.html`), e os planos dizem, à
+ * vista, que a assinatura abre em breve e que, por enquanto, o acesso é completo e nada é cobrado (`linhaDoConvite`; até 27/11/2026, "A
+ * assinatura abre em breve, na web e nas lojas.", sem ação nenhuma ao lado). Depois do lançamento, nada.
  */
 function assinaturaEmBreve(estado) {
-  return estado.lancado ? '' : 'A assinatura abre em breve, na web e nas lojas.';
+  return estado.lancado ? '' : linhaDoConvite();
+}
+
+/**
+ * O botão "Criar conta grátis" (só antes do lançamento): a tela de criar conta do app web, com `?plano=individual|familia` quando a página é
+ * de um plano (`plano`, o do núcleo), para o app abrir a tela Assinatura com essa escolha quando a assinatura abrir. Nunca a uma compra.
+ * Lançado, recusa: quem convida é o próprio "Assine aqui".
+ */
+function botaoDoConvite(estado, { plano = null } = {}) {
+  if (estado.lancado) throw new Error('o convite "Criar conta grátis" é só antes do lançamento: lançado, "Assine aqui" já leva ao cadastro');
+  return `<a class="botao botao-principal" href="${esc(urlDoCadastro({ plano }))}" rel="noopener noreferrer">${esc(TEXTO_DO_CONVITE)}</a>`;
+}
+
+/**
+ * O convite ao cadastro num bloco, antes do lançamento (a seção Planos do início, logo abaixo do título, aonde "Assine aqui" da capa leva):
+ * a linha honesta e o botão "Criar conta grátis". Lançado, nada (os cartões levam à página de cada plano, que tem "Assine aqui").
+ */
+function conviteAoCadastro(estado, { plano = null } = {}) {
+  if (estado.lancado) return '';
+  return `<div class="convite-conta">\n<p class="aviso-assinatura">${esc(linhaDoConvite())}</p>\n<p class="acoes acoes-convite">${botaoDoConvite(estado, { plano })}</p>\n</div>`;
 }
 
 /**
  * As chamadas da capa dos planos (`planos.html` e a página de cada plano, D-129): lançado, as de sempre ("Assine aqui", para criar conta, e
- * "Conheça o app"), com a linha do teste; antes do lançamento, a linha de que a assinatura abre em breve e um caminho a seguir, "Conheça o
- * app" (os planos são onde "Assine aqui" chega: não podem ser um beco sem saída).
+ * "Conheça o app"), com a linha do teste; antes do lançamento (desde 27/11/2026), "Criar conta grátis" (com o plano da página) e "Conheça o
+ * app", com a linha honesta embaixo, no lugar da linha da capa. Os planos são onde "Assine aqui" chega antes do lançamento: até 27/11/2026,
+ * só com "Conheça o app", que voltava a "Assine aqui" (o laço da jornada de compra, seção 2.1).
  */
 function chamadasDosPlanos(arquivo, estado, { plano = null, periodo = null } = {}) {
   if (estado.lancado) return `${chamadas(arquivo, estado, { secundaria: 'app', plano, periodo })}\n<p class="estado-produto">${esc(linhaDaCapa(estado))}</p>`;
-  return `<p class="estado-produto">${esc(assinaturaEmBreve(estado))}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${rel(arquivo, SECUNDARIAS.app.pagina)}">${esc(SECUNDARIAS.app.texto)}</a>\n</div>`;
+  return `${chamadasDoConvite(arquivo, estado, { plano })}\n<p class="estado-produto">${esc(linhaDoConvite())}</p>`;
+}
+
+/**
+ * Os dois botões do convite, antes do lançamento: "Criar conta grátis" e "Conheça o app" (`secundaria`, como em `chamadas`: `app` ou `web`;
+ * a da própria página não aparece). Para as capas dos planos e a chamada final de Use no navegador. Lançado, recusa (use `chamadas`).
+ */
+function chamadasDoConvite(arquivo, estado, { secundaria = 'app', plano = null } = {}) {
+  const botoes = [botaoDoConvite(estado, { plano })];
+  const s = SECUNDARIAS[secundaria];
+  if (!s) throw new Error(`a chamada secundária "${secundaria}" não existe (use app ou web)`);
+  if (s.pagina !== arquivo) botoes.push(`<a class="botao botao-suave" href="${rel(arquivo, s.pagina)}">${esc(s.texto)}</a>`);
+  return `<div class="acoes">\n${botoes.join('\n')}\n</div>`;
+}
+
+/**
+ * A ponte do conteúdo para o produto (jornada de compra de 27/11/2026, item S2): uma linha calma no fim de Aprender, das calculadoras, da
+ * Ajuda e das Novidades, que antes terminavam sem nenhum caminho para o app. Nos dois estados, "crie a sua conta na Clarevo", para a tela de
+ * criar conta: lançado, com o teste grátis; antes do lançamento (desde 27/11/2026, era "conheça o app da Clarevo"), com a linha honesta do
+ * convite (`linhaDoConvite`). Sem pressa nem promessa. Entra pelo modelo de página (`montarPagina`, opção `ponte`).
+ */
+function ponteParaOProduto(arquivo, estado) {
+  const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
+  const depois = estado.lancado ? `Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.` : linhaDoConvite();
+  return `<p class="ponte">${esc(inicio)} <a href="${esc(urlDoCadastro())}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. ${esc(depois)}</p>`;
 }
 
 /**
  * "Já tem conta? Entrar no navegador" (D-129), embaixo das chamadas de Use no navegador, nos dois estados: a tela de entrar do app web, de
  * quem já tem conta (antes do lançamento, também no menu; lançado, o menu tem "Entrar" ao lado de "Assine aqui").
  */
-/**
- * A ponte do conteúdo para o produto (jornada de compra de 27/11/2026, item S2): uma linha calma no fim de Aprender, das calculadoras, da
- * Ajuda e das Novidades, que antes terminavam sem nenhum caminho para o app. Antes do lançamento, "conheça o app da Clarevo" (O app);
- * lançado, o cadastro, com o teste grátis. Sem pressa nem promessa. Entra pelo modelo de página (`montarPagina`, opção `ponte`).
- */
-function ponteParaOProduto(arquivo, estado) {
-  const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
-  if (estado.lancado) return `<p class="ponte">${esc(inicio)} <a href="${esc(urlDoCadastro())}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. ${esc(`Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.`)}</p>`;
-  return `<p class="ponte">${esc(inicio)} <a href="${rel(arquivo, SECUNDARIAS.app.pagina)}">conheça o app da Clarevo</a>.</p>`;
-}
-
 function jaTemConta() {
   return `<p class="ja-tem-conta">Já tem conta? <a href="${esc(URL_ENTRAR)}" rel="noopener noreferrer">Entrar no navegador</a></p>`;
 }
@@ -270,8 +326,8 @@ function linkDaDemonstracao() {
  * A chamada do cabeçalho: antes do lançamento, "Entrar", que leva à tela de entrar do app web (até 26/11/2026, "Entrar (quem testa)"; D-128);
  * depois, "Assine aqui", para a tela de criar conta, como a chamada principal das páginas, e, ao lado, "Entrar" como link de texto (análise
  * geral de 26/11/2026, D-129: lançado, não havia como entrar pelo site). Nunca a tela inicial do app web antes do lançamento: ela começa com
- * "14 dias grátis, sem cartão" e "Criar conta", e o site não convida a criar conta antes do lançamento enquanto o Enzo não decidir (o
- * cadastro em si está aberto, D-129 A: a tela de entrar tem "Criar conta").
+ * "14 dias grátis, sem cartão". Antes do lançamento, o menu fica só com "Entrar" (decisão anterior do Enzo, mantida em 27/11/2026): o
+ * convite "Criar conta grátis" fica nos planos, em Comece aqui, em Use no navegador e no fim das páginas de conteúdo, nunca no cabeçalho.
  */
 function chamadaDoMenu(estado) {
   return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Assine aqui' } : { href: URL_ENTRAR, texto: 'Entrar' };
@@ -292,8 +348,9 @@ function linkDaVersaoWeb(estado) {
 
 /**
  * O app que qualquer pessoa pode abrir agora, para a nota das calculadoras ("ou use a versão web da Clarevo"): só depois do lançamento.
- * Antes, nenhum (D-128: a demonstração não é mais oferecida fora de O app e de Use no navegador, e a tela inicial do app web convida a
- * criar conta, o que o site não faz antes do lançamento enquanto o Enzo não decidir, D-129 A).
+ * Antes, nenhum (D-128: a demonstração não é mais oferecida fora de O app e de Use no navegador; a tela inicial do app web fala do teste
+ * grátis, e antes do lançamento o site só leva à tela de criar conta, com a linha do convite, e à de entrar). As calculadoras já terminam
+ * com a linha para o app (`ponteParaOProduto`), que antes do lançamento convida a criar a conta.
  */
 function appParaUsar(estado) {
   return estado.lancado ? { href: URL_APP, texto: 'versão web' } : null;
@@ -333,7 +390,12 @@ module.exports = {
   assineAqui,
   chamadas,
   assinaturaEmBreve,
+  linhaDoConvite,
+  botaoDoConvite,
+  conviteAoCadastro,
+  chamadasDoConvite,
   chamadasDosPlanos,
+  TEXTO_DO_CONVITE,
   urlDoCadastro,
   ponteParaOProduto,
   jaTemConta,

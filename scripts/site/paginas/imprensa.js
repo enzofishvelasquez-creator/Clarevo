@@ -29,7 +29,10 @@ const MARCAS = [
   { nome: 'clarevo-simbolo-uma-cor', tipo: 'símbolo', titulo: 'Símbolo de uma cor', uso: 'Impressão ou fundos em que a cor não é possível.', fundo: 'claro' },
 ];
 
-/** As capturas do kit: as telas da demonstração em tamanho original (as de `docs/lojas/capturas/`), com o nome do arquivo para baixar. */
+/**
+ * As capturas do kit: as telas da demonstração em tamanho original (1206 x 2622, as de O app, `site-src/imagens/telas/app-*.png`, sem o
+ * selo "Demonstração" desde 27/11/2026; antes, as telas cruas de `docs/lojas/capturas/`), com o nome do arquivo para baixar.
+ */
 const CAPTURAS = [
   { id: 'resumo', arquivo: '01-resumo.png' },
   { id: 'anotar', arquivo: '02-anotar-gasto.png' },
@@ -231,7 +234,7 @@ ${cores}
     ),
     bloco(
       `<h2 id="capturas">Capturas de tela</h2>
-<p class="lead-bloco">Telas da demonstração da Clarevo. Os dados são fictícios, e a etiqueta "Demonstração" aparece no próprio app. Cite sempre como demonstração.</p>
+<p class="lead-bloco">Telas da demonstração da Clarevo. Os dados são fictícios: cite sempre como demonstração.</p>
 <div class="capturas-imprensa">
 ${capturas}
 </div>`,

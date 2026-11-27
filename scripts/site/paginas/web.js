@@ -3,8 +3,12 @@
  * Use a Clarevo no navegador (`web.html`, D-128, 26/11/2026, pedido do Enzo): a página da versão web, para incentivar o uso no navegador.
  * Só o que o app faz hoje, conferido no núcleo e nas decisões:
  *   - no navegador do computador ou do celular, sem instalar nada (o app web, `URL_APP`, do mesmo código do app, D-003);
- *   - no computador, o desenho largo, com o menu ao lado (as telas `docs/telas/630_computador_resumo.png` e `631_computador_movimentos.png`,
- *     gravadas da demonstração pelo roteiro de telas);
+ *   - no computador, o desenho largo, com o menu ao lado: desde 27/11/2026 (pedido do Enzo: "focar em demonstração por vídeos do app" e, da
+ *     tela parada do computador, "melhorar qualidade e deixar como vídeo de demonstração como os outros"), quatro vídeos da versão web
+ *     gravados da demonstração (dados fictícios, sem o selo) por `scripts/gravar-videos-site.js`, numa janela de 1280 x 800 com o menu ao
+ *     lado: o Resumo e Movimentos, anotar um gasto, importar um extrato e as contas do mês no Calendário (`telaLargaComVideo`, a mesma
+ *     moldura larga das capturas e o mesmo comportamento dos vídeos de celular, `js/videos.js`). Até então, duas capturas paradas
+ *     (`docs/telas/630_computador_resumo.png` e `631_computador_movimentos.png`, com o selo);
  *   - a mesma conta e os mesmos dados do app para celular (o mesmo banco, D-004);
  *   - na web, o pagamento é pelo serviço de pagamento (D-084 e D-093): no cartão, a assinatura renova sozinha a cada mês ou a cada ano e se
  *     cancela na tela Assinatura do app; com Pix, paga-se um mês ou um ano de cada vez, sem renovação automática, e o Resumo avisa antes de
@@ -18,10 +22,22 @@
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, icone, telaLarga } = require('../modelo');
-const { chamadas, jaTemConta, linhaDaCapa, linkDaDemonstracao, noCelular, selosDasLojas } = require('../estado');
+const { montarPagina, marcadoresEmHtml, bloco, icone } = require('../modelo');
+const { telaLargaComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
+const { chamadas, chamadasDoConvite, jaTemConta, linhaDaCapa, linhaDoConvite, linkDaDemonstracao, noCelular, selosDasLojas } = require('../estado');
 
 const ARQUIVO = 'web.html';
+
+/**
+ * Os vídeos do computador embaixo do principal (o Resumo e Movimentos): cada um ao lado de um título e de uma frase do que ele mostra,
+ * conferidos no app (a tela Anotar gasto ao lado do Resumo; a importação lida no aparelho, com a revisão de cada linha, D-048 e D-108; o
+ * Calendário do mês, D-105).
+ */
+const VIDEOS_DA_WEB = [
+  { id: 'computador-anotar', titulo: 'Anotar sem sair do Resumo', texto: 'Anotar gasto fica no alto do menu. O formulário abre ao lado do Resumo e, ao salvar, o Pago e a Diferença do mês já contam o gasto.' },
+  { id: 'computador-importar', titulo: 'Importar o extrato', texto: 'Escolha o arquivo do banco, em PDF, OFX ou planilha, lido no próprio navegador. Você revisa cada linha antes de importar, e o arquivo não é guardado.' },
+  { id: 'computador-contas', titulo: 'As contas do mês', texto: 'O Calendário mostra as contas e as faturas de cada dia, com o previsto separado do que já foi pago.' },
+];
 
 /** O que muda no navegador, em três cartões (a grade de três fecha a linha: uma coluna no celular, três no computador). */
 function vantagens() {
@@ -52,16 +68,21 @@ const PAGAR = [
 ];
 
 /**
- * A frase da chamada final (D-129): lançado, o convite de sempre; antes do lançamento, só o que a página oferece (ver o app por dentro e
- * entrar, para quem já tem conta), sem convidar a criar conta: "Assine aqui" leva aos planos, que dizem que a assinatura abre em breve.
+ * A frase da chamada final (D-129): lançado, o convite de sempre, com "Assine aqui"; antes do lançamento, desde 27/11/2026 (decisão do
+ * Enzo, jornada de compra, pergunta 1: a frase era "Por enquanto, veja o app por dentro." e a página não deixava começar nada), o convite a
+ * criar a conta, com a linha honesta (`linhaDoConvite`) e os botões "Criar conta grátis" e "Conheça o app" (`chamadasDaChamadaFinal`).
  */
 function fimDaPagina(estado) {
   return estado.lancado
     ? 'Abra a Clarevo no computador, anote os gastos de hoje e veja o mês tomar forma.'
-    : 'Por enquanto, veja o app por dentro. Quando a assinatura abrir, é só abrir a Clarevo no computador, anotar os gastos de hoje e ver o mês tomar forma.';
+    : `Crie a sua conta, anote os gastos de hoje e veja o mês tomar forma no computador. ${linhaDoConvite()}`;
+}
+/** Os botões da chamada final: lançado, "Assine aqui" e "Conheça o app"; antes do lançamento, "Criar conta grátis" e "Conheça o app". */
+function chamadasDaChamadaFinal(estado) {
+  return estado.lancado ? chamadas(ARQUIVO, estado, { secundaria: 'app' }) : chamadasDoConvite(ARQUIVO, estado, { secundaria: 'app' });
 }
 
-function paginaWeb({ valores, img, estado }) {
+function paginaWeb({ valores, img, videos, estado }) {
   const u = (d) => rel(ARQUIVO, d);
   const { catalogo } = require('../catalogo');
   const dias = catalogo().PLANOS.diasDeTeste;
@@ -83,22 +104,33 @@ ${selosDasLojas(estado, { pequenos: true })}`;
     )
     .join('\n');
 
+  // Desde 27/11/2026, a página começa pelos vídeos do computador (logo depois da capa): o principal, o Resumo e Movimentos, na largura do
+  // conteúdo, e os outros três ao lado de um título e de uma frase. Os vídeos só baixam quando aparecem na tela (`preload="none"` e
+  // `js/videos.js`); antes disso, só a capa de cada um.
   const brutas = [
+    bloco(
+      `<h2 id="no-computador">Veja como é no computador</h2>
+<p class="lead-bloco">O menu fica ao lado, com Anotar gasto sempre à mão, e as telas aproveitam a largura: o Resumo do mês num olhar só e os movimentos numa tabela.</p>
+${telaLargaComVideo('computador-resumo', { videos, img }, ARQUIVO, { classe: 'video-principal' })}
+<div class="videos-web">
+${VIDEOS_DA_WEB.map((v) => `<article class="video-web">
+<div class="video-web-texto">
+<h3>${esc(v.titulo)}</h3>
+<p>${esc(v.texto)}</p>
+</div>
+${telaLargaComVideo(v.id, { videos, img }, ARQUIVO)}
+</article>`).join('\n')}
+</div>`,
+      { rotulo: 'no-computador' },
+    ),
+    // Os fundos alternam: os vídeos (claro), "No navegador, do seu jeito" (alternado), "Use como app no celular" (claro), "Assinar na web"
+    // (alternado) e a chamada final.
     bloco(
       `<h2 id="no-navegador">No navegador, do seu jeito</h2>
 <ul class="recursos-grade" role="list">
 ${cartoes}
 </ul>`,
-      { rotulo: 'no-navegador' },
-    ),
-    bloco(
-      `<h2 id="no-computador">No computador</h2>
-<p class="lead-bloco">O menu fica ao lado, com Anotar gasto sempre à mão, e as telas aproveitam a largura: o Resumo do mês num olhar só e os movimentos numa tabela.</p>
-<div class="telas-web">
-${telaLarga(img['computador-resumo'], ARQUIVO)}
-${telaLarga(img['computador-movimentos'], ARQUIVO)}
-</div>`,
-      { variante: 'alt', rotulo: 'no-computador' },
+      { variante: 'alt', rotulo: 'no-navegador' },
     ),
     bloco(
       `<h2 id="como-app">Use como app no celular</h2>
@@ -123,7 +155,7 @@ ${PAGAR.map((i) => `<li>${esc(i.replace('14 dias', `${dias} dias`))}</li>`).join
       `<div class="chamada-final">
 <h2 id="comecar">Comece pelo navegador</h2>
 <p>${esc(`${fimDaPagina(estado)} ${noCelular(estado)}`)}</p>
-${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
+${chamadasDaChamadaFinal(estado)}
 ${jaTemConta()}
 </div>`,
       { rotulo: 'comecar' },
@@ -139,7 +171,8 @@ ${jaTemConta()}
     fonte: brutas.join('\n') + capa,
     valores,
     classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DOS_VIDEOS],
   });
 }
 
-module.exports = { paginaWeb, ARQUIVO_WEB: ARQUIVO };
+module.exports = { paginaWeb, VIDEOS_DA_WEB, ARQUIVO_WEB: ARQUIVO };

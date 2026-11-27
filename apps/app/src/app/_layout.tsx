@@ -1,7 +1,7 @@
 // Manrope em subconjunto Latin (português do Brasil), gerado de @expo-google-fonts/manrope por `scripts/gerar-fontes.js`: cinco
 // arquivos de 34 KB no lugar de cinco de 97 KB (D-063 item 2, docs/19). O pacote continua instalado, mas não é importado. Só os
 // pesos usados (`fonts` em theme/tokens.ts). `packages/core/test/fontes.test.ts` confere que todo caractere dos textos está neles.
-import { pathFromAppLink, sessionEndAfterDeletion } from '@clarevo/core';
+import { pathFromAppLink, sessionEndAfterDeletion, signupEntryFrom } from '@clarevo/core';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -23,7 +23,7 @@ import { rememberChosenPlanFromLocation } from '@/lib/chosen-plan';
 import { initCrashReport } from '@/lib/crash-report';
 import { useWideLayout } from '@/lib/layout';
 import { forgetDevice } from '@/lib/device-forget';
-import { afterLogin, deletedAccountIntent, firstStepTarget, restoreTarget, signOutIntent } from '@/lib/nav';
+import { afterLogin, deletedAccountIntent, firstStepTarget, restoreTarget, signOutIntent, signupEntryTarget } from '@/lib/nav';
 import { SessionProvider, takeInitialLink, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
@@ -91,6 +91,19 @@ let entryTarget = readEntryTarget();
 // O plano escolhido no site (jornada de compra de 27/11/2026): do endereço da primeira carga, também para quem já está na conta e não passa
 // por Criar conta nem por Entrar. Fica só no aparelho, para a tela Assinatura.
 rememberChosenPlanFromLocation();
+// O link de cadastro do site (27/11/2026): sem sessão, a página aberta em `/criar-conta` vai direto a Criar conta (a tela de carregamento
+// decide), em vez de passar pelas boas-vindas.
+signupEntryTarget.set(readSignupEntry());
+
+/** Na web, o endereço da primeira carga, se for o de Criar conta (`signupEntryFrom`); no celular, nada (os links do site abrem a web). */
+function readSignupEntry(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.location) return null;
+  try {
+    return signupEntryFrom(window.location.pathname, window.location.search);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Devolve o endereço guardado uma única vez. Fica fora dos componentes de propósito: o React Compiler trata variáveis
