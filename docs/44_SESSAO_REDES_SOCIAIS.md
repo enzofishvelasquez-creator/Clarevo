@@ -10,8 +10,8 @@ Este é o ponto de partida da sessão do Claude que trabalha com a Elis nas rede
 
 | Quem | Papel |
 |---|---|
-| **Enzo** | Fundador da Clarevo. Decide posicionamento, oferta, preço, marca e qualquer mudança no app, no site, no banco ou nos textos legais. Faz o merge dos PRs. É a única pessoa que mexe, à mão, em contas, senhas, códigos, pagamentos, chaves e verificações (seção 11) |
-| **Elis** | Redes sociais da Clarevo. Antes disso, foi a pessoa de fora que mais testou o app (os retornos de 30 e 31/10/2026 são atribuídos a ela por dedução; o de 09/11, com certeza): anotar por mensagem, ler print e foto de comprovante e boleto e o pacote de holerite, boleto e extrato em PDF nasceram dos retornos dela (`docs/41_RELATORIO_ELIS.md`). Usa o app no celular Android, pelo navegador, e anota pelo Telegram. Conhece o app como usuária, não o código |
+| **Enzo** | Fundador da Clarevo. Decide posicionamento, oferta, preço, marca e qualquer mudança no app, no site, no banco ou nos textos legais. Desde 27/11/2026 (D-130), gera os conteúdos das redes com esta sessão. Faz o merge dos PRs. É a única pessoa que mexe, à mão, em contas, senhas, códigos, pagamentos, chaves e verificações (seção 11) |
+| **Elis** | Responsável pelas redes sociais da Clarevo (D-130): administra, publica e responde. Antes disso, foi a pessoa de fora que mais testou o app (os retornos de 30 e 31/10/2026 são atribuídos a ela por dedução; o de 09/11, com certeza): anotar por mensagem, ler print e foto de comprovante e boleto e o pacote de holerite, boleto e extrato em PDF nasceram dos retornos dela (`docs/41_RELATORIO_ELIS.md`). Usa o app no celular Android, pelo navegador, e anota pelo Telegram. Conhece o app como usuária, não o código |
 | **Esta sessão (redes)** | Prepara peças, roteiros, legendas, textos alternativos, calendário, gravações da demonstração, artes de referência e o relatório semanal. Confere cada afirmação sobre o app antes de entregar |
 | **A sessão do app** | Outra sessão do Claude, na mesma conta, que desenvolve o app, o site e o banco. Trabalha na branch `claude/clarevo-app-setup-0r7sxn`. **Esta sessão não usa essa branch** (seção 10) |
 | **Claude Chrome** | Extensão que executa, no navegador, roteiros que a sessão escreve (por exemplo, abrir o PR no GitHub). Tem regras próprias (seção 11.2) |
@@ -26,20 +26,20 @@ Linguagem: os documentos de redes evitam nomes de pessoas e usam funções ("pro
 
 | Assunto | Situação | Pode comunicar? |
 |---|---|---|
-| Site `clarevo.app.br` | No ar como **versão preliminar**, com a faixa "em revisão" e sem indexação nas buscas. A página do link da bio é `clarevo.app.br/comece.html` | O link da bio, sim, sem parâmetro (seção 7) |
+| Site `clarevo.app.br` | No ar, ainda sem indexação nas buscas (`site/robots.txt`). Desde a D-128 (26/11/2026) não fala mais em "fase de testes": a capa diz "Assinatura em breve, com 14 dias grátis, sem cartão. Cancele quando quiser." e os planos, "A assinatura abre em breve, na web e nas lojas.". A página do link da bio é `clarevo.app.br/comece.html`, que diz o que é a Clarevo e leva a "Conheça o app" e aos planos | O link da bio, sim, sem parâmetro (seção 7) |
 | App na web `app.clarevo.app.br` | No ar, com login real. É o que a Elis usa | Só depois de Enzo abrir o acesso (abaixo) |
 | Demonstração `demo.clarevo.app.br` | No ar, com dados fictícios e a etiqueta "Demonstração"; o "hoje" é sempre 07/10/2026 | Sim: é a fonte de toda tela das peças |
 | Lojas (App Store e Google Play) | **Ainda em nenhuma loja.** Houve um build de teste no Android | Não. Até Enzo liberar, nada de loja, plataforma nem "em breve" (`docs/25`, seção 6) |
-| Lançamento | Meta de **30/11/2026** para web, iPhone e Android juntos, "tudo junto, mesmo se atrasar" (D-082). O `docs/37` já aponta a primeira quinzena de dezembro como o mais provável (depende das contas da Apple e do Google e do advogado) | **Não anunciar data** |
-| Acesso | A comunicação pública ainda é a do **acesso em preparação**: "A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as Novidades." (`scripts/site/paginas/comece.js`) A bio, a peça P03 e o destaque Comece aqui seguem essa versão | Só o que já está na página `comece.html`. Falar de um recurso com a demonstração pode; convidar a usar, cadastrar ou baixar, não |
-| Preço | Decidido (D-083, D-090): **Individual R$ 29,90 por mês**; **Família R$ 69,90 por mês**, até 6 pessoas; **14 dias grátis** sem pedir cartão; depois, a conta fica só para ver e exportar. Quem tem o benefício pela empresa não paga. Nas lojas, compra pela própria loja; na web, só cartão de crédito no começo (D-085; atualiza o "cartão e Pix" do `CLAUDE.md`). A compra ainda está fechada e nenhuma cobrança acontece até Enzo marcar o início | **Sim, como no site (Enzo liberou em 16/11/2026).** O início do site ganhou a seção Planos: Individual R$ 29,90 por mês, Família R$ 69,90 por mês (até 6 pessoas), 14 dias grátis sem cartão e, enquanto a compra está fechada, "A assinatura pelo app abre no lançamento. Até lá, nada é cobrado." Uma peça pode citar os planos e os preços com essas mesmas palavras e sempre com essa última frase, sem convidar a assinar e sem data de lançamento; o preço ainda é uma pergunta aberta ao advogado (pergunta 47), então qualquer mudança dele vale para as peças também, e não grave nem capture a tela Conta, Assinatura |
+| Lançamento | A abertura é **a partir de janeiro de 2027** (Enzo, D-130). A meta de 30/11/2026 (D-082) não se mantém (`docs/37`) | **Não anunciar data.** Nas peças, "em breve", só na frase do site |
+| Acesso | O site deixou de falar em fase de testes (D-128) e o cadastro continua aberto em produção (D-129). **Nas redes, antes da abertura, o convite é só para conhecer** (D-130): "Conheça a Clarevo pelo link da bio". A bio termina com "Conheça a Clarevo ↓" e a P03 é "Como conhecer a Clarevo" | Falar de um recurso com a demonstração pode; convidar a usar, a criar conta ou a baixar, não. Nada de "fase de testes", "piloto" nem "informações de acesso" (o gerador recusa) |
+| Preço | Decidido (D-083, D-090): **Individual R$ 29,90 por mês**; **Família R$ 69,90 por mês**, até 6 pessoas; **14 dias grátis** sem pedir cartão; depois, a conta fica só para ver e exportar. Quem tem o benefício pela empresa não paga. Nas lojas, compra pela própria loja; na web, cartão ou Pix, pelo serviço de pagamento, com os mesmos preços das lojas (D-128, item 8; antes, D-085 previa só cartão no começo). A compra ainda está fechada e nenhuma cobrança acontece até Enzo marcar o início | **Sim, com as palavras do site (Enzo liberou em 16/11/2026 e confirmou em 27/11, D-130).** O site mostra os planos Individual, R$ 29,90 por mês ou R$ 269,90 por ano, e Família, R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas (D-127), com a etiqueta "Em breve" e a linha "14 dias grátis, sem cartão. Cancele quando quiser." (D-128; a frase "A assinatura pelo app abre no lançamento. Até lá, nada é cobrado." saiu). Uma peça pode citar os planos e os preços com essas palavras, sempre junto de "Assinatura em breve, com 14 dias grátis, sem cartão.", sem convidar a assinar, sem data e sem falar em economia no anual; o preço ainda é uma pergunta aberta ao advogado (pergunta 47), então qualquer mudança dele vale para as peças também, e não grave nem capture a tela Conta, Assinatura |
 | Telegram | **No ar**, para todas as pessoas: **@ClarevoBot** (`t.me/ClarevoBot`). Funciona depois de ligar a conta em Conta, Telegram, "Gerar código". Exemplos: "mercado 52,30", "farmácia 41 cartão", DESFAZER, AJUDA. Abriu antes da resposta do advogado (pergunta 45, D-081) | Pode citar como recurso, sem chamar para criar conta. Tela do app só pela demonstração (como a captura `10_telegram` das lojas). Conversa com o bot só com uma conta de teste que Enzo criar, com nome fictício: nunca a da Elis nem a dele (o bot responde com o nome da pessoa e os registros são reais). Confirmar com Enzo antes da primeira peça |
 | WhatsApp | **Não está no ar** (a conta da Meta está bloqueada) | Não |
 | E-mails | `suporte@clarevo.app.br`, `contato@clarevo.app.br` e `privacidade@clarevo.app.br` estão no site | Confirmar com Enzo que são atendidos antes de citar numa peça (destaque Ajuda, P11) |
 
 **No app hoje (web):** Resumo do mês (Recebido, Pago, Diferença do mês, Ainda a pagar e renda comprometida), Contas a pagar, gastos fixos, parcelamentos e contas do ano (IPVA, IPTU), Cartões e faturas (com "Importar fatura"), Orçamento por categoria (sete categorias, entre elas "Crédito e parcelas"), Metas e reserva para imprevistos (com as 15 metas mais comuns prontas e 17 imagens, D-092), Família, as dez calculadoras e o simulador, Assinaturas, Aprender, Evolução, Análises, "Seu mês em 30 segundos", importar extrato (PDF, OFX ou CSV), ler comprovante, boleto, holerite, nota fiscal e nota de serviço, Ocultar valores, exportar os dados (CSV ou PDF) e excluir a conta.
 
-**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (ligado no lançamento pela D-093, mas ainda sem teste em aparelho: anunciar só depois do teste e com o app nas lojas), WhatsApp, Pix Automático, plano anual, integração bancária, saldo por conta, IA, recomendação de produto financeiro.
+**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (ligado no lançamento pela D-093, mas ainda sem teste em aparelho: anunciar só depois do teste e com o app nas lojas), WhatsApp, Pix Automático, economia ou desconto no plano anual (o preço por ano pode aparecer, como no site), integração bancária, saldo por conta, IA, recomendação de produto financeiro.
 
 **Confidencial, nunca em peça:** a conversa com a Marinha e qualquer número de militares (`docs/28`, `docs/30`); os valores para empresas (`docs/26`, "a validar"); o acordo de sócios e qualquer dado de quem investe na Clarevo; números de uso, de pessoas ou de receita.
 
@@ -52,7 +52,7 @@ Linguagem: os documentos de redes evitam nomes de pessoas e usam funções ("pro
 - **Contrastes:** branco sobre azul e marinho sobre lima, à vontade; **nunca branco sobre lima**; lima sobre azul só em texto grande e em negrito, ícones e decoração.
 - **Fontes:** Manrope no app e no site; **DM Sans só nas artes do Canva** (títulos em negrito, corpo sem negrito nem itálico). A DM Sans está em `scripts/instagram/fontes` (licença OFL).
 - **Logotipo** "clarevo.", em minúsculas com o ponto lima: só pelos arquivos de `docs/marca/`, nunca redigitado nem redesenhado. O ponto faz parte da marca. **Símbolo C** aberto: só como ícone (avatar do perfil, app, favicon). A assinatura "clarevo." nunca vai no avatar.
-- **Perfil do Instagram** (`docs/25_INSTAGRAM.md`, seção 3): nome de exibição "Clarevo | Bem-estar financeiro" (30 caracteres); destaques Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas (este só com o canal comercial conferido); fixados P01, P02 e P03. A bio e o link dependem do acesso (seção 2).
+- **Perfil do Instagram** (`docs/25_INSTAGRAM.md`, seção 3): nome de exibição "Clarevo | Bem-estar financeiro" (30 caracteres); destaques Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas (este só com o canal comercial conferido); fixados P01, P02 e P03. O identificador é `@clarevo` e a bio termina com "Conheça a Clarevo ↓" (D-130).
 - **Produto novo:** nada da marca, dos ativos, dos dados ou do código do Bíos.
 
 ## 4. Regras de redação
@@ -88,7 +88,7 @@ Afirmações que atravessam as peças (atualizadas em 11/11/2026):
 | "Saldo" | **Não existe** no app |
 | Crédito, produto financeiro | **Não existe.** O app não oferece nem recomenda |
 | Acompanhar investimentos | **Existe a partir da versão com a aba Investir (D-093, `docs/45_INVESTIMENTOS.md`)**: a pessoa registra à mão aportes, resgates, rendimentos e o valor do extrato, só no Pessoal, e vê o ganho e a rentabilidade ao lado do CDI e do IPCA (Banco Central). **Anunciar só depois que estiver no ar** (o Enzo aplica os passos do Supabase). Sempre com "não é recomendação de investimento"; nunca nome de produto, banco ou corretora, nem promessa de rendimento. Na demonstração, o CDI e o IPCA são de exemplo |
-| Ler sem digitar (comprovante, boleto, nota, holerite, extrato) | **Existe**, lido no próprio aparelho; a pessoa confere e salva. A versão com a câmera do celular só pode ser gravada no aparelho |
+| Ler sem digitar (comprovante, boleto, nota, holerite, extrato) | **Existe**, lido no próprio aparelho; a pessoa confere e salva. **Fora das peças até estar testado com documentos reais (D-130, que mantém a D-093):** nota, comprovante, boleto e holerite. Importar extrato e fatura pode aparecer, sempre como "não é conexão com o banco". A versão com a câmera do celular só pode ser gravada no aparelho |
 | Anotar por mensagem | **Existe pelo Telegram** (texto escrito, regras simples, sem IA). WhatsApp: ver seção 2 |
 | Família | **Existe** (até 6 pessoas, papéis titular, "anota e vê" e "só vê", convite por link de uso único válido por 7 dias). A demonstração não tem Família de exemplo: peça sobre Família precisa de conferência própria |
 | Empresas | Painel só na web, sem finanças: **a empresa nunca vê as finanças de ninguém, nem somadas**. A B01 e o destaque Para empresas dependem do canal comercial e da revisão técnica |
@@ -126,8 +126,8 @@ Decisão de Enzo de 24/10/2026 (`docs/24`, seção 4), que a política de privac
 | Logotipo, símbolo e ícones | `docs/marca/` (SVG) e `docs/marca/LEIAME.md` | Usar os arquivos, sem redesenhar |
 | Capturas de tela do app (cerca de 1.000) | `docs/telas/` | Geradas pelo teste de telas da sessão do app (`scripts/e2e-web.js`), com a demonstração. Os sufixos `_320px` e `_360px` são larguras de celular pequeno. Esta sessão não regenera essa pasta |
 | Manual do app | `docs/manual/` | Gerado por `npm run manual` (sessão do app) |
-| Capturas e ficha das lojas | `docs/lojas/capturas/`, `docs/lojas/ficha.md` | Boa fonte de frases conferidas, com dois cuidados: traz preço e "14 dias grátis" (não usar ainda) e "membro" e "leitor" (use "Anota e vê" e "Só vê") |
-| Gravações para as redes (MP4 1080 x 1920, sem áudio, com `.srt`, capa e quadros de conferência) e capturas 4:5 | `node scripts/gravar-redes.js --saida <pasta>` | Peças `p02`, `p05`, `p08`, `p11`, `reels`, `camera` e `capturas` (`--so`); `--build` refaz a demonstração antes; `--apresentacao` grava 5 clipes para slides. A narração usa os números lidos da tela e o script falha se a tela mudar. Desde 11/11/2026 todas terminam com "Veja no perfil as informações de acesso"; confira sempre o `.srt` com as regras do gerador (`scripts/instagram/calculos.js`), porque o Reels do mercado e o R03 não passam por ele |
+| Capturas e ficha das lojas | `docs/lojas/capturas/`, `docs/lojas/ficha.md` | Boa fonte de frases conferidas, com dois cuidados: traz preço e "14 dias grátis" (nas peças, só com as palavras do site, seção 2) e "membro" e "leitor" (use "Anota e vê" e "Só vê") |
+| Gravações para as redes (MP4 1080 x 1920, sem áudio, com `.srt`, capa e quadros de conferência) e capturas 4:5 | `node scripts/gravar-redes.js --saida <pasta>` | Peças `p02`, `p05`, `p08`, `p11`, `reels`, `camera` e `capturas` (`--so`); `--build` refaz a demonstração antes; `--apresentacao` grava 5 clipes para slides. A narração usa os números lidos da tela e o script falha se a tela mudar. Desde 27/11/2026 (D-130) todas terminam com "Conheça a Clarevo pelo link da bio."; confira sempre o `.srt` com as regras do gerador (`scripts/instagram/calculos.js`), porque o Reels do mercado e o R03 não passam por ele |
 | Desenho de referência do perfil e das peças do primeiro mês | `node scripts/gerar-instagram.js --saida <pasta> --redes <pasta das gravações>` | Avatar, destaques, prévia do perfil, carrosséis, capas, rascunhos em MP4, legendas, textos alternativos, fichas, calendário D1 a D30 e folha de contato. Textos em `scripts/instagram/conteudo.js` |
 | Vídeo de demonstração completo | `node scripts/video-demonstracao.js` | Ver `docs/17_ROTEIRO_DEMONSTRACAO.md` |
 | Kit de imprensa e imagem de compartilhamento | `scripts/gerar-marca-imprensa.js`, `scripts/gerar-og-site.js` | Sessão do app |
@@ -176,7 +176,8 @@ As duas sessões trabalham no mesmo repositório. Para não haver conflito:
 
 | Esta sessão pode mexer em | Esta sessão não mexe em |
 |---|---|
-| `scripts/instagram/`, `scripts/gerar-instagram.js` | `apps/`, `packages/core/src/`, `supabase/`, `site-src/`, `scripts/site/`, `site/` |
+| `scripts/instagram/`, `scripts/gerar-instagram.js` | `apps/`, `packages/core/src/`, `supabase/`, `scripts/site/` e o resto de `site-src/` e de `site/` |
+| Os textos de Novidades do site, `site-src/novidades/*.md` (liberado pelo Enzo em 27/11/2026, D-130), e as páginas que `node scripts/gerar-site.js` reescreve em `site/` por causa deles. Seguir `site-src/novidades/como-escrevemos.md` e avisar a sessão do app antes de cada texto | As outras páginas do site, o estilo, os scripts e os textos legais |
 | `docs/24_REDES_SOCIAIS.md`, `docs/25_INSTAGRAM.md`, `docs/referencias/redes-sociais-e-guia-visual.md` e este guia | `docs/telas/`, `docs/manual/` (gerados pela sessão do app) |
 | Documentos novos de redes (por exemplo, `docs/redes/`) | `docs/legal/`, `docs/lojas/`, `CLAUDE.md` |
 | `packages/core/test/instagram.test.ts`, só quando mudar o gerador | O resto de `packages/core/test/` |
@@ -185,6 +186,7 @@ As duas sessões trabalham no mesmo repositório. Para não haver conflito:
 
 - A partir deste guia, `docs/24`, `docs/25`, `scripts/instagram/` e `scripts/gerar-instagram.js` passam a ser desta sessão: a sessão do app só mexe neles combinando antes (o `CLAUDE.md` registra a divisão). O `scripts/gravar-redes.js` continua dividido, porque depende das telas.
 - Use a branch que o sistema da sessão indicar (uma `claude/...` própria). **Nunca** `main` nem `claude/clarevo-app-setup-0r7sxn`.
+- **Textos de Novidades:** escreva o `.md` e só gere o site (`node scripts/gerar-site.js`) com a `main` em dia e sem PR da sessão do app em aberto que mexa em `site/`, para não haver conflito em centenas de páginas geradas. Antes do PR: `npm test` (o teste de sincronia falha se `site/` não estiver regerado) e `npm run test:site`. A capa é `capa: <id>` no cabeçalho, com um id que exista em `scripts/site/imagens.js` (imagem nova se pede à sessão do app). Para prévia, use sempre `--saida <pasta temporária>`. O site passa a ser indexado: cada texto vai para a busca.
 - Antes de começar um trabalho que mexe no repositório, puxe a `main` (`git fetch origin main`) e parta dela: a sessão do app faz merges com frequência.
 - Se a gravação falhar porque uma tela mudou, o gravador acusa qual texto não achou. Ajuste a peça se for só a narração; se a tela mudou de verdade, avise Enzo.
 
@@ -254,7 +256,7 @@ As dez calculadoras: "Antes de financiar", "Parcelado ou à vista?", "Quanto cus
 - O app mostra a diferença do mês sem julgar. Sem vermelho e verde de "certo" e "errado".
 - Conteúdo de Aprender com fonte oficial e data de revisão, sem recomendar produto.
 
-**A política ainda está em revisão** (tem trechos "[A DEFINIR]" e o site é preliminar): confira a versão publicada antes de cada peça que cite uma frase dela. Não use o "nada é guardado nem enviado" do rascunho de `docs/34`.
+**A política ainda está em revisão** (tem trechos "[A DEFINIR]" e o site ainda não é indexado): confira a versão publicada antes de cada peça que cite uma frase dela. Não use o "nada é guardado nem enviado" do rascunho de `docs/34`.
 
 **Não dizer:** "criptografia de ponta a ponta", "ninguém consegue ver", "100% seguro", conformidade com a LGPD, "dados guardados no Brasil" (há pergunta aberta ao advogado). A própria política diz que nenhum sistema é totalmente seguro.
 
@@ -282,26 +284,40 @@ Documentos datados: `docs/29_FUNCIONALIDADES_COMERCIAIS.md` (27/10) e a ficha de
 
 ## 14. Pendências de redes
 
-Até 11/11/2026 o repositório não registra perfil criado nem peça publicada: confirme com a Elis em que ponto está o Instagram.
+Em 27/11/2026 o perfil ainda não tinha sido criado. O plano (fases, calendário de dezembro, passo a passo e o que falta decidir) está em `docs/redes/plano-do-instagram.md`, com as decisões do Enzo na D-130: `@clarevo`, a Elis responsável pelas redes, o Enzo gerando os conteúdos com esta sessão, convite só para conhecer antes da abertura (a partir de janeiro de 2027) e a leitura de documentos fora das peças até o teste com documentos reais.
 
 ### 14.1 O que já está pronto
 
 - O gerador do Instagram com o perfil (avatar, destaques, bio, prévia), os carrosséis do calendário (P01, P03, P04, P07, P10, B01 e T01), as peças de reserva (R01, R02 "Organizar as finanças com a câmera do celular", B, F01, F02 e o Reels R03), as capas, os rascunhos em vídeo e o calendário D1 a D30 (`docs/25`).
 - As gravações da demonstração: P02, P05, P08, P11, o Reels da compra de mercado e do orçamento (pedido da Elis em 09/11, D-089 F) e o Reels R03 de nota, comprovante e boleto lidos sem digitar (pedido da Elis em 31/10).
 - A peça "câmera do celular" (R02 e R03) e o vídeo do mercado são os dois pedidos da Elis já atendidos.
+- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
 
-### 14.2 Perguntar a Enzo antes de publicar
+### 14.2 Perguntas a Enzo: respondidas e abertas
 
-1. **Leitura de documentos:** `docs/29_FUNCIONALIDADES_COMERCIAIS.md` (27/10) ainda diz "não anunciar" a leitura de nota e de comprovante, testada só com documentos sintéticos, mas a ficha das lojas (10/11) e as peças R02 e R03 já contam com ela. Na narração, prefira a frase da política: "A imagem não vai para nenhum servidor da Clarevo." (no Android, o componente do Google pode enviar dados técnicos ao Google; a nota do Rio de Janeiro é consultada no site da Sefaz). A página 6 da R02 já foi alinhada à política em 11/11/2026.
-2. **Preço e "14 dias grátis":** quando podem aparecer.
-3. **Abrir o acesso:** quando abrir, mudam juntos a bio (a terceira linha volta a "Conheça a Clarevo ↓"), a P03, o destaque Comece aqui, as frases finais dos Reels ("Veja no perfil as informações de acesso") e o texto `ACESSO` de `scripts/site/paginas/comece.js` (este, pela sessão do app).
-4. **Responsável pelo produto** que refaz o teste na versão publicada antes de cada peça de demonstração (o Playbook pede nome, data e versão). A ficha de afirmações de `docs/24` é de 24/10: depois disso vieram, entre outras, as decisões D-086 a D-092 (categorias, lembretes, Telegram com cartão, fatura importada, salário do fim do mês, metas prontas).
-5. **Identificador do Instagram** (o `@`), quem administra, publica e responde.
+Respondidas em 26 e 27/11/2026 (D-130):
+
+1. **Leitura de documentos:** fica fora das peças até estar testada com documentos reais (D-093 mantida). R02 e R03 esperam; a R02 espera também o app de celular, porque a câmera só funciona nele. Importar extrato e fatura pode aparecer, sempre como "não é conexão com o banco". Quando a leitura for liberada, na narração prefira a frase da política: "A imagem não vai para nenhum servidor da Clarevo." (no Android, o componente do Google pode enviar dados técnicos ao Google; a nota do Rio de Janeiro é consultada no site da Sefaz), sem dizer que lê qualquer documento nem que acerta sempre.
+2. **Preço e "14 dias grátis":** podem aparecer, com as palavras do site (seção 2).
+3. **Abertura:** a partir de janeiro de 2027, sem data nas peças. Antes dela, o convite é só para conhecer. Na abertura, uma fixada nova entra no lugar da P03 e o destaque Comece aqui é refeito; os Reels já publicados ficam como saíram.
+4. **Identificador e responsáveis:** `@clarevo`; a Elis administra, publica e responde; o Enzo gera os conteúdos com esta sessão.
+
+Abertas:
+
+1. **Quem confere o app antes de cada peça que mostra tela** (o Playbook pede nome, data e versão). Proposta desta sessão: a sessão confere na demonstração e anota a data, e a Elis confirma no app dela, sem print da própria conta. A ficha de afirmações de `docs/24` é de 24/10: depois disso vieram muitas decisões (D-086 em diante).
+2. **E-mail e horário de ajuda** confirmados, para o destaque Ajuda e a P11 (o site fala em resposta em até 1 dia útil, D-126).
+3. **Conta de teste do Telegram**, com nome fictício, criada pelo Enzo.
+4. **Pessoas reais** (P06, P09 e P12), com autorização de imagem e de fala. As capas da P01, da F01 e da F02 ficaram só com texto, sem foto (decisão do Enzo de 27/11/2026).
+5. **Segunda linha da bio:** manter "App para organizar seu mês." ou aproximar do subtítulo do site.
+6. **Empresas:** se o "pedir uma apresentação" do site é o canal comercial conferido; a revisão técnica e a pergunta 35 ao advogado continuam pendentes.
+7. **Outras redes (D-130, item 6):** Facebook, LinkedIn e YouTube com vídeos animados; a ordem e o que entra em cada um. O espaço no site é a página Novidades, e a pasta dos textos foi liberada para esta sessão (seção 10).
 
 ### 14.3 Bloqueios conhecidos
 
 - **B01 e o destaque Para empresas:** canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
-- **P11 e o destaque Ajuda:** canal de ajuda e horário real de atendimento.
+- **P11 e o destaque Ajuda:** canal de ajuda e horário real de atendimento. A P11 só sai depois da abertura (D-130).
+- **R02 e R03:** fora até a leitura de nota, comprovante, boleto e holerite estar testada com documentos reais (D-130); a R02 espera também o app de celular.
+- **Lojas:** a D-130 não liberou citar loja nem plataforma nas peças, embora o site já cite.
 - **P06, P09 e P12:** pessoas reais, com autorização de imagem e de fala.
 - **F02:** se citar a Família da Clarevo, conferência própria (a demonstração não tem Família de exemplo).
 - **Trends (T01, T02):** referência e direitos de uso escolhidos na revisão semanal.
