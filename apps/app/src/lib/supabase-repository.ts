@@ -176,6 +176,8 @@ import {
   parseWebSubscriptionStatus,
   parseOwnWebEntitlementsWithPlan,
   parseWebSubscriptionStart,
+  parseWebWithdrawalResult,
+  parseWebWithdrawalState,
   STORE_SUBSCRIPTION_FUNCTION,
   WEB_SUBSCRIPTION_FUNCTION,
   parseLegalAcceptance,
@@ -190,6 +192,8 @@ import {
   type WebSubscriptionStatus,
   type OwnWebEntitlement,
   type WebSubscriptionStart,
+  type WebWithdrawalResult,
+  type WebWithdrawalState,
   type LegalAcceptance,
   type BusinessContext,
   type BusinessContribution,
@@ -4346,6 +4350,21 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.from('plan_entitlements').select('valid_from, valid_until, plan').eq('provider', 'web');
     if (error) throw repoError(error);
     return parseOwnWebEntitlementsWithPlan(data);
+  }
+
+  /**
+   * "desistencia" (D-131, item F): a compra pela web no prazo de 7 dias, ou o pedido já recebido. Só leitura; a função recusa (503) com a
+   * desistência fechada, e então a tela não mostra nada.
+   */
+  async getWebWithdrawal(): Promise<WebWithdrawalState | null> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'desistencia' } });
+    return error ? null : parseWebWithdrawalState(data);
+  }
+
+  /** "desistir" (D-131, item F): o pedido de desistência, com a devolução integral; a recusa (503, 429...) vem no mesmo formato. */
+  async requestWebWithdrawal(): Promise<WebWithdrawalResult> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'desistir' } });
+    return parseWebWithdrawalResult(error ? await functionErrorBody(error) : data);
   }
 
   /** "pix": o Checkout do Asaas de um mês (ou de um ano, D-127) com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */

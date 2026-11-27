@@ -2,6 +2,7 @@ import type { IsoDate, IsoMonth } from './dates';
 import { ACCOUNT_MARK_KEYS, LEVEL_NOTE_ACTIONS, type AccountLevelState, type AccountMarkKey, type AccountMarks } from './levels';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { OwnWebEntitlement } from './assinatura-web/primeira-cobranca';
+import type { WebWithdrawalResult, WebWithdrawalState } from './assinatura-web/desistencia-app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
 import type { BillingPeriod, PlanKind } from './plano-precos';
@@ -6152,6 +6153,15 @@ export class MemoryRepository implements RecordsRepository {
   // Na demonstração e nos testes, ninguém assina na web: nenhum direito pela web.
   async getOwnWebEntitlements(): Promise<OwnWebEntitlement[]> {
     return [];
+  }
+
+  // A desistência em 7 dias (D-131, item F): só existe com o Supabase e o Asaas; na demonstração e nos testes, nada a oferecer.
+  async getWebWithdrawal(): Promise<WebWithdrawalState | null> {
+    return null;
+  }
+
+  async requestWebWithdrawal(): Promise<WebWithdrawalResult> {
+    return { result: 'indisponivel' };
   }
 
   // Assinatura pelas lojas (D-090): só existe com o Supabase, as lojas e o RevenueCat; na demonstração e nos testes, indisponível.

@@ -65,6 +65,7 @@ export * from './nota-flow';
 export * from './boleto';
 export * from './navigation';
 export * from './legal';
+export * from './avisos-email';
 export * from './welcome';
 export * from './plano-escolhido';
 export * from './budget';

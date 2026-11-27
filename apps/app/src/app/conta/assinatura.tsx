@@ -2,6 +2,7 @@ import {
   ACCESS_TEXT,
   FAMILY_PLAN_NEXT_TEXT,
   WEB_SUBSCRIPTION_TEXT,
+  WEB_WITHDRAWAL_TEXT,
   accessView,
   chosenPlanStillUseful,
   familyPlanNextStep,
@@ -10,13 +11,25 @@ import {
   todayIn,
   type Access,
   type PlanKind,
+  type WebWithdrawalReceipt,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, CheckCircle2, Info, UserPlus, Users } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, View, type ScrollView } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
-import { PixRenewCard, PlansCard, StoreManageCard, useAccessNow, useAccessTimeZone, useWebSubscriptionState } from '@/components/access-parts';
+import {
+  PixRenewCard,
+  PlansCard,
+  StoreManageCard,
+  StoreRefundNote,
+  WithdrawalCard,
+  WithdrawalReceiptBanner,
+  useAccessNow,
+  useAccessTimeZone,
+  useWebSubscriptionState,
+} from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -170,6 +183,20 @@ export default function AssinaturaScreen() {
   const welcomed = returned === 'sucesso' && access.data?.status === 'assinatura';
   const subscribed = access.data ? ['assinatura', 'familia', 'beneficio', 'cortesia'].includes(access.data.status) : false;
   const [trialCanceled, setTrialCanceled] = useState<string | null>(null);
+  // A desistência em 7 dias (D-131, item F): o pedido recebido fica no alto da tela enquanto ela está aberta (a confirmação imediata, com a
+  // data e a hora), e a situação é lida de novo algumas vezes, até o aviso de estorno do Asaas chegar e tirar o período pago.
+  const [withdrawn, setWithdrawn] = useState<WebWithdrawalReceipt | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const scroll = useRef<ScrollView>(null);
+  const reduced = useReducedMotion();
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const reloadAccess = useReloadAccess();
+  const onWithdrawn = (receipt: WebWithdrawalReceipt) => {
+    setWithdrawn(receipt);
+    // A confirmação fica no alto da tela: a pessoa tocou no botão mais abaixo, e a tela sobe para ela ver na hora.
+    scroll.current?.scrollTo({ y: 0, animated: !reduced });
+    timers.current.push(...[5000, 15000, 45000].map((ms) => setTimeout(() => void reloadAccess(), ms)));
+  };
   // O plano escolhido no site: lido uma vez ao abrir a tela. Com a situação lida, sai do aparelho (usado agora ou, para quem já não escolhe
   // plano, sem uso) e só vale enquanto esta tela está aberta.
   const [chosen, setChosen] = useState(() => peekChosenPlan());
@@ -182,7 +209,7 @@ export default function AssinaturaScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
-      <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+      <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
         {returned && !welcomed ? (
           <Banner tone={returned === 'sucesso' ? 'sucesso' : 'info'} icon={returned === 'sucesso' ? CheckCircle2 : Info}>
             <Txt variant="label">{W.returned[returned]}</Txt>
@@ -196,19 +223,32 @@ export default function AssinaturaScreen() {
             <Txt variant="label">{trialCanceled}</Txt>
           </Banner>
         ) : null}
+        {withdrawn ? <WithdrawalReceiptBanner receipt={withdrawn} /> : null}
         {access.isPending ? (
           <LoadingState />
         ) : !access.data || !view ? (
           <ErrorState message={T.loadFailed} onRetry={() => access.refetch()} />
         ) : (
           <>
-            <SubscriptionHero access={access.data} view={view} now={now} timeZone={timeZone} justPaid={welcomed} canceled={webCard && webStatus.data?.active === false} />
-            {webCard && !pending ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
+            <SubscriptionHero
+              access={access.data}
+              // Depois do pedido de desistência, até o aviso de estorno do Asaas mudar a situação: o selo e a frase da desistência pedida.
+              view={withdrawn && access.data.status === 'assinatura' ? { ...view, eyebrow: WEB_WITHDRAWAL_TEXT.heroEyebrow, body: WEB_WITHDRAWAL_TEXT.heroBody } : view}
+              now={now}
+              timeZone={timeZone}
+              justPaid={welcomed}
+              canceled={webCard && webStatus.data?.active === false}
+            />
+            {webCard && !pending && !withdrawn ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
+            {/* A desistência em 7 dias (D-131, item F): logo depois do cancelamento (o alto da tela diz que ele vem "logo abaixo"), só com
+                compra pela web no prazo. */}
+            {withdrawn ? null : <WithdrawalCard access={access.data} webTest={webTest} onReceived={onWithdrawn} />}
             {onWeb && pending ? <WebCancelCard canceled={false} trialEnd={trialEnd} onTrialCanceled={setTrialCanceled} /> : null}
             {access.data.status === 'assinatura' && access.data.provider === 'pix' && Platform.OS === 'web' ? (
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}
             {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
+            <StoreRefundNote access={access.data} webTest={webTest} />
             <FamilyNextStep access={access.data} now={now} scheduledPlan={web.firstChargePlan} />
             {/* Quem ainda escolhe um plano: os planos primeiro e o que a assinatura libera depois deles (jornada de compra de 27/11/2026). */}
             {view.showPlans ? null : <BenefitsCard subscribed={subscribed} />}

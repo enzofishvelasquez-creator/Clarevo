@@ -16,6 +16,16 @@ export type PlanKind = 'individual' | 'familiar';
  */
 export const SUBSCRIBE_OPEN = false;
 
+/**
+ * A desistência em 7 dias pela tela Assinatura, na web (direito de arrependimento, CDC art. 49; D-131, item F: "preparado desligado e ligado
+ * com o texto do advogado", pergunta 64 do resumo para o advogado, seção m). Desligada, o app não mostra o botão nem pergunta nada à função
+ * do servidor, e a função recusa "desistencia" e "desistir" com 503 "indisponivel" (só a chave do sandbox do Asaas, que não cobra ninguém,
+ * aceita, para o teste da equipe em `/conta/assinatura?assinar=teste`, como na compra). Ligar é um PR que troca para `true`, gera de novo a
+ * função (`npm run assinatura-web`) e a publica, depois da migração 0050 (`docs/39`, seção 8). Aqui, e não em `plano.ts`, porque a função do
+ * servidor também lê.
+ */
+export const WITHDRAWAL_OPEN = false;
+
 /** O período da cobrança: mensal ou anual (D-125). O que já existia antes da D-127 é mensal. */
 export type BillingPeriod = 'mensal' | 'anual';
 

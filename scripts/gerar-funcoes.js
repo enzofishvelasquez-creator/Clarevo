@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Gera as funções do servidor, cada uma num arquivo só: supabase/functions/whatsapp/index.ts (D-076), supabase/functions/telegram/index.ts
- * (D-080), supabase/functions/assinatura-web/index.ts (D-084), supabase/functions/assinatura-lojas/index.ts (D-090), supabase/functions/indices/index.ts (D-093) e
- * supabase/functions/precos/index.ts (D-099). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
+ * (D-080), supabase/functions/assinatura-web/index.ts (D-084), supabase/functions/assinatura-lojas/index.ts (D-090), supabase/functions/indices/index.ts (D-093),
+ * supabase/functions/precos/index.ts (D-099) e supabase/functions/aviso-fim-do-teste/index.ts (D-131 E). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
  * packages/core/src/telegram/servidor.ts, e o que eles usam), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
  * funções do painel do Supabase, sem instalar nada (docs/05, passos 12j e 12l).
  *
@@ -143,6 +143,8 @@ const FUNCTIONS = [
       '// cabeçalho asaas-access-token, consulta o estado atual da assinatura e das cobranças e chama billing_apply no banco com a chave de',
       '// serviço. Segredos no painel do Supabase (Edge Functions, Secrets): ASAAS_API_KEY ($aact_prod_ ou $aact_hmlg_, que define o',
       '// ambiente) e ASAAS_WEBHOOK_TOKEN; opcional CLAREVO_APP_URL. SUPABASE_URL e a chave de serviço o próprio Supabase fornece.',
+      '// Desistência em 7 dias (D-131, item F, "desistencia" e "desistir"): desligada por WITHDRAWAL_OPEN até o texto do advogado; só o',
+      '// sandbox atende antes disso. Precisa da migração 0050 (docs/39, seção 9).',
       '// Publicar com "Verify JWT" desligado (o Asaas não manda login; a função confere o token da sessão do app ela mesma).',
     ],
     serve: [
@@ -287,6 +289,35 @@ const FUNCTIONS = [
       '    body: () => req.text(),',
       '  });',
       '  return new Response(res.status === 204 ? null : res.body, { status: res.status, headers: res.headers });',
+      '});',
+      '',
+    ],
+  },
+  {
+    // Só o servidor e os textos do aviso (avisos-email.ts): o aviso de fim do teste por e-mail (D-131 E, docs/53), desligado até o Enzo ligar.
+    entry: 'packages/core/src/aviso-fim-do-teste/servidor.ts',
+    out: 'supabase/functions/aviso-fim-do-teste/index.ts',
+    header: [
+      '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/aviso-fim-do-teste. Não editar à mão: mude o núcleo e rode `npm run whatsapp`.',
+      '// Clarevo · função do servidor "aviso-fim-do-teste" (Edge Function do Supabase, D-131 E, docs/53): acordada pelo agendamento do banco com o',
+      '// token no cabeçalho x-clarevo-avisos-token, pede ao banco um aviso por vez da fila que ele preparou (trial_notice_claim, com a chave de',
+      '// serviço), envia pela API do Resend o e-mail único de fim do teste e grava o resultado (trial_notice_finish). Sem o token, 401 e nada',
+      '// acontece. Segredos no painel do Supabase (Edge Functions, Secrets), só o Enzo: AVISOS_EMAIL_TOKEN e RESEND_API_KEY (sem ela, nada é',
+      '// enviado; o ensaio funciona sem ela); opcional CLAREVO_APP_URL. SUPABASE_URL e a chave de serviço o próprio Supabase fornece.',
+      '// Publicar com "Verify JWT" desligado (o agendamento não manda login; a função confere o token ela mesma).',
+    ],
+    serve: [
+      'const aviso = __req(0);',
+      'const handler = aviso.createAvisoFimDoTesteHandler({',
+      '  config: aviso.avisoFimDoTesteConfigFrom((name) => Deno.env.get(name)),',
+      '  fetch: (url, init) => fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: AbortSignal.timeout(init.timeoutMs) }),',
+      '  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),',
+      '  log: (message) => console.error(message),',
+      '});',
+      '',
+      'Deno.serve(async (req) => {',
+      '  const res = await handler({ method: req.method, header: (name) => req.headers.get(name) });',
+      '  return new Response(res.body, { status: res.status, headers: res.headers });',
       '});',
       '',
     ],

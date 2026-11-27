@@ -42,6 +42,13 @@
  * pagamento já gravado, e chamam `billing_pix_apply` (só o resumo SHA-256 do identificador da cobrança e o dia do pagamento), que
  * recalcula até quando o acesso vale (origem 'pix'). Pagar o próximo mês só nos últimos PIX_PAY_AHEAD_DAYS dias do mês pago.
  *
+ * Desistência em 7 dias (direito de arrependimento, CDC art. 49; D-131, item F; regras em `desistencia.ts`): "desistencia" diz ao app se há uma
+ * compra pela web no prazo (o valor, o último dia e o acesso que fica depois) e "desistir" grava o pedido no banco (`billing_withdrawal_begin`,
+ * migração 0050, uma linha por compra: dois toques ou uma repetição nunca devolvem duas vezes), remove a assinatura do cartão no Asaas e pede
+ * a devolução integral da cobrança paga (`POST /v3/payments/{id}/refund`); o período pago sai pelo aviso de estorno do Asaas, como antes.
+ * Fechada por WITHDRAWAL_OPEN (`plano-precos.ts`) até o advogado aprovar o texto: com ela fechada, as duas respondem 503 "indisponivel",
+ * menos com a chave do sandbox (o teste da equipe).
+ *
  * Segredos (painel do Supabase, Edge Functions, Secrets, só o Enzo): ASAAS_API_KEY (começa com $aact_prod_ em produção e $aact_hmlg_ no
  * sandbox, que define o ambiente) e ASAAS_WEBHOOK_TOKEN (32 a 255 caracteres, inventado, diferente da chave). SUPABASE_URL, a chave de
  * serviço e a chave pública (SUPABASE_PUBLISHABLE_KEY ou SUPABASE_ANON_KEY, usada nas chamadas feitas como a pessoa) o Supabase fornece.
@@ -49,9 +56,18 @@
  * segredo entra no app nem no repositório, e nenhum identificador da pessoa vai para o registro (logs).
  */
 import { addDays, addMonthsToDate, todayIn, type IsoDate } from '../dates';
-import { PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSCRIBE_OPEN, type BillingPeriod, type PlanKind } from '../plano-precos';
+import { PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSCRIBE_OPEN, WITHDRAWAL_OPEN, type BillingPeriod, type PlanKind } from '../plano-precos';
 import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
 import { sha256Hex, utf8Bytes } from '../sha256';
+import {
+  REFUND_STATUSES,
+  WITHDRAWAL_REFUND_DESCRIPTION,
+  cardWithdrawal,
+  pixWithdrawal,
+  withdrawalLastDay,
+  type PixPurchaseRow,
+  type WithdrawalCheck,
+} from './desistencia';
 import { parsePixReference, pixCanPayNext, pixReference } from './pix';
 import { paidStartDay } from './primeira-cobranca';
 
@@ -178,6 +194,13 @@ export interface AsaasPayment {
   paidOn: IsoDate | null;
   /** PIX, CREDIT_CARD, BOLETO ou UNDEFINED (nulo quando o Asaas não diz). */
   billingType: string | null;
+  /**
+   * O dia da confirmação do pagamento (no cartão, o dia da cobrança; o `paymentDate` do cartão é o do crédito, 32 dias depois), para o prazo
+   * da desistência (D-131, item F). Ausente nos objetos montados à mão.
+   */
+  confirmedOn?: IsoDate | null;
+  /** O valor da cobrança, em centavos (o Asaas manda em reais), para a devolução integral na desistência. */
+  valueCents?: number | null;
 }
 
 const isoDate = (v: unknown): IsoDate | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
@@ -222,6 +245,8 @@ export function asaasPaymentFrom(raw: unknown): AsaasPayment | null {
     checkoutSession: text(p.checkoutSession),
     paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
     billingType: text(p.billingType),
+    confirmedOn: isoDate(p.confirmedDate) ?? isoDate(p.clientPaymentDate),
+    valueCents: typeof p.value === 'number' && Number.isFinite(p.value) && p.value > 0 ? Math.round(p.value * 100) : null,
   };
 }
 
@@ -573,10 +598,45 @@ export interface AssinaturaWebDeps {
   now?: () => Date;
 }
 
+/** O acesso que fica depois da desistência (o de `clarevo_access`, calculado no banco como se a compra fosse devolvida): situação, fim e origem. */
+export interface WithdrawalAfter {
+  status: string;
+  until: string | null;
+  provider: string | null;
+}
+
+/** O meio de pagamento da compra: a assinatura no cartão ou um pagamento por Pix. */
+export type WithdrawalMethod = 'cartao' | 'pix';
+
+/** "desistencia": a compra pela web que está no prazo, com o valor, o último dia (Brasília) e o acesso que fica depois. */
+export interface WithdrawalOfferReply {
+  result: 'pode';
+  meio: WithdrawalMethod;
+  plan: PlanKind;
+  period: BillingPeriod;
+  amountCents: number;
+  lastDay: IsoDate;
+  after: WithdrawalAfter | null;
+}
+
+/** "desistir" (e "desistencia" depois dele): o pedido recebido, com a hora em que chegou (a confirmação imediata, Decreto 7.962/2013, art. 5º, § 4º). */
+export interface WithdrawalReceiptReply {
+  result: 'recebida';
+  meio: WithdrawalMethod;
+  requestedAt: string;
+  amountCents: number | null;
+  after: WithdrawalAfter | null;
+}
+
 /** As respostas da função ao app. */
 export type AssinaturaWebResult =
   | { result: 'checkout'; url: string }
   | { result: 'ativa'; nextDueDate: IsoDate | null }
+  | WithdrawalOfferReply
+  | WithdrawalReceiptReply
+  /** A desistência que ficou pela metade (o Asaas não respondeu): o pedido continua gravado, com a hora. */
+  | { result: 'tente_de_novo'; requestedAt: string }
+  | { result: 'em_andamento'; requestedAt: string | null }
   | {
       result:
         | 'ja_assinante'
@@ -590,7 +650,11 @@ export type AssinaturaWebResult =
         | 'nao_autenticado'
         | 'pedido_invalido'
         | 'indisponivel'
-        | 'tente_de_novo';
+        | 'tente_de_novo'
+        | 'sem_direito'
+        | 'fora_do_prazo'
+        | 'nada_cobrado'
+        | 'sem_compra';
     };
 
 const JSON_TYPE = 'application/json; charset=utf-8';
@@ -624,6 +688,83 @@ function referenceFromRpc(r: JsonResponse): WebReference | null {
   if (r.status !== 200 || !personId || !UUID.test(personId) || (plan !== 'individual' && plan !== 'familiar')) return null;
   return { personId: personId.toLowerCase(), plan, period: found?.period === 'anual' ? 'anual' : 'mensal' };
 }
+
+/** Uma assinatura no cartão da pessoa com direito começando nos últimos dias (pode estar no prazo da desistência). */
+export interface WithdrawalWebCandidate {
+  externalRef: string;
+  plan: PlanKind;
+  after: WithdrawalAfter | null;
+}
+
+/** Um pagamento por Pix da pessoa feito nos últimos dias (pode estar no prazo da desistência). */
+export interface WithdrawalPixCandidate extends PixPurchaseRow {
+  after: WithdrawalAfter | null;
+}
+
+/** Um pedido de desistência já gravado (`billing_withdrawals`). */
+export interface WithdrawalRecord {
+  provider: 'web' | 'pix';
+  purchaseHash: string;
+  status: 'pedida' | 'devolvida';
+  requestedAt: string;
+  amountCents: number | null;
+}
+
+/** O que o banco sabe das compras da pessoa que podem estar no prazo (`billing_withdrawal_options`, migração 0050). */
+export interface WithdrawalOptions {
+  web: WithdrawalWebCandidate[];
+  pix: WithdrawalPixCandidate[];
+  withdrawals: WithdrawalRecord[];
+}
+
+const HASH = /^[0-9a-f]{64}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const list = (json: unknown): unknown[] => {
+  const data = obj(json)?.data;
+  return Array.isArray(data) ? data : [];
+};
+
+/** O acesso que fica depois, como o banco devolve (`clarevo_access`); fora do formato, null (a tela diz a regra, sem a data). */
+export function parseWithdrawalAfter(raw: unknown): WithdrawalAfter | null {
+  const a = obj(raw);
+  const status = text(a?.status);
+  if (!a || !status) return null;
+  const until = typeof a.until === 'string' && !Number.isNaN(Date.parse(a.until)) ? a.until : null;
+  return { status, until, provider: text(a.provider) };
+}
+
+/** Lê a resposta de `billing_withdrawal_options`. 'sem_pessoa': conta excluída ou inexistente; null: fora do formato. */
+export function parseWithdrawalOptions(raw: unknown): WithdrawalOptions | 'sem_pessoa' | null {
+  const r = obj(raw);
+  if (r?.result === 'sem_pessoa') return 'sem_pessoa';
+  if (r?.result !== 'ok') return null;
+  const rows = (v: unknown) => (Array.isArray(v) ? v.map(obj).filter((x): x is Record<string, unknown> => x !== null) : []);
+  const plan = (v: unknown): PlanKind | null => (v === 'individual' || v === 'familiar' ? v : null);
+  const web: WithdrawalWebCandidate[] = [];
+  for (const w of rows(r.web)) {
+    const p = plan(w.plan);
+    if (typeof w.external_ref === 'string' && HASH.test(w.external_ref) && p) web.push({ externalRef: w.external_ref, plan: p, after: parseWithdrawalAfter(w.access_after) });
+  }
+  const pix: WithdrawalPixCandidate[] = [];
+  for (const x of rows(r.pix)) {
+    const p = plan(x.plan);
+    const paidOn = typeof x.paid_on === 'string' && DAY.test(x.paid_on) ? x.paid_on : null;
+    const startsOn = typeof x.starts_on === 'string' && DAY.test(x.starts_on) ? x.starts_on : null;
+    if (typeof x.payment_hash !== 'string' || !HASH.test(x.payment_hash) || !p || !paidOn) continue;
+    pix.push({ paymentHash: x.payment_hash, plan: p, period: x.period === 'anual' ? 'anual' : 'mensal', paidOn, startsOn, after: parseWithdrawalAfter(x.access_after) });
+  }
+  const withdrawals: WithdrawalRecord[] = [];
+  for (const w of rows(r.withdrawals)) {
+    if ((w.provider !== 'web' && w.provider !== 'pix') || typeof w.purchase_hash !== 'string' || !HASH.test(w.purchase_hash)) continue;
+    if ((w.status !== 'pedida' && w.status !== 'devolvida') || typeof w.requested_at !== 'string' || Number.isNaN(Date.parse(w.requested_at))) continue;
+    const amount = typeof w.amount_cents === 'number' && Number.isSafeInteger(w.amount_cents) && w.amount_cents > 0 ? w.amount_cents : null;
+    withdrawals.push({ provider: w.provider, purchaseHash: w.purchase_hash, status: w.status, requestedAt: w.requested_at, amountCents: amount });
+  }
+  return { web, pix, withdrawals };
+}
+
+/** Até quantas páginas de 100 cobranças de Pix a desistência procura, pelos dias de pagamento que o banco diz (a cobrança da pessoa, pelo resumo). */
+export const WITHDRAWAL_PIX_PAGES = 5;
 
 export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: AssinaturaWebRequest) => Promise<AssinaturaWebResponse> {
   const log = deps.log ?? (() => {});
@@ -805,6 +946,208 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
   }
 
+  // -------------------------------------------------------------------------------------------------------------------------------------
+  // Desistência em 7 dias (D-131, item F; regras em desistencia.ts)
+  // -------------------------------------------------------------------------------------------------------------------------------------
+
+  /** Uma compra da pessoa conferida no Asaas: de onde veio, o resumo, o plano, o período, o acesso que fica depois e o que o Asaas diz. */
+  interface WithdrawalFound {
+    provider: 'web' | 'pix';
+    purchaseHash: string;
+    plan: PlanKind;
+    period: BillingPeriod;
+    after: WithdrawalAfter | null;
+    check: WithdrawalCheck;
+    /** A assinatura do cartão (para removê-la antes da devolução). */
+    sub?: AsaasSubscription;
+  }
+
+  /**
+   * As compras da pessoa que o banco diz poderem estar no prazo, conferidas no Asaas. Cartão: as assinaturas pela referência da pessoa,
+   * também as já removidas (quem cancelou e depois desiste), só as que o banco liga a ela (o resumo do identificador), com as cobranças.
+   * Pix: as cobranças de Pix pagas nos dias que o banco diz, só as que o banco liga a ela (o resumo). Nada do que o app manda entra aqui.
+   */
+  async function findWithdrawals({ asaas }: Clients, personId: string, o: WithdrawalOptions): Promise<WithdrawalFound[]> {
+    const found: WithdrawalFound[] = [];
+    for (const plan of PLANS) {
+      const candidates = o.web.filter((w) => w.plan === plan);
+      if (candidates.length === 0) continue;
+      const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&includeDeleted=true&limit=10`);
+      if (r.status !== 200) throw new TransientError('Asaas não listou as assinaturas');
+      for (const raw of list(r.json)) {
+        const s = asaasSubscriptionFrom(raw);
+        if (!s || parseWebReference(s.externalReference)?.personId !== personId) continue;
+        const w = candidates.find((c) => c.externalRef === sha256Hex(s.id));
+        if (!w || found.some((f) => f.purchaseHash === w.externalRef)) continue;
+        const pays = await asaas('GET', `/payments?subscription=${encodeURIComponent(s.id)}&limit=100`);
+        if (pays.status !== 200) throw new TransientError(`Asaas respondeu ${pays.status} ao listar cobranças`);
+        const payments = list(pays.json)
+          .map(asaasPaymentFrom)
+          .filter((p): p is AsaasPayment => p !== null && (p.subscription === null || p.subscription === s.id));
+        found.push({ provider: 'web', purchaseHash: w.externalRef, plan: w.plan, period: periodOfCycle(s.cycle), after: w.after, check: cardWithdrawal(payments, now()), sub: s });
+      }
+    }
+    if (o.pix.length > 0) {
+      const days = o.pix.map((x) => x.paidOn).sort();
+      const from = addDays(days[0]!, -1);
+      const to = addDays(days[days.length - 1]!, 1);
+      const pending = new Map(o.pix.map((x) => [x.paymentHash, x]));
+      for (let page = 0; page < WITHDRAWAL_PIX_PAGES && pending.size > 0; page++) {
+        const r = await asaas('GET', `/payments?billingType=PIX&paymentDate%5Bge%5D=${from}&paymentDate%5Ble%5D=${to}&limit=100&offset=${page * 100}`);
+        if (r.status !== 200) throw new TransientError(`Asaas respondeu ${r.status} ao listar cobranças de Pix`);
+        for (const raw of list(r.json)) {
+          const p = asaasPaymentFrom(raw);
+          const row = p && !p.subscription ? pending.get(sha256Hex(p.id)) : undefined;
+          if (!p || !row) continue;
+          pending.delete(row.paymentHash);
+          found.push({ provider: 'pix', purchaseHash: row.paymentHash, plan: row.plan, period: row.period, after: row.after, check: pixWithdrawal(row, p, now()) });
+        }
+        if (obj(r.json)?.hasMore !== true) break;
+      }
+    }
+    return found;
+  }
+
+  /** O pedido já gravado de uma compra. */
+  const recordOf = (o: WithdrawalOptions, f: WithdrawalFound) => o.withdrawals.find((w) => w.provider === f.provider && w.purchaseHash === f.purchaseHash) ?? null;
+  const methodOf = (f: WithdrawalFound): WithdrawalMethod => (f.provider === 'pix' ? 'pix' : 'cartao');
+
+  /** Remove a assinatura do cartão que ainda está ativa no Asaas (nada mais é cobrado). */
+  async function removeSubscription(asaas: AsaasCall, sub: AsaasSubscription | undefined): Promise<void> {
+    if (!sub || sub.status !== 'ACTIVE' || sub.deleted) return;
+    const del = await asaas('DELETE', `/subscriptions/${encodeURIComponent(sub.id)}`);
+    if (del.status !== 200 && del.status !== 404) throw new TransientError(`Asaas respondeu ${del.status} ao remover a assinatura`);
+  }
+
+  /**
+   * Pede a devolução integral de cada cobrança paga (sem valor no pedido: o Asaas devolve o integral, no mesmo meio de pagamento). Se o Asaas
+   * recusar, confere a cobrança de novo: já devolvida (por uma tentativa anterior que ficou sem resposta) conta como feita, e nunca se pede outra.
+   */
+  async function refund(asaas: AsaasCall, payments: readonly AsaasPayment[]): Promise<void> {
+    for (const p of payments) {
+      const path = `/payments/${encodeURIComponent(p.id)}`;
+      const r = await asaas('POST', `${path}/refund`, { description: WITHDRAWAL_REFUND_DESCRIPTION });
+      if (r.status === 200) continue;
+      const again = await asaas('GET', path);
+      const current = again.status === 200 ? asaasPaymentFrom(again.json) : null;
+      if (current && REFUND_STATUSES.has(current.status)) continue;
+      throw new TransientError(`Asaas recusou a devolução (${r.status})`);
+    }
+  }
+
+  /**
+   * "desistencia" (só leitura) e "desistir". O pedido é gravado no banco antes de qualquer devolução (`billing_withdrawal_begin`, uma linha por
+   * compra, com uma trava curta de tentativa): dois toques, duas abas ou uma repetição não devolvem duas vezes, e a hora do pedido fica guardada
+   * mesmo que o Asaas falhe. No cartão, a assinatura sai antes da devolução (nada mais é cobrado; a já removida é achada de novo na
+   * repetição). Qualquer falha do Asaas solta a trava e responde "tente_de_novo" com a hora do pedido; a repetição relê o Asaas antes de
+   * pedir a devolução.
+   */
+  async function withdrawal(clients: Clients, personId: string, act: boolean): Promise<[number, AssinaturaWebResult]> {
+    const { asaas, db } = clients;
+    const res = await db.rpcService('billing_withdrawal_options', { p_person: personId });
+    // Sem a migração 0050 no banco, a função do banco não existe (404): indisponível, sem chamar o Asaas.
+    if (res.status === 404) {
+      log('billing_withdrawal_options não existe: falta a migração 0050');
+      return [503, { result: 'indisponivel' }];
+    }
+    if (res.status !== 200) throw new TransientError(`banco respondeu ${res.status} em billing_withdrawal_options`);
+    const o = parseWithdrawalOptions(res.json);
+    if (o === 'sem_pessoa') return [401, { result: 'nao_autenticado' }];
+    if (!o) throw new TransientError('resposta inesperada de billing_withdrawal_options');
+    const found = o.web.length + o.pix.length > 0 ? await findWithdrawals(clients, personId, o) : [];
+    // A compra mais recente no prazo; sem ela, a já devolvida que tem pedido gravado (uma tentativa anterior deu certo).
+    const best = found
+      .flatMap((f) => (f.check.state === 'pode' ? [{ offer: f, check: f.check }] : []))
+      .sort((a, b) => b.check.startDay.localeCompare(a.check.startDay))[0];
+    const done = found.find((f) => f.check.state === 'devolvida' && recordOf(o, f) !== null);
+    const receipt = (f: WithdrawalFound, requestedAt: string, amountCents: number | null): WithdrawalReceiptReply => ({
+      result: 'recebida',
+      meio: methodOf(f),
+      requestedAt,
+      amountCents,
+      after: f.after,
+    });
+
+    if (!act) {
+      if (best) {
+        const { offer, check } = best;
+        return [200, { result: 'pode', meio: methodOf(offer), plan: offer.plan, period: offer.period, amountCents: check.amountCents, lastDay: withdrawalLastDay(check.startDay), after: offer.after }];
+      }
+      if (done) {
+        const rec = recordOf(o, done)!;
+        return [200, receipt(done, rec.requestedAt, rec.amountCents)];
+      }
+      return [200, { result: 'sem_direito' }];
+    }
+
+    if (!best) {
+      if (done) {
+        // Devolvida no Asaas por uma tentativa anterior: a assinatura que ficou ativa sai, e o banco marca a devolução feita.
+        const rec = recordOf(o, done)!;
+        await removeSubscription(asaas, done.sub);
+        if (rec.status === 'pedida') {
+          await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: done.provider, p_purchase_hash: done.purchaseHash, p_refunded: true });
+        }
+        return [200, receipt(done, rec.requestedAt, rec.amountCents)];
+      }
+      const reason = found.some((f) => f.check.state === 'nada_cobrado') ? 'nada_cobrado' : found.some((f) => f.check.state === 'fora_do_prazo') ? 'fora_do_prazo' : 'sem_compra';
+      return [200, { result: reason }];
+    }
+
+    const { offer, check } = best;
+    const begun = await db.rpcService('billing_withdrawal_begin', {
+      p_person: personId,
+      p_provider: offer.provider,
+      p_purchase_hash: offer.purchaseHash,
+      p_plan: offer.plan,
+      p_period: offer.period,
+      p_amount_cents: check.amountCents,
+      p_contracted_on: check.startDay,
+    });
+    if (begun.status !== 200) {
+      log(`banco não gravou o pedido de desistência (${begun.status})`);
+      return [500, { result: 'tente_de_novo' }];
+    }
+    const b = obj(begun.json);
+    const requestedAt = text(b?.requested_at);
+    switch (b?.result) {
+      case 'nova':
+      case 'retomar':
+        break;
+      case 'concluida':
+        return [200, receipt(offer, requestedAt ?? now().toISOString(), check.amountCents)];
+      case 'em_andamento':
+        return [200, { result: 'em_andamento', requestedAt }];
+      case 'fora_do_prazo':
+        return [200, { result: 'fora_do_prazo' }];
+      case 'sem_pagamento':
+        return [200, { result: 'sem_compra' }];
+      case 'muitas_tentativas':
+        return [429, { result: 'muitas_tentativas' }];
+      case 'sem_pessoa':
+        return [401, { result: 'nao_autenticado' }];
+      default:
+        log('resposta inesperada de billing_withdrawal_begin');
+        return [500, { result: 'tente_de_novo' }];
+    }
+    const at = requestedAt ?? now().toISOString();
+    try {
+      await removeSubscription(asaas, offer.sub);
+      await refund(asaas, check.refundable);
+    } catch (e) {
+      // A trava sai (a próxima tentativa relê o Asaas); o pedido continua gravado, com a hora.
+      await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: false }).catch(() => undefined);
+      log(`desistência sem devolução concluída: ${e instanceof Error ? e.message : 'erro'}`);
+      return [e instanceof TransientError ? 503 : 500, { result: 'tente_de_novo', requestedAt: at }];
+    }
+    const finished = await db
+      .rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: true })
+      .catch(() => null);
+    // A devolução já foi pedida ao Asaas: sem a marca no banco, a próxima leitura a acha devolvida e marca (a pessoa já tem a confirmação).
+    if (!finished || finished.status !== 200) log('desistência devolvida sem a marca no banco');
+    return [200, receipt(offer, at, check.amountCents)];
+  }
+
   async function app({ asaas, db }: Clients, req: AssinaturaWebRequest, cors: Record<string, string>): Promise<AssinaturaWebResponse> {
     const reply = (status: number, body: AssinaturaWebResult) => json(status, body, cors);
     if (!config) return reply(503, { result: 'indisponivel' });
@@ -824,14 +1167,20 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     // O período (D-127): sem ele, mensal (o app de antes do plano anual não manda).
     const period: BillingPeriod | null = payload?.period === undefined ? 'mensal' : payload.period === 'mensal' || payload.period === 'anual' ? payload.period : null;
     if (
-      (action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
+      (action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao' && action !== 'desistencia' && action !== 'desistir') ||
       ((action === 'assinar' || action === 'pix') && ((plan !== 'individual' && plan !== 'familiar') || period === null))
     ) {
       return reply(400, { result: 'pedido_invalido' });
     }
+    // A desistência fechada (WITHDRAWAL_OPEN, D-131, item F): com a chave de produção, nada; só o sandbox do Asaas (o teste da equipe).
+    if ((action === 'desistencia' || action === 'desistir') && !WITHDRAWAL_OPEN && !config.sandbox) return reply(503, { result: 'indisponivel' });
     try {
       const personId = await db.userId(auth[1] ?? '');
       if (!personId) return reply(401, { result: 'nao_autenticado' });
+      if (action === 'desistencia' || action === 'desistir') {
+        const [status, body] = await withdrawal({ asaas, db }, personId, action === 'desistir');
+        return reply(status, body);
+      }
       // "situacao" (12/11/2026, teste no sandbox): se ainda há assinatura no cartão ativa no Asaas e quando renova. O acesso continua até
       // o fim do período pago depois de cancelar, então só o Asaas diz se ela foi cancelada (a tela esconde o botão e diz que não renova).
       if (action === 'situacao') {

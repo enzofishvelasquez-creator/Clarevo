@@ -59,6 +59,7 @@ import type { LegalAcceptance } from './aceite';
 import type { PublicPrices } from './investment-prices';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { OwnWebEntitlement } from './assinatura-web/primeira-cobranca';
+import type { WebWithdrawalResult, WebWithdrawalState } from './assinatura-web/desistencia-app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { AccountLevelState, AccountMarks } from './levels';
 import type { Access } from './plano';
@@ -1145,6 +1146,13 @@ export interface RecordsRepository {
    * para saber se há assinatura no cartão (paga ou marcada para o fim do teste) antes de perguntar ao Asaas e antes de excluir a conta.
    */
   getOwnWebEntitlements(): Promise<OwnWebEntitlement[]>;
+  /**
+   * "desistencia" (D-131, item F): se há compra pela web no prazo de 7 dias (o valor, o último dia e o acesso que fica depois), ou se o pedido já
+   * foi recebido; null quando não deu para saber (desistência fechada, falha). Só leitura.
+   */
+  getWebWithdrawal(): Promise<WebWithdrawalState | null>;
+  /** "desistir" (D-131, item F): grava o pedido, cancela a assinatura do cartão e pede a devolução integral ao Asaas; idempotente. */
+  requestWebWithdrawal(): Promise<WebWithdrawalResult>;
 
   // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
 

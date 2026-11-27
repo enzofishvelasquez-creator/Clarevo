@@ -8,6 +8,8 @@ import {
   STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
   WEB_SUBSCRIPTION_TEXT,
+  WEB_WITHDRAWAL_TEXT,
+  WITHDRAWAL_OPEN,
   accessBanner,
   accessPeriod,
   accessView,
@@ -15,6 +17,7 @@ import {
   demoInstant,
   deviceTimeZone,
   formatDateBR,
+  formatDateTimeBR,
   hasLiveWebEntitlement,
   isStoreSubscription,
   paidStartDay,
@@ -25,28 +28,34 @@ import {
   pixNextPaymentFrom,
   planPeriodPriceAmount,
   storeChangeDone,
+  storeRefundNoteApplies,
   todayIn,
   trialDaysLeft,
   trialEndRelation,
   TRIAL_WARNING_DAYS,
+  withdrawalConfirmLines,
+  withdrawalMayApply,
+  withdrawalReceiptLines,
   type Access,
   type BillingPeriod,
   type ChosenPlan,
   type PlanKind,
   type StorePurchaseResult,
   type WebSubscriptionStart,
+  type WebWithdrawalReceipt,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, Check, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw, User, Users } from 'lucide-react-native';
+import { AlertCircle, Check, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw, Undo2, User, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { ConfirmDialog } from '@/components/dialog';
 import { Banner, Button, Card, LinkButton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { PURCHASE_PREVIEW, PURCHASE_PREVIEW_SITE } from '@/lib/capture';
 import { useWideLayout } from '@/lib/layout';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases, type StoreChoice } from '@/lib/store-purchases';
-import { useAccess, useOwnWebEntitlements, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
+import { useAccess, useOwnWebEntitlements, useReloadAccess, useWebSubscriptionStatus, useWebWithdrawal } from '@/state/access';
 import { useSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -54,6 +63,7 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const T = ACCESS_TEXT;
 const W = WEB_SUBSCRIPTION_TEXT;
 const S = STORE_SUBSCRIPTION_TEXT;
+const WD = WEB_WITHDRAWAL_TEXT;
 
 /** O fuso da pessoa (o do espaço; sem ele, o do aparelho), para as datas do teste e da renovação. */
 export function useAccessTimeZone(): string {
@@ -408,6 +418,119 @@ export function PixRenewCard({ access, hidden = false }: { access: Access; hidde
           </Txt>
         </Banner>
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * A confirmação do pedido de desistência (D-131, item F; textos pendentes do advogado, pergunta 64): na hora, com a data e a hora em que o
+ * pedido chegou ao servidor (Decreto 7.962/2013, art. 5º, § 4º), a devolução pedida, o acesso depois e a quem escrever.
+ */
+export function WithdrawalReceiptBanner({ receipt }: { receipt: WebWithdrawalReceipt }) {
+  const timeZone = useAccessTimeZone();
+  const [first, ...rest] = withdrawalReceiptLines(receipt, timeZone);
+  return (
+    <Banner tone="sucesso" icon={CheckCircle2}>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+        {first}
+      </Txt>
+      {rest.map((line) => (
+        <Txt key={line} variant="label">
+          {line}
+        </Txt>
+      ))}
+    </Banner>
+  );
+}
+
+/**
+ * A desistência em 7 dias (direito de arrependimento, CDC art. 49; D-131, item F; textos pendentes do advogado, pergunta 64): só na web, só
+ * para a compra feita na web (a assinatura no cartão ou um pagamento por Pix, `withdrawalMayApply`), com a desistência aberta
+ * (WITHDRAWAL_OPEN) ou no teste da equipe (`?assinar=teste`, que só a chave do sandbox do Asaas atende: com a de produção, a função responde
+ * "indisponivel" e nada aparece), e só quando a função do servidor diz que há compra no prazo (o prazo vem do Asaas e do banco, nunca do
+ * aparelho). Na demonstração, nada (a não ser no roteiro de telas, PURCHASE_PREVIEW, com o repositório em memória simulado). O botão abre
+ * a confirmação, que diz o que acontece; confirmado, a tela mostra na hora o pedido recebido, com a data e a hora (`onReceived`). Dois toques
+ * não pedem duas devoluções: o botão fica ocupado durante o pedido, e a função grava um pedido por compra.
+ */
+export function WithdrawalCard({ access, webTest, onReceived }: { access: Access; webTest: boolean; onReceived: (receipt: WebWithdrawalReceipt) => void }) {
+  const { auth } = useSession();
+  const repo = useRepo();
+  const reload = useReloadAccess();
+  const timeZone = useAccessTimeZone();
+  const demo = auth.mode === 'demo' && !PURCHASE_PREVIEW;
+  const enabled = Platform.OS === 'web' && !demo && (WITHDRAWAL_OPEN || webTest) && withdrawalMayApply(access);
+  const state = useWebWithdrawal(enabled);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const data = enabled ? state.data : null;
+  if (!data || data.result === 'sem_direito') return null;
+  // O pedido já recebido (a tela foi aberta de novo antes de o aviso do Asaas mudar a situação): a confirmação, sem botão.
+  if (data.result === 'recebida') return <WithdrawalReceiptBanner receipt={data} />;
+  const confirm = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await repo.requestWebWithdrawal();
+      if (r.result === 'recebida') {
+        setBusy(false);
+        setOpen(false);
+        onReceived(r);
+        void reload();
+        return;
+      }
+      setMsg(r.result === 'tente_de_novo' ? WD.errors.tente_de_novo(r.requestedAt ? formatDateTimeBR(r.requestedAt, timeZone) : null) : WD.errors[r.result]);
+    } catch {
+      setMsg(WD.errors.tente_de_novo(null));
+    }
+    setBusy(false);
+    setOpen(false);
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {WD.title}
+      </Txt>
+      <Txt color={colors.textSecondary}>{WD.intro(data.meio, formatDateBR(data.lastDay), data.amountCents)}</Txt>
+      {msg ? (
+        <Banner tone="erro" icon={AlertCircle}>
+          <Txt variant="label" color={colors.error}>
+            {msg}
+          </Txt>
+        </Banner>
+      ) : null}
+      <Button label={WD.action} icon={Undo2} tone="soft" busy={busy} busyLabel={WD.busy} onPress={() => setOpen(true)} />
+      <ConfirmDialog
+        visible={open}
+        title={WD.confirmTitle(data.amountCents)}
+        cancelLabel={WD.back}
+        confirmLabel={WD.confirmAction}
+        confirmTone="brand"
+        busy={busy}
+        onCancel={() => setOpen(false)}
+        onConfirm={() => void confirm()}>
+        {withdrawalConfirmLines(data, timeZone).map((line) => (
+          <Txt key={line}>{line}</Txt>
+        ))}
+      </ConfirmDialog>
+    </Card>
+  );
+}
+
+/**
+ * Quem assina pela App Store ou pelo Google Play (D-131, item F): sem botão de desistir; a tela diz, com o texto dos Termos (pendente do
+ * advogado, pergunta 64), que o reembolso é pedido à loja. Com a desistência aberta, ou no teste da equipe na web.
+ */
+export function StoreRefundNote({ access, webTest }: { access: Access; webTest: boolean }) {
+  const { auth } = useSession();
+  const demo = auth.mode === 'demo' && !PURCHASE_PREVIEW;
+  if (demo || !(WITHDRAWAL_OPEN || webTest) || !storeRefundNoteApplies(access)) return null;
+  return (
+    <Card>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {WD.storeRefund}
+      </Txt>
     </Card>
   );
 }

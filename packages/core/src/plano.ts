@@ -21,12 +21,25 @@ import {
   PLAN_PERIOD_PRICE_CENTS,
   PLAN_PRICE_CENTS,
   SUBSCRIBE_OPEN,
+  WITHDRAWAL_OPEN,
   parseBillingPeriod,
   type BillingPeriod,
   type PlanKind,
 } from './plano-precos';
 
-export { BILLING_PERIODS, PERIOD_MONTHS, PERIOD_NAME, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, PLAN_PRICE_CENTS, SUBSCRIBE_OPEN, parseBillingPeriod, type BillingPeriod, type PlanKind };
+export {
+  BILLING_PERIODS,
+  PERIOD_MONTHS,
+  PERIOD_NAME,
+  PLAN_NAME,
+  PLAN_PERIOD_PRICE_CENTS,
+  PLAN_PRICE_CENTS,
+  SUBSCRIBE_OPEN,
+  WITHDRAWAL_OPEN,
+  parseBillingPeriod,
+  type BillingPeriod,
+  type PlanKind,
+};
 
 /** Dias de teste grátis (o mesmo intervalo do banco, em clarevo_access). */
 export const TRIAL_DAYS = 14;

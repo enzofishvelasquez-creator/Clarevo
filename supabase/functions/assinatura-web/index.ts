@@ -5,6 +5,8 @@
 // cabeçalho asaas-access-token, consulta o estado atual da assinatura e das cobranças e chama billing_apply no banco com a chave de
 // serviço. Segredos no painel do Supabase (Edge Functions, Secrets): ASAAS_API_KEY ($aact_prod_ ou $aact_hmlg_, que define o
 // ambiente) e ASAAS_WEBHOOK_TOKEN; opcional CLAREVO_APP_URL. SUPABASE_URL e a chave de serviço o próprio Supabase fornece.
+// Desistência em 7 dias (D-131, item F, "desistencia" e "desistir"): desligada por WITHDRAWAL_OPEN até o texto do advogado; só o
+// sandbox atende antes disso. Precisa da migração 0050 (docs/39, seção 9).
 // Publicar com "Verify JWT" desligado (o Asaas não manda login; a função confere o token da sessão do app ela mesma).
 
 const __mods = [
@@ -12,7 +14,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TransientError = exports.REFUSED_EVENTS = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.WITHDRAWAL_PIX_PAGES = exports.TransientError = exports.REFUSED_EVENTS = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
     exports.paymentsLookbackMonths = paymentsLookbackMonths;
     exports.periodOfCycle = periodOfCycle;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
@@ -34,13 +36,16 @@ const __mods = [
     exports.checkoutPixRequest = checkoutPixRequest;
     exports.checkoutLink = checkoutLink;
     exports.corsHeaders = corsHeaders;
+    exports.parseWithdrawalAfter = parseWithdrawalAfter;
+    exports.parseWithdrawalOptions = parseWithdrawalOptions;
     exports.createAssinaturaWebHandler = createAssinaturaWebHandler;
     const dates_1 = __req(1);
     const plano_precos_1 = __req(2);
     const servidor_comum_1 = __req(3);
     const sha256_1 = __req(4);
-    const pix_1 = __req(5);
-    const primeira_cobranca_1 = __req(6);
+    const desistencia_1 = __req(5);
+    const pix_1 = __req(6);
+    const primeira_cobranca_1 = __req(7);
     exports.ASAAS_PRODUCTION_URL = 'https://api.asaas.com/v3';
     exports.ASAAS_SANDBOX_URL = 'https://api-sandbox.asaas.com/v3';
     exports.ASAAS_KEY_PRODUCTION = '$aact_prod_';
@@ -134,6 +139,8 @@ const __mods = [
             checkoutSession: text(p.checkoutSession),
             paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
             billingType: text(p.billingType),
+            confirmedOn: isoDate(p.confirmedDate) ?? isoDate(p.clientPaymentDate),
+            valueCents: typeof p.value === 'number' && Number.isFinite(p.value) && p.value > 0 ? Math.round(p.value * 100) : null,
         };
     }
     function pixPaidOn(p, today) {
@@ -376,6 +383,55 @@ const __mods = [
             return null;
         return { personId: personId.toLowerCase(), plan, period: found?.period === 'anual' ? 'anual' : 'mensal' };
     }
+    const HASH = /^[0-9a-f]{64}$/;
+    const DAY = /^\d{4}-\d{2}-\d{2}$/;
+    const list = (json) => {
+        const data = (0, servidor_comum_1.obj)(json)?.data;
+        return Array.isArray(data) ? data : [];
+    };
+    function parseWithdrawalAfter(raw) {
+        const a = (0, servidor_comum_1.obj)(raw);
+        const status = text(a?.status);
+        if (!a || !status)
+            return null;
+        const until = typeof a.until === 'string' && !Number.isNaN(Date.parse(a.until)) ? a.until : null;
+        return { status, until, provider: text(a.provider) };
+    }
+    function parseWithdrawalOptions(raw) {
+        const r = (0, servidor_comum_1.obj)(raw);
+        if (r?.result === 'sem_pessoa')
+            return 'sem_pessoa';
+        if (r?.result !== 'ok')
+            return null;
+        const rows = (v) => (Array.isArray(v) ? v.map(servidor_comum_1.obj).filter((x) => x !== null) : []);
+        const plan = (v) => (v === 'individual' || v === 'familiar' ? v : null);
+        const web = [];
+        for (const w of rows(r.web)) {
+            const p = plan(w.plan);
+            if (typeof w.external_ref === 'string' && HASH.test(w.external_ref) && p)
+                web.push({ externalRef: w.external_ref, plan: p, after: parseWithdrawalAfter(w.access_after) });
+        }
+        const pix = [];
+        for (const x of rows(r.pix)) {
+            const p = plan(x.plan);
+            const paidOn = typeof x.paid_on === 'string' && DAY.test(x.paid_on) ? x.paid_on : null;
+            const startsOn = typeof x.starts_on === 'string' && DAY.test(x.starts_on) ? x.starts_on : null;
+            if (typeof x.payment_hash !== 'string' || !HASH.test(x.payment_hash) || !p || !paidOn)
+                continue;
+            pix.push({ paymentHash: x.payment_hash, plan: p, period: x.period === 'anual' ? 'anual' : 'mensal', paidOn, startsOn, after: parseWithdrawalAfter(x.access_after) });
+        }
+        const withdrawals = [];
+        for (const w of rows(r.withdrawals)) {
+            if ((w.provider !== 'web' && w.provider !== 'pix') || typeof w.purchase_hash !== 'string' || !HASH.test(w.purchase_hash))
+                continue;
+            if ((w.status !== 'pedida' && w.status !== 'devolvida') || typeof w.requested_at !== 'string' || Number.isNaN(Date.parse(w.requested_at)))
+                continue;
+            const amount = typeof w.amount_cents === 'number' && Number.isSafeInteger(w.amount_cents) && w.amount_cents > 0 ? w.amount_cents : null;
+            withdrawals.push({ provider: w.provider, purchaseHash: w.purchase_hash, status: w.status, requestedAt: w.requested_at, amountCents: amount });
+        }
+        return { web, pix, withdrawals };
+    }
+    exports.WITHDRAWAL_PIX_PAGES = 5;
     function createAssinaturaWebHandler(deps) {
         const log = deps.log ?? (() => { });
         const now = deps.now ?? (() => new Date());
@@ -551,6 +607,178 @@ const __mods = [
                 return json(200, { received: true, outcome: 'recusado' });
             }
         }
+        async function findWithdrawals({ asaas }, personId, o) {
+            const found = [];
+            for (const plan of exports.PLANS) {
+                const candidates = o.web.filter((w) => w.plan === plan);
+                if (candidates.length === 0)
+                    continue;
+                const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&includeDeleted=true&limit=10`);
+                if (r.status !== 200)
+                    throw new TransientError('Asaas não listou as assinaturas');
+                for (const raw of list(r.json)) {
+                    const s = asaasSubscriptionFrom(raw);
+                    if (!s || parseWebReference(s.externalReference)?.personId !== personId)
+                        continue;
+                    const w = candidates.find((c) => c.externalRef === (0, sha256_1.sha256Hex)(s.id));
+                    if (!w || found.some((f) => f.purchaseHash === w.externalRef))
+                        continue;
+                    const pays = await asaas('GET', `/payments?subscription=${encodeURIComponent(s.id)}&limit=100`);
+                    if (pays.status !== 200)
+                        throw new TransientError(`Asaas respondeu ${pays.status} ao listar cobranças`);
+                    const payments = list(pays.json)
+                        .map(asaasPaymentFrom)
+                        .filter((p) => p !== null && (p.subscription === null || p.subscription === s.id));
+                    found.push({ provider: 'web', purchaseHash: w.externalRef, plan: w.plan, period: periodOfCycle(s.cycle), after: w.after, check: (0, desistencia_1.cardWithdrawal)(payments, now()), sub: s });
+                }
+            }
+            if (o.pix.length > 0) {
+                const days = o.pix.map((x) => x.paidOn).sort();
+                const from = (0, dates_1.addDays)(days[0], -1);
+                const to = (0, dates_1.addDays)(days[days.length - 1], 1);
+                const pending = new Map(o.pix.map((x) => [x.paymentHash, x]));
+                for (let page = 0; page < exports.WITHDRAWAL_PIX_PAGES && pending.size > 0; page++) {
+                    const r = await asaas('GET', `/payments?billingType=PIX&paymentDate%5Bge%5D=${from}&paymentDate%5Ble%5D=${to}&limit=100&offset=${page * 100}`);
+                    if (r.status !== 200)
+                        throw new TransientError(`Asaas respondeu ${r.status} ao listar cobranças de Pix`);
+                    for (const raw of list(r.json)) {
+                        const p = asaasPaymentFrom(raw);
+                        const row = p && !p.subscription ? pending.get((0, sha256_1.sha256Hex)(p.id)) : undefined;
+                        if (!p || !row)
+                            continue;
+                        pending.delete(row.paymentHash);
+                        found.push({ provider: 'pix', purchaseHash: row.paymentHash, plan: row.plan, period: row.period, after: row.after, check: (0, desistencia_1.pixWithdrawal)(row, p, now()) });
+                    }
+                    if ((0, servidor_comum_1.obj)(r.json)?.hasMore !== true)
+                        break;
+                }
+            }
+            return found;
+        }
+        const recordOf = (o, f) => o.withdrawals.find((w) => w.provider === f.provider && w.purchaseHash === f.purchaseHash) ?? null;
+        const methodOf = (f) => (f.provider === 'pix' ? 'pix' : 'cartao');
+        async function removeSubscription(asaas, sub) {
+            if (!sub || sub.status !== 'ACTIVE' || sub.deleted)
+                return;
+            const del = await asaas('DELETE', `/subscriptions/${encodeURIComponent(sub.id)}`);
+            if (del.status !== 200 && del.status !== 404)
+                throw new TransientError(`Asaas respondeu ${del.status} ao remover a assinatura`);
+        }
+        async function refund(asaas, payments) {
+            for (const p of payments) {
+                const path = `/payments/${encodeURIComponent(p.id)}`;
+                const r = await asaas('POST', `${path}/refund`, { description: desistencia_1.WITHDRAWAL_REFUND_DESCRIPTION });
+                if (r.status === 200)
+                    continue;
+                const again = await asaas('GET', path);
+                const current = again.status === 200 ? asaasPaymentFrom(again.json) : null;
+                if (current && desistencia_1.REFUND_STATUSES.has(current.status))
+                    continue;
+                throw new TransientError(`Asaas recusou a devolução (${r.status})`);
+            }
+        }
+        async function withdrawal(clients, personId, act) {
+            const { asaas, db } = clients;
+            const res = await db.rpcService('billing_withdrawal_options', { p_person: personId });
+            if (res.status === 404) {
+                log('billing_withdrawal_options não existe: falta a migração 0050');
+                return [503, { result: 'indisponivel' }];
+            }
+            if (res.status !== 200)
+                throw new TransientError(`banco respondeu ${res.status} em billing_withdrawal_options`);
+            const o = parseWithdrawalOptions(res.json);
+            if (o === 'sem_pessoa')
+                return [401, { result: 'nao_autenticado' }];
+            if (!o)
+                throw new TransientError('resposta inesperada de billing_withdrawal_options');
+            const found = o.web.length + o.pix.length > 0 ? await findWithdrawals(clients, personId, o) : [];
+            const best = found
+                .flatMap((f) => (f.check.state === 'pode' ? [{ offer: f, check: f.check }] : []))
+                .sort((a, b) => b.check.startDay.localeCompare(a.check.startDay))[0];
+            const done = found.find((f) => f.check.state === 'devolvida' && recordOf(o, f) !== null);
+            const receipt = (f, requestedAt, amountCents) => ({
+                result: 'recebida',
+                meio: methodOf(f),
+                requestedAt,
+                amountCents,
+                after: f.after,
+            });
+            if (!act) {
+                if (best) {
+                    const { offer, check } = best;
+                    return [200, { result: 'pode', meio: methodOf(offer), plan: offer.plan, period: offer.period, amountCents: check.amountCents, lastDay: (0, desistencia_1.withdrawalLastDay)(check.startDay), after: offer.after }];
+                }
+                if (done) {
+                    const rec = recordOf(o, done);
+                    return [200, receipt(done, rec.requestedAt, rec.amountCents)];
+                }
+                return [200, { result: 'sem_direito' }];
+            }
+            if (!best) {
+                if (done) {
+                    const rec = recordOf(o, done);
+                    await removeSubscription(asaas, done.sub);
+                    if (rec.status === 'pedida') {
+                        await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: done.provider, p_purchase_hash: done.purchaseHash, p_refunded: true });
+                    }
+                    return [200, receipt(done, rec.requestedAt, rec.amountCents)];
+                }
+                const reason = found.some((f) => f.check.state === 'nada_cobrado') ? 'nada_cobrado' : found.some((f) => f.check.state === 'fora_do_prazo') ? 'fora_do_prazo' : 'sem_compra';
+                return [200, { result: reason }];
+            }
+            const { offer, check } = best;
+            const begun = await db.rpcService('billing_withdrawal_begin', {
+                p_person: personId,
+                p_provider: offer.provider,
+                p_purchase_hash: offer.purchaseHash,
+                p_plan: offer.plan,
+                p_period: offer.period,
+                p_amount_cents: check.amountCents,
+                p_contracted_on: check.startDay,
+            });
+            if (begun.status !== 200) {
+                log(`banco não gravou o pedido de desistência (${begun.status})`);
+                return [500, { result: 'tente_de_novo' }];
+            }
+            const b = (0, servidor_comum_1.obj)(begun.json);
+            const requestedAt = text(b?.requested_at);
+            switch (b?.result) {
+                case 'nova':
+                case 'retomar':
+                    break;
+                case 'concluida':
+                    return [200, receipt(offer, requestedAt ?? now().toISOString(), check.amountCents)];
+                case 'em_andamento':
+                    return [200, { result: 'em_andamento', requestedAt }];
+                case 'fora_do_prazo':
+                    return [200, { result: 'fora_do_prazo' }];
+                case 'sem_pagamento':
+                    return [200, { result: 'sem_compra' }];
+                case 'muitas_tentativas':
+                    return [429, { result: 'muitas_tentativas' }];
+                case 'sem_pessoa':
+                    return [401, { result: 'nao_autenticado' }];
+                default:
+                    log('resposta inesperada de billing_withdrawal_begin');
+                    return [500, { result: 'tente_de_novo' }];
+            }
+            const at = requestedAt ?? now().toISOString();
+            try {
+                await removeSubscription(asaas, offer.sub);
+                await refund(asaas, check.refundable);
+            }
+            catch (e) {
+                await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: false }).catch(() => undefined);
+                log(`desistência sem devolução concluída: ${e instanceof Error ? e.message : 'erro'}`);
+                return [e instanceof TransientError ? 503 : 500, { result: 'tente_de_novo', requestedAt: at }];
+            }
+            const finished = await db
+                .rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: true })
+                .catch(() => null);
+            if (!finished || finished.status !== 200)
+                log('desistência devolvida sem a marca no banco');
+            return [200, receipt(offer, at, check.amountCents)];
+        }
         async function app({ asaas, db }, req, cors) {
             const reply = (status, body) => json(status, body, cors);
             if (!config)
@@ -573,14 +801,20 @@ const __mods = [
             const action = payload?.action;
             const plan = payload?.plan;
             const period = payload?.period === undefined ? 'mensal' : payload.period === 'mensal' || payload.period === 'anual' ? payload.period : null;
-            if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
+            if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao' && action !== 'desistencia' && action !== 'desistir') ||
                 ((action === 'assinar' || action === 'pix') && ((plan !== 'individual' && plan !== 'familiar') || period === null))) {
                 return reply(400, { result: 'pedido_invalido' });
             }
+            if ((action === 'desistencia' || action === 'desistir') && !plano_precos_1.WITHDRAWAL_OPEN && !config.sandbox)
+                return reply(503, { result: 'indisponivel' });
             try {
                 const personId = await db.userId(auth[1] ?? '');
                 if (!personId)
                     return reply(401, { result: 'nao_autenticado' });
+                if (action === 'desistencia' || action === 'desistir') {
+                    const [status, body] = await withdrawal({ asaas, db }, personId, action === 'desistir');
+                    return reply(status, body);
+                }
                 if (action === 'situacao') {
                     const subs = await activeSubscriptions(asaas, personId);
                     const next = subs.map((s) => s.nextDueDate).filter((d) => d !== null).sort()[0] ?? null;
@@ -876,9 +1110,10 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.PERIOD_NAME = exports.PLAN_NAME = exports.PLAN_PERIOD_PRICE_CENTS = exports.PLAN_PRICE_CENTS = exports.PERIOD_MONTHS = exports.BILLING_PERIODS = exports.SUBSCRIBE_OPEN = void 0;
+    exports.PERIOD_NAME = exports.PLAN_NAME = exports.PLAN_PERIOD_PRICE_CENTS = exports.PLAN_PRICE_CENTS = exports.PERIOD_MONTHS = exports.BILLING_PERIODS = exports.WITHDRAWAL_OPEN = exports.SUBSCRIBE_OPEN = void 0;
     exports.parseBillingPeriod = parseBillingPeriod;
     exports.SUBSCRIBE_OPEN = false;
+    exports.WITHDRAWAL_OPEN = false;
     exports.BILLING_PERIODS = ['mensal', 'anual'];
     exports.PERIOD_MONTHS = { mensal: 1, anual: 12 };
     exports.PLAN_PRICE_CENTS = { individual: 2990, familiar: 6990 };
@@ -1027,6 +1262,90 @@ const __mods = [
     }
     function sha256Hex(text) {
         return sha256HexOfBytes(utf8Bytes(text));
+    }
+  },
+  // packages/core/src/assinatura-web/desistencia.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.REFUND_STATUSES = exports.REFUNDABLE_STATUSES = exports.WITHDRAWAL_REFUND_DESCRIPTION = exports.WITHDRAWAL_DEADLINE_OFFSET = exports.WITHDRAWAL_DAYS = void 0;
+    exports.withdrawalLastDay = withdrawalLastDay;
+    exports.withdrawalDeadline = withdrawalDeadline;
+    exports.withinWithdrawal = withinWithdrawal;
+    exports.cardChargeDay = cardChargeDay;
+    exports.cardWithdrawal = cardWithdrawal;
+    exports.pixWithdrawalStart = pixWithdrawalStart;
+    exports.pixWithdrawal = pixWithdrawal;
+    const dates_1 = __req(1);
+    exports.WITHDRAWAL_DAYS = 7;
+    exports.WITHDRAWAL_DEADLINE_OFFSET = '-05:00';
+    exports.WITHDRAWAL_REFUND_DESCRIPTION = 'Desistência da compra em até 7 dias (CDC, art. 49)';
+    exports.REFUNDABLE_STATUSES = new Set(['CONFIRMED', 'RECEIVED']);
+    exports.REFUND_STATUSES = new Set(['REFUNDED', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS']);
+    const EVER_PAID = new Set([
+        ...exports.REFUNDABLE_STATUSES,
+        ...exports.REFUND_STATUSES,
+        'RECEIVED_IN_CASH',
+        'DUNNING_RECEIVED',
+        'CHARGEBACK_REQUESTED',
+        'CHARGEBACK_DISPUTE',
+        'AWAITING_CHARGEBACK_REVERSAL',
+    ]);
+    function withdrawalLastDay(startDay) {
+        return (0, dates_1.addDays)(startDay, exports.WITHDRAWAL_DAYS);
+    }
+    function withdrawalDeadline(startDay) {
+        return new Date(`${withdrawalLastDay(startDay)}T23:59:59.999${exports.WITHDRAWAL_DEADLINE_OFFSET}`);
+    }
+    function withinWithdrawal(startDay, now) {
+        return now.getTime() <= withdrawalDeadline(startDay).getTime();
+    }
+    function cardChargeDay(p) {
+        if (p.deleted || !EVER_PAID.has(p.status) || !p.dueDate)
+            return null;
+        const confirmed = p.confirmedOn ?? null;
+        return confirmed && confirmed > p.dueDate ? confirmed : p.dueDate;
+    }
+    const cents = (p) => (typeof p.valueCents === 'number' && Number.isSafeInteger(p.valueCents) && p.valueCents > 0 ? p.valueCents : null);
+    function refundTotal(refundable) {
+        let total = 0;
+        for (const p of refundable) {
+            const c = cents(p);
+            if (c === null)
+                return null;
+            total += c;
+        }
+        return total;
+    }
+    function cardWithdrawal(payments, now) {
+        const charged = payments.map((p) => ({ p, day: cardChargeDay(p) })).filter((x) => x.day !== null);
+        if (charged.length === 0)
+            return { state: 'nada_cobrado' };
+        const startDay = charged.map((x) => x.day).sort()[0];
+        if (!withinWithdrawal(startDay, now))
+            return { state: 'fora_do_prazo', startDay };
+        const refundable = charged.map((x) => x.p).filter((p) => exports.REFUNDABLE_STATUSES.has(p.status));
+        if (refundable.length === 0) {
+            return charged.some((x) => exports.REFUND_STATUSES.has(x.p.status)) ? { state: 'devolvida', startDay } : { state: 'sem_compra' };
+        }
+        const amountCents = refundTotal(refundable);
+        return amountCents === null ? { state: 'sem_compra' } : { state: 'pode', startDay, refundable, amountCents };
+    }
+    function pixWithdrawalStart(row) {
+        return row.startsOn && row.startsOn > row.paidOn ? row.startsOn : row.paidOn;
+    }
+    function pixWithdrawal(row, payment, now) {
+        const startDay = pixWithdrawalStart(row);
+        if (payment.deleted)
+            return { state: 'sem_compra' };
+        if (!withinWithdrawal(startDay, now))
+            return { state: 'fora_do_prazo', startDay };
+        if (exports.REFUND_STATUSES.has(payment.status))
+            return { state: 'devolvida', startDay };
+        if (!exports.REFUNDABLE_STATUSES.has(payment.status))
+            return { state: 'sem_compra' };
+        const amountCents = cents(payment);
+        return amountCents === null ? { state: 'sem_compra' } : { state: 'pode', startDay, refundable: [payment], amountCents };
     }
   },
   // packages/core/src/assinatura-web/pix.ts

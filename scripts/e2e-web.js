@@ -15481,6 +15481,109 @@ setInterval(async () => {
         ok(`Compra na web (D-129): nada passa da largura em ${w} px`, !largo);
         if (w === 1280) await cpShot('620_assinatura_compra_web_computador');
       }
+      // 5. A desistência em 7 dias (D-131, item F; textos pendentes do advogado, pergunta 64), simulada no repositório da demonstração (em
+      // memória, sem rede): a conta assina pela web, e a função do servidor diz que há uma compra no prazo. Com a desistência desligada
+      // (WITHDRAWAL_OPEN) e sem "?assinar=teste", nada aparece e a tela nem pergunta à função; com "?assinar=teste" (o teste da equipe, que só
+      // a chave do sandbox do Asaas atende), o cartão "Desistência em até 7 dias", a confirmação que diz o que acontece e, confirmado, o pedido
+      // recebido na hora, com a data e a hora, sem segundo pedido. Nas lojas, nenhum botão: a nota do reembolso pela loja. A demonstração sem a
+      // marca do roteiro continua sem nada disso (bloco anterior: nenhum botão de compra).
+      await cp.setViewportSize({ width: 390, height: 844 });
+      const simularDesistencia = (meio) => cp.evaluate(async (meio) => {
+        const repo = await window.__cp.repo();
+        const pix = meio === 'pix';
+        const loja = meio === 'loja';
+        window.__desistencia = { consultas: 0, pedidos: 0 };
+        const depois = pix ? { status: 'teste', until: '2026-12-09T15:00:00.000Z', provider: null } : { status: 'leitura', until: '2026-11-10T15:00:00.000Z', provider: null };
+        let recebida = null;
+        repo.getMyAccess = async () => ({ status: 'assinatura', plan: 'individual', until: pix ? '2026-12-31T02:59:59.999Z' : '2027-11-30T02:59:59.999Z', canWrite: true, provider: loja ? 'apple' : pix ? 'pix' : 'web', period: pix ? 'mensal' : 'anual' });
+        repo.getWebSubscriptionStatus = async () => (pix || loja ? null : { active: true, nextDueDate: '2027-11-27' });
+        repo.getOwnWebEntitlements = async () => (pix || loja ? [] : [{ validFrom: '2026-11-27T03:00:00.000Z', validUntil: '2027-11-30T02:59:59.999Z' }]);
+        repo.getWebWithdrawal = async () => {
+          window.__desistencia.consultas++;
+          return recebida ?? { result: 'pode', meio, plan: 'individual', period: pix ? 'mensal' : 'anual', amountCents: pix ? 2990 : 26990, lastDay: '2026-12-04', after: depois };
+        };
+        repo.requestWebWithdrawal = async () => {
+          window.__desistencia.pedidos++;
+          await new Promise((r) => setTimeout(r, 300));
+          recebida = { result: 'recebida', meio, requestedAt: '2026-11-27T17:05:00.000Z', amountCents: pix ? 2990 : 26990, after: depois };
+          return recebida;
+        };
+        await window.__cp.refresh();
+      }, meio);
+      const desistencia = () => cp.evaluate(() => window.__desistencia);
+      const desistirBtn = () => cp.getByRole('button', { name: 'Desistir e receber de volta', exact: true }).filter({ visible: true });
+      // 5a. Desligada, sem "?assinar=teste": nada aparece, e a tela não pergunta nada à função.
+      await cpOpen('/conta/assinatura', FECHADA);
+      await simularDesistencia('cartao');
+      await cpWait('Plano Individual anual'); await cp.waitForTimeout(700);
+      t = await cpBody();
+      ok('Desistência (D-131 F): desligada (WITHDRAWAL_OPEN) e sem "?assinar=teste", nenhum botão de desistir, nenhum texto novo e nenhuma pergunta à função',
+        (await desistirBtn().count()) === 0 && !t.includes('Desistência em até 7 dias') && (await desistencia()).consultas === 0 && (await cpCount('button', 'Cancelar assinatura')) === 1, t.slice(0, 900));
+      // 5b. Com "?assinar=teste": o cartão logo depois de "Cancelar assinatura" (o alto da tela diz que ele vem "logo abaixo"), com o último dia
+      // e o valor.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      await simularDesistencia('cartao');
+      await cpWait('Desistência em até 7 dias'); await cp.waitForTimeout(600);
+      t = await cpBody();
+      const INTRO_CARTAO = 'Você pode desistir da assinatura até 04/12/2026 e receber de volta o valor pago, R$ 269,90, como prevê o Código de Defesa do Consumidor (art. 49).';
+      ok('Desistência (D-131 F): com "?assinar=teste", o cartão "Desistência em até 7 dias", com o último dia e o valor, e o botão "Desistir e receber de volta", logo depois de "Cancelar assinatura"',
+        t.includes(INTRO_CARTAO) && (await desistirBtn().count()) === 1 && t.lastIndexOf('Cancelar assinatura') < t.indexOf('Desistência em até 7 dias') && t.indexOf('Plano Individual anual') < t.indexOf('Desistência em até 7 dias') &&
+          (await cp.getByRole('heading', { name: 'Desistência em até 7 dias' }).filter({ visible: true }).count()) === 1, t.slice(0, 1200));
+      await cpShot('623_assinatura_desistencia_botao');
+      await desistirBtn().first().click();
+      await cpWait('Desistir e receber R$ 269,90 de volta?'); await cp.waitForTimeout(400);
+      t = await cpBody();
+      const LINHAS_CARTAO = [
+        'A Clarevo devolve o valor integral, R$ 269,90, no mesmo cartão usado na compra.',
+        'O estorno aparece na fatura do cartão no prazo do banco ou da administradora do cartão, que não depende da Clarevo.',
+        'A assinatura é cancelada na hora, e nada mais é cobrado.',
+        'Depois, a conta fica só para ver e exportar, com os seus dados guardados.',
+        'A situação muda nesta tela em alguns minutos, quando o Asaas confirmar a devolução.',
+      ];
+      ok('Desistência (D-131 F): a confirmação diz o que acontece (o valor integral no mesmo cartão, o prazo do estorno pelo banco, o cancelamento, o acesso depois e quando muda), com "Voltar" primeiro, sem pressa nem culpa',
+        LINHAS_CARTAO.every((l) => t.includes(l)) && (await cpCount('button', 'Voltar')) >= 1 && !/certeza|perder|perda|culpa/i.test(t), t.slice(0, 1600));
+      await cpShot('624_assinatura_desistencia_confirmacao');
+      // "Voltar" fecha sem pedir nada; confirmar pede uma vez só, mesmo com dois toques.
+      await cp.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).last().click(); await cp.waitForTimeout(400);
+      const depoisDeVoltar = await desistencia();
+      await desistirBtn().first().click(); await cpWait('Desistir e receber R$ 269,90 de volta?'); await cp.waitForTimeout(300);
+      const confirmar = desistirBtn().last();
+      await confirmar.click();
+      await confirmar.click({ timeout: 1000 }).catch(() => {});
+      await cpWait('Pedido de desistência recebido em 27/11/2026 às 14:05.'); await cp.waitForTimeout(700);
+      t = await cpBody();
+      const contagem = await desistencia();
+      const naTela = await cp.evaluate(() => {
+        const e = [...document.querySelectorAll('div,span')].find((x) => x.children.length === 0 && (x.textContent || '').startsWith('Pedido de desistência recebido em'));
+        const r = e ? e.getBoundingClientRect() : null;
+        return r ? r.top >= 0 && r.bottom <= innerHeight : false;
+      });
+      ok('Desistência (D-131 F): confirmada, o pedido recebido aparece na hora, no alto da tela e à vista (a tela sobe), com a data e a hora, a devolução pedida, o acesso depois, quando a situação muda e o suporte; o botão some e a tela não pede outra vez',
+        naTela && depoisDeVoltar.pedidos === 0 && contagem.pedidos === 1 && (await desistirBtn().count()) === 0 &&
+          t.includes('A devolução de R$ 269,90 foi pedida ao Asaas, no mesmo cartão da compra, e a assinatura foi cancelada.') && t.includes('A situação muda nesta tela em alguns minutos, quando o Asaas confirmar a devolução.') &&
+          t.includes('Se tiver alguma dúvida sobre a devolução, escreva para suporte@clarevo.app.br.') && (await cpCount('button', 'Cancelar assinatura')) === 0 &&
+          t.indexOf('Pedido de desistência recebido') < t.indexOf('Plano Individual anual') && t.includes('Desistência pedida') &&
+          t.includes('A desistência foi pedida, e a devolução está com o Asaas. A situação muda aqui em alguns minutos.') && !t.includes('logo abaixo') && !t.includes('renova em'), JSON.stringify({ naTela, depoisDeVoltar, contagem, trecho: t.slice(0, 1200) }));
+      await cpShot('625_assinatura_desistencia_recebida');
+      // 5c. Pix: a devolução por Pix, sem o prazo do cartão nem cancelamento, e a volta ao teste com a data.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      await simularDesistencia('pix');
+      await cpWait('Desistência em até 7 dias'); await cp.waitForTimeout(500);
+      await desistirBtn().first().click(); await cpWait('Desistir e receber R$ 29,90 de volta?'); await cp.waitForTimeout(400);
+      t = await cpBody();
+      ok('Desistência (D-131 F): no Pix, o valor integral volta por Pix para a conta de onde saiu, e a conta volta ao teste grátis, com a data; sem o texto do cartão',
+        t.includes('Você pode desistir do pagamento feito com Pix até 04/12/2026 e receber de volta o valor pago, R$ 29,90, como prevê o Código de Defesa do Consumidor (art. 49).') &&
+          t.includes('A Clarevo devolve o valor integral, R$ 29,90, por Pix, para a conta de onde saiu o pagamento.') && t.includes('Depois, a conta volta ao teste grátis, que vai até 09/12/2026.') &&
+          !t.includes('A assinatura é cancelada na hora') && !t.includes('O estorno aparece na fatura'), t.slice(0, 1400));
+      await cp.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).last().click(); await cp.waitForTimeout(300);
+      // 5d. Lojas: nenhum botão; a nota do reembolso pela loja, e nenhuma pergunta à função.
+      await cpOpen('/conta/assinatura?assinar=teste', 'Assinar o plano Individual mensal');
+      await simularDesistencia('loja');
+      await cpWait('o reembolso é pedido à loja'); await cp.waitForTimeout(400);
+      t = await cpBody();
+      ok('Desistência (D-131 F): assinatura pela App Store vista na web, sem botão de desistir, com "Nas compras pela App Store ou pelo Google Play, o reembolso é pedido à loja; se ela não atender, escreva para suporte@clarevo.app.br."',
+        t.includes('Nas compras pela App Store ou pelo Google Play, o reembolso é pedido à loja; se ela não atender, escreva para suporte@clarevo.app.br.') &&
+          (await desistirBtn().count()) === 0 && (await desistencia()).consultas === 0, t.slice(0, 900));
       ok('Compra na web (D-129): nada vai à rede (nenhum pedido para fora de localhost, nenhuma gravação) e nenhum erro na página',
         fora.length === 0 && cpWrites.length === 0 && cpErrors.length === 0, JSON.stringify({ fora: fora.slice(0, 3), cpWrites: cpWrites.slice(0, 3), cpErrors: cpErrors.slice(0, 3) }));
     } finally {

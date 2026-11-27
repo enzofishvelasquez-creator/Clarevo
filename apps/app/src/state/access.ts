@@ -7,6 +7,7 @@ import {
   type OwnWebEntitlement,
   type ShownAccountLevel,
   type WebSubscriptionStatus,
+  type WebWithdrawalState,
 } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -59,6 +60,7 @@ export function useReloadAccess() {
       qc.invalidateQueries({ queryKey: ['access'] }),
       qc.invalidateQueries({ queryKey: ['web-subscription'] }),
       qc.invalidateQueries({ queryKey: ['web-entitlements'] }),
+      qc.invalidateQueries({ queryKey: ['web-withdrawal'] }),
     ]);
 }
 
@@ -89,6 +91,22 @@ export function useWebSubscriptionStatus(enabled: boolean) {
   return useQuery({
     queryKey: ['web-subscription', user?.id ?? null],
     queryFn: (): Promise<WebSubscriptionStatus | null> => repo!.getWebSubscriptionStatus(),
+    enabled: Boolean(enabled && repo && user),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+/**
+ * A desistência em 7 dias (D-131, item F): se há compra pela web no prazo, ou o pedido já recebido, lido na função do servidor (o Asaas e o
+ * banco; nada do aparelho decide o prazo). Só com a desistência aberta (ou no teste da equipe) e só para quem assina pela web (`enabled`);
+ * null quando não deu para saber (a tela não mostra nada).
+ */
+export function useWebWithdrawal(enabled: boolean) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['web-withdrawal', user?.id ?? null],
+    queryFn: (): Promise<WebWithdrawalState | null> => repo!.getWebWithdrawal(),
     enabled: Boolean(enabled && repo && user),
     staleTime: 60_000,
     retry: false,

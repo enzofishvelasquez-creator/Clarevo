@@ -1052,7 +1052,7 @@ begin
   -- vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
   assert pg_temp.person_fks() = array['account_level_clock.person_id', 'account_marks.person_id', 'billing_checkouts.person_id', 'billing_pix_payments.person_id',
-      'business_invites.created_by', 'business_invites.used_by', 'business_receivables.created_by', 'business_receivables.deleted_by',
+      'billing_withdrawals.person_id', 'business_invites.created_by', 'business_invites.used_by', 'business_receivables.created_by', 'business_receivables.deleted_by',
       'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by',
       'category_budgets.created_by', 'category_budgets.deleted_by', 'chat_link_codes.person_id', 'chat_links.person_id', 'chat_messages.person_id',
       'commitment_limits.created_by', 'commitment_limits.deleted_by', 'commitment_series.created_by', 'commitment_series.deleted_by',
@@ -1062,8 +1062,9 @@ begin
       'goals.deleted_by', 'income_references.created_by', 'income_references.deleted_by', 'investment_movements.created_by',
       'investments.created_by', 'legal_acceptances.person_id', 'licenses.person_id',
       'month_checks.updated_by', 'organization_admins.person_id', 'person_photos.person_id', 'plan_entitlements.person_id', 'record_operations.actor_id',
-      'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 52 que a exclusão da conta trata (com o a receber, 0045, os convites do negócio, 0043, o aceite dos termos, 0024, o Checkout do Asaas, 0026, os pagamentos por Pix, 0033, os marcos dos níveis, 0034, a foto do perfil, 0038, e a contagem do tempo sem anotar dos níveis, 0041, que saem em cascata ou, no ramo anônimo, pelos gatilhos persons_forget_anonymous e persons_photo_cleanup, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
+      'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id',
+      'trial_notices.person_id'],
+    'as chaves estrangeiras para persons são as 54 que a exclusão da conta trata (com o aviso de fim do teste, 0051, os pedidos de desistência, 0050, o a receber, 0045, os convites do negócio, 0043, o aceite dos termos, 0024, o Checkout do Asaas, 0026, os pagamentos por Pix, 0033, os marcos dos níveis, 0034, a foto do perfil, 0038, e a contagem do tempo sem anotar dos níveis, 0041, que saem em cascata ou, no ramo anônimo, pelos gatilhos persons_forget_anonymous, persons_photo_cleanup e persons_trial_notice_cleanup, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
