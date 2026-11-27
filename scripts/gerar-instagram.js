@@ -9,7 +9,7 @@
  *                           celular, nome-e-bio.txt (com a contagem de caracteres)
  *   D05-P01-.../ ...        uma pasta por peça, na ordem do calendário: pagina-N.png (carrosséis 1080 x 1350), capa.png (Reels e vídeos com
  *                           integrante, 1080 x 1920), rascunho.mp4 (Reels), legenda.txt, alt.txt, roteiro.md (vídeos), ficha.md
- *   reserva-.../            pautas de reserva (R01, B, F01 e F02), fora do calendário
+ *   reserva-.../            peças fora do calendário de dezembro (janeiro, depois da abertura ou à espera de algo)
  *   calendario.md, calendario.png, montagem.png (folha de contato) e LEIA-ME.txt
  *
  * Marca: a assinatura "clarevo." é o ativo original de `docs/marca` (nunca redigitada) e o ícone C só aparece no avatar. DM Sans (OFL, em
@@ -238,7 +238,7 @@ function calendarioMd() {
   l.push('| Dia | Peça | Formato | Objetivo | Ação | Depende da equipe |', '|---|---|---|---|---|---|');
   for (const c of CALENDARIO) l.push(`| D${c.dia} | ${c.peca} | ${c.formato} | ${c.objetivo} | ${c.acao} | ${c.depende} |`);
   l.push('', '**Fora do calendário de dezembro (pastas reserva-*):** P11 e a fixada da abertura ficam para depois da abertura; B, F02 e as peças novas, para janeiro; R02 e R03 esperam o teste da leitura com documentos reais; B01 espera o canal comercial, a revisão técnica e o advogado; P06, P09 e P12 esperam pessoas reais com autorização; T01 e T02, a referência e os direitos de uso.', '');
-  l.push('**Bloqueios conhecidos hoje:** a B01 (D27) e o destaque Para empresas dependem do canal comercial conferido, da revisão técnica de saúde e NR-1 e da resposta da pergunta 35 ao advogado; a chamada final da P11 e o destaque Ajuda dependem do canal de ajuda; todas as peças de produto dependem do teste na versão que for ao ar.', '');
+  l.push('**Bloqueios conhecidos hoje:** a B01 e o destaque Para empresas dependem do canal comercial conferido, da revisão técnica de saúde e NR-1 e da resposta da pergunta 35 ao advogado; a chamada final da P11 e o destaque Ajuda dependem do canal de ajuda; todas as peças de produto dependem do teste na versão que for ao ar.', '');
   return `${l.join('\n')}\n`;
 }
 
@@ -339,8 +339,8 @@ async function main() {
       fs.mkdirSync(dir, { recursive: true });
       const itens = [];
       if (p.semArte) {
-        fs.writeFileSync(path.join(dir, 'LEIA-ME.txt'), `T02: posição flexível do D20, sem arte pronta.\n\nO Playbook v2.2 define só o objetivo (reconhecimento e reflexão) e a ação (salvar ou comentar a experiência): o formato em circulação é escolhido na revisão semanal, perto da publicação (até 48 horas antes), com a ficha de referência externa do Manual (mídia exata, origem e link direto, data e sinal, justificativa, direitos, aplicação técnica, plano B e resultado esperado). "Uma referência passageira não deve ser fechada com um mês de antecedência."\n\nSe não houver referência adequada, relevante, autorizada e viável em tempo, publicar a alternativa perene: P09 (pasta D20-P09-...).\n`);
-        fs.writeFileSync(path.join(dir, 'ficha.md'), `# T02: trend em circulação\n\n- **Dia:** D20 · posição flexível\n- **Objetivo:** ${p.objetivo}\n- **Ação principal:** ${p.acao}\n- **Alternativa perene:** ${p.alternativaPerene}\n\n## O que depende da equipe\n\n${p.depende.map((d) => `- ${d}`).join('\n')}\n`);
+        fs.writeFileSync(path.join(dir, 'LEIA-ME.txt'), `T02: trend em circulação, fora do calendário de dezembro, sem arte pronta.\n\nO Playbook v2.2 define só o objetivo (reconhecimento e reflexão) e a ação (salvar ou comentar a experiência): o formato em circulação é escolhido na revisão semanal, perto da publicação (até 48 horas antes), com a ficha de referência externa do Manual (mídia exata, origem e link direto, data e sinal, justificativa, direitos, aplicação técnica, plano B e resultado esperado). "Uma referência passageira não deve ser fechada com um mês de antecedência."\n\nSe não houver referência adequada, relevante, autorizada e viável em tempo, publicar a alternativa perene: P09 (pasta D20-P09-...).\n`);
+        fs.writeFileSync(path.join(dir, 'ficha.md'), `# T02: trend em circulação\n\n- **Dia:** reserva (fora do calendário de dezembro)\n- **Objetivo:** ${p.objetivo}\n- **Ação principal:** ${p.acao}\n- **Alternativa perene:** ${p.alternativaPerene}\n\n## O que depende da equipe\n\n${p.depende.map((d) => `- ${d}`).join('\n')}\n`);
         console.log(`${p.id}: sem arte (a definir na revisão semanal)`);
         continue;
       }
@@ -432,7 +432,7 @@ async function main() {
         fs.writeFileSync(path.join(perfilDir, 'previa-do-perfil.png'), png.codificar(img, { paleta: false }));
         console.log(`perfil: prévia ${img.largura}x${img.altura}`);
       } else {
-        console.log('perfil: a prévia precisa das peças P01 a P09 já geradas (rode sem --so ou inclua as peças)');
+        console.log('perfil: a prévia precisa das peças P01 a P05, P07, P08, P10 e R01 já geradas (rode sem --so ou inclua as peças)');
       }
     }
 
@@ -526,6 +526,7 @@ BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - B01 e o destaque Para empresas: canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
 - P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento. A P11 só sai depois da abertura (D-130).
 - R02 e R03: fora até a leitura de nota, comprovante, boleto e holerite estar testada com documentos reais (D-130); a R02 espera também o app de celular.
+- N01 (os planos): conferir os preços e as frases com a página Planos do site no dia de publicar; o preço ainda é pergunta aberta ao advogado (47).
 - P03, a bio e o fim dos Reels: antes da abertura, o convite é só para conhecer (D-130), sem data, lista de espera nem chamada para criar conta. Na abertura, uma fixada nova entra no lugar da P03.
 - Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram.
 - Identificador (@clarevo, D-130) e nome de exibição: conferir na conta se o @ está livre e o limite do nome.

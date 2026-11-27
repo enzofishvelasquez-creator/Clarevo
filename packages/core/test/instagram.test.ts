@@ -333,7 +333,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(peca('T02').semArte).toBe(true);
   });
 
-  it('o calendário cobre D1 a D30, com as peças do Playbook v2.2 nos dias certos', () => {
+  it('o calendário cobre D1 a D30, com as peças do plano de dezembro (D-130) nos dias certos', () => {
     const dias = new Map(conteudo.CALENDARIO.map((c) => [c.dia, c.peca]));
     expect([...dias.keys()].sort((a, b) => a - b)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
     expect(dias.get(5)).toBe('P01');
@@ -347,6 +347,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(dias.get(20)).toBe('Reels do mercado');
     expect(dias.get(23)).toBe('P10');
     expect(dias.get(25)).toBe('Sem publicação');
+    expect(dias.get(26)).toBe('Sem publicação');
     expect(dias.get(27)).toBe('N01');
     expect(dias.get(30)).toBe('F01');
   });
@@ -375,11 +376,36 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(txt).toContain(calc.FRASE_DA_ASSINATURA);
     expect(txt).not.toMatch(/assine|crie sua conta|econom|desconto|equivale|fictíci/i);
     expect(n01.legenda?.endsWith('Conheça a Clarevo pelo link da bio.')).toBe(true);
-    const semPreco = JSON.parse(JSON.stringify(conteudo.PECAS)) as typeof conteudo.PECAS;
-    const copia = semPreco.find((p) => p.id === 'N01')!;
-    copia.legenda = (copia.legenda ?? '').replace(calc.FRASE_DA_ASSINATURA, '');
-    copia.paginas = copia.paginas?.slice(0, 4);
-    expect(validar.conferirRegrasDasPecas(semPreco).some((e) => e.startsWith('N01:'))).toBe(true);
+  });
+
+  it('as regras da N01 recusam preço faltando ou no plano errado, a frase longe do preço, economia, convite para assinar e data, também no texto alternativo', () => {
+    type Peca = (typeof conteudo.PECAS)[number] & { alt?: string[] };
+    const com = (muda: (p: Peca) => void) => {
+      const pecas = JSON.parse(JSON.stringify(conteudo.PECAS)) as Peca[];
+      muda(pecas.find((p) => p.id === 'N01')!);
+      return validar.conferirRegrasDasPecas(pecas).filter((e) => e.startsWith('N01:')).length;
+    };
+    const F = calc.FRASE_DA_ASSINATURA;
+    expect(com(() => {})).toBe(0);
+    expect(com((p) => { p.legenda = (p.legenda ?? '').replace('R$ 269,90', 'R$ 29,90'); })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.legenda = (p.legenda ?? '').replace(F, ''); })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas!.at(-1)!.corpo = 'Conheça o app.'; p.paginas![1]!.corpo = 'Para uma pessoa.'; delete (p.paginas![1] as { chamada?: string }).chamada; })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas![1]!.titulo = '*R$ 69,90* por mês ou R$ 629,90 por ano.'; })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas![1]!.titulo = '*R$ 269,90* por mês ou R$ 29,90 por ano.'; })).toBeGreaterThanOrEqual(1);
+    for (const frase of ['No anual tem desconto.', 'Economize no anual.', 'O anual sai mais barato.', 'Pague 9 meses e leve 12.', 'Assine sem cartão.', 'Garanta o seu plano.', 'A assinatura abre em janeiro.', 'A partir de 2027.', 'Equivale a menos por mês.']) {
+      expect(com((p) => { p.legenda = `${frase} ${p.legenda ?? ''}`; }), frase).toBeGreaterThanOrEqual(1);
+      expect(com((p) => { p.alt = [...(p.alt ?? []).slice(0, 4), `${(p.alt ?? [])[4] ?? ''} ${frase}`]; }), `alt: ${frase}`).toBeGreaterThanOrEqual(1);
+    }
+    // Os preços dos planos só aparecem na N01.
+    const outra = JSON.parse(JSON.stringify(conteudo.PECAS)) as Peca[];
+    const p04 = outra.find((p) => p.id === 'P04')!;
+    p04.legenda = `${p04.legenda ?? ''} O plano custa R$ 29,90.`;
+    expect(validar.conferirRegrasDasPecas(outra).some((e) => e.startsWith('P04:'))).toBe(true);
+  });
+
+  it('cada peça com dia está nesse dia do calendário', () => {
+    const dias = new Map(conteudo.CALENDARIO.map((c) => [c.dia, c.peca]));
+    for (const p of conteudo.PECAS as unknown as { id: string; dia?: number | null }[]) if (p.dia) expect(dias.get(p.dia), p.id).toBe(p.id);
   });
 });
 

@@ -14,12 +14,12 @@ Saída em `--saida <pasta>` (nesta rodada, uma pasta fora do repositório). Quan
 | Capas de destaque 1080 x 1920 (Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda, Para empresas) | 6 | `perfil/destaques/` |
 | Prévia do perfil no celular (cabeçalho, nome, bio, link, destaques e a grade com as 9 primeiras peças) | 1 | `perfil/previa-do-perfil.png` |
 | Nome de exibição, bio (com a contagem de caracteres), link, destaques e fixados | 1 texto | `perfil/nome-e-bio.txt` |
-| Carrosséis do calendário, todas as páginas 1080 x 1350: P01 (6), P03 (5), P04 (5), P07 (5), P10 (6), B01 (5) e T01 (5) | 7 peças, 37 páginas | uma pasta por peça, na ordem do calendário |
-| Peças de reserva, fora do calendário: os carrosséis R01 (5), R02 (6, "Organizar as finanças com a câmera do celular"), B do Manual (5), F01 (7) e F02 (6), e o Reels R03 (nota, comprovante e boleto lidos sem digitar) | 6 peças, 29 páginas e um Reels | `reserva-*` |
+| Carrosséis do calendário de dezembro, todas as páginas 1080 x 1350: P01 (6), P03 (5), P04 (5), R01 (5), P07 (5), P10 (6), N01 (5) e F01 (7) | 8 peças, 44 páginas | uma pasta por peça, na ordem do calendário |
+| Fora do calendário de dezembro: os carrosséis B01 (5), T01 (5), R02 (6, "Organizar as finanças com a câmera do celular"), B do Manual (5) e F02 (6), e os Reels P11 e R03 (nota, comprovante e boleto lidos sem digitar) | 5 carrosséis, 27 páginas, e dois Reels | `reserva-*` |
 | Capas de Reel 1080 x 1920 (P02, P05, P08, P11) | 4 | `capa.png` |
 | Rascunhos em MP4 com a gravação real e o texto na tela do roteiro, em trechos (1080 x 1920, H.264, 25 quadros por segundo, sem áudio, de 33 a 36 s, de 1,4 a 1,9 MB) | 4 | `rascunho.mp4`, mais `rascunho-conferencia.png` (3 quadros), `gravacao-limpa.mp4` e `legendas.srt` (a narração) |
 | Capas de vídeo com integrante real, com o quadro "[Gravação com integrante real]" (P06, P09 e P12) | 3 | `capa.png` e `roteiro.md` |
-| T02 (trend a definir): só a ficha, sem arte | 1 | `D20-T02-trend-a-definir/` |
+| T02 (trend a definir): só a ficha, sem arte | 1 | `reserva-T02-trend-a-definir/` |
 | Em cada peça: `legenda.txt`, `alt.txt` (uma linha por página nos carrosséis), `ficha.md` (ação principal, o que depende da equipe, conferência das afirmações sobre o app, ajustes ao Playbook e a lista de conferência antes de publicar) | todas | na pasta da peça |
 | Calendário D1 a D30 (dia, peça, formato, objetivo, ação e o que depende da equipe) e a imagem-resumo | 2 | `calendario.md`, `calendario.png` |
 | Folha de contato com todas as páginas e capas, e o `LEIA-ME.txt` com a ordem de publicação | 2 | `montagem.png`, `LEIA-ME.txt` |
@@ -47,6 +47,8 @@ node scripts/gerar-instagram.js --saida <pasta> --redes <pasta> --sem-video
 
 ### O que o gerador recusa
 
+**A peça dos planos (N01)** tem regras próprias: os quatro preços e a frase do site aparecem nas páginas e na legenda; cada página de plano traz o preço por mês e por ano do plano certo, junto da frase; nada de "desconto", "economia", "equivale", percentual, convite para assinar ("assine", "garanta", "experimente"), mês, ano ou data, nem no texto alternativo. É a única peça com números que não leva "Exemplo fictício", porque os preços são reais, e os preços dos planos são recusados em qualquer outra peça.
+
 Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: travessão, a expressão que o `CLAUDE.md` proíbe, a marca no masculino, nome de pessoa real, termo de promessa ("grátis", "gratuito" e "em breve" fora da frase do site "Assinatura em breve, com 14 dias grátis, sem cartão.", mesmo em frase com "sem" ou "não"; "crie sua conta", "assine"; lista de espera, "saldo disponível" afirmado, "acaba com a ansiedade", "certificado pela NR-1"...), chamada que sugira usar agora ("como acessar", "conhecer o acesso", "fixado Como acessar", cadastro, download: antes da abertura, o convite é só para conhecer, D-130), o texto antigo do acesso ("fase de testes", "piloto", "informações de acesso", "abre no lançamento", "quem testa", que o site deixou de dizer na D-128), legenda com campo entre colchetes ("legenda pronta" não tem marcador a preencher), valor em reais que não seja de um exemplo conferido, número de páginas diferente do Playbook, nome ou bio acima dos limites e contraste abaixo do mínimo. Confere também pontos que a revisão pediu: a P11 dizer que na conta nova o primeiro registro começa do zero, a frase "não é saldo nem autorização para gastar" da P02 ter sujeito, a B01 dizer que a empresa nunca vê as finanças de ninguém, nem somadas (D-056), e a T01 página 3, a B página 5 e a R01 página 4 com o texto fixado. Em **cada página desenhada**, no navegador, confere ainda: margens laterais de 80 px; nada sobre o rodapé; nas artes 9:16, o conteúdo entre 250 px do topo e 350 px do rodapé; rótulo de 24 px ou mais, título de 56 a 72 px e corpo de 32 a 40 px; contraste real de cada texto (nunca branco sobre lima; lima sobre azul só em texto grande e em negrito); texto que não rola nem é cortado. O teste `packages/core/test/instagram.test.ts` roda a parte pura (limites do perfil, somas dos exemplos, contrastes do Manual, redação, estrutura e que cada nome de tela do app citado existe no app).
 
 ## 3. Identidade do perfil
@@ -63,13 +65,13 @@ Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: trave
 - **Identificador:** `@clarevo` (D-130). Conferir, ao criar a conta, se está livre; a prévia já mostra o @.
 - **Avatar:** o ícone oficial C, o mesmo de `docs/marca/icone-app.svg`, nos 1080 px. A 110 px (perfil) e a 44 px (feed) o C e o crescente lima continuam legíveis (conferência em `perfil/avatar-conferencia.png`). A assinatura "clarevo." nunca vai no avatar.
 - **Destaques (nesta ordem):** Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas. As seis capas têm o mesmo desenho: só um ícone simples em traço marinho, grande e centrado, sobre um disco lima no fundo azul, **sem o nome** (o Instagram já mostra o rótulo do destaque, e o texto dentro do círculo ficaria ilegível a 110 px). O disco e o ícone ficam no centro da arte, que é onde o Instagram recorta o círculo; a prévia do perfil usa o mesmo recorte central. O conteúdo de cada destaque está em `perfil/nome-e-bio.txt`. **Para empresas** só entra com a apresentação e o canal comercial conferidos, como o Playbook manda; na prévia aparece esmaecido e tracejado.
-- **Fixados:** P01, P02 e P03, nessa ordem. Na grade, os três fixados vêm primeiro e, depois, as peças mais novas primeiro (a prévia usa P09 no D20 e P06 no D13, as alternativas perenes).
+- **Fixados:** P01, P02 e P03, nessa ordem. Na grade, os três fixados vêm primeiro e, depois, as peças mais novas primeiro (a prévia usa P10, P08, P07, R01, P05 e P04; o Reels do mercado ainda não tem pasta no gerador).
 
 ## 4. Peças do primeiro mês
 
 **Desde 27/11/2026 (D-130) a ordem é a do plano de dezembro** (`docs/redes/plano-do-instagram.md`), e não mais a do Playbook: saíram de dezembro as posições de trend e de vídeo com integrante (P06, P09, T01 e T02), a P11 (só depois da abertura) e a B01 (bloqueada); entraram a R01 (D13), o Reels do mercado (D20), a peça nova N01 "Os planos da Clarevo" (D27) e a F01 (D30); o D25 fica sem publicação. Com a conta criada em 30/11/2026, D5 é 04/12 e D30 é 29/12. O que saiu está nas pastas `reserva-*`.
 
-Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, ação, o que depende da equipe, a conferência com o app e os ajustes) está na `ficha.md` da pasta.
+Na ordem do plano de dezembro. O detalhe de cada peça (objetivo, ação, o que depende da equipe, a conferência com o app e os ajustes) está na `ficha.md` da pasta.
 
 | Dia | Peça | Formato | Ação principal | Arte gerada |
 |---|---|---|---|---|
@@ -149,10 +151,10 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 
 ## 9. Decisões
 
-As decisões de 26 e 27/11/2026 (identificador, responsáveis, convite só para conhecer, abertura a partir de janeiro de 2027, preço liberado e leitura de documentos fora até o teste) estão na D-130 de `docs/00_VISAO_E_DECISOES.md`, e o plano, em `docs/redes/plano-do-instagram.md`. O calendário D1 a D30 da seção 5 ainda é o do Playbook: a ordem de dezembro é a do plano, e o gerador será reordenado na próxima rodada. As de 25/10/2026, a registrar:
+As decisões de 26 e 27/11/2026 (identificador, responsáveis, convite só para conhecer, abertura a partir de janeiro de 2027, preço liberado e leitura de documentos fora até o teste) estão na D-130 de `docs/00_VISAO_E_DECISOES.md`, e o plano, em `docs/redes/plano-do-instagram.md`. O calendário D1 a D30 do gerador segue o plano de dezembro desde 27/11/2026 (seções 4 e 5). As de 25/10/2026, a registrar:
 
 1. D-069: o ciclo do Instagram gera, por script, o desenho de referência do perfil e das peças do primeiro mês (`scripts/gerar-instagram.js`), sem mudar app, site nem banco; as artes finais são do Canva e do Edits.
 2. A DM Sans (OFL) entra no repositório só para estas artes.
 3. O nome de exibição tem 30 caracteres (no limite adotado) e a bio, 102 caracteres (D-130).
 4. A B01 e o destaque Para empresas ficam bloqueados até o canal comercial e a revisão técnica (saúde e NR-1).
-5. Pautas de reserva fora do calendário: R01, B, F01 e F02.
+5. Pautas de reserva fora do calendário: R01, B, F01 e F02 (desde 27/11/2026, a R01 e a F01 estão no calendário de dezembro).

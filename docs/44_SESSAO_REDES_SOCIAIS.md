@@ -39,7 +39,7 @@ Linguagem: os documentos de redes evitam nomes de pessoas e usam funções ("pro
 
 **No app hoje (web):** Resumo do mês (Recebido, Pago, Diferença do mês, Ainda a pagar e renda comprometida), Contas a pagar, gastos fixos, parcelamentos e contas do ano (IPVA, IPTU), Cartões e faturas (com "Importar fatura"), Orçamento por categoria (sete categorias, entre elas "Crédito e parcelas"), Metas e reserva para imprevistos (com as 15 metas mais comuns prontas e 17 imagens, D-092), Família, as dez calculadoras e o simulador, Assinaturas, Aprender, Evolução, Análises, "Seu mês em 30 segundos", importar extrato (PDF, OFX ou CSV), ler comprovante, boleto, holerite, nota fiscal e nota de serviço, Ocultar valores, exportar os dados (CSV ou PDF) e excluir a conta.
 
-**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (ligado no lançamento pela D-093, mas ainda sem teste em aparelho: anunciar só depois do teste e com o app nas lojas), WhatsApp, Pix Automático, plano anual, integração bancária, saldo por conta, IA, recomendação de produto financeiro.
+**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (ligado no lançamento pela D-093, mas ainda sem teste em aparelho: anunciar só depois do teste e com o app nas lojas), WhatsApp, Pix Automático, economia ou desconto no plano anual (o preço por ano pode aparecer, como no site), integração bancária, saldo por conta, IA, recomendação de produto financeiro.
 
 **Confidencial, nunca em peça:** a conversa com a Marinha e qualquer número de militares (`docs/28`, `docs/30`); os valores para empresas (`docs/26`, "a validar"); o acordo de sócios e qualquer dado de quem investe na Clarevo; números de uso, de pessoas ou de receita.
 
@@ -177,7 +177,7 @@ As duas sessões trabalham no mesmo repositório. Para não haver conflito:
 | Esta sessão pode mexer em | Esta sessão não mexe em |
 |---|---|
 | `scripts/instagram/`, `scripts/gerar-instagram.js` | `apps/`, `packages/core/src/`, `supabase/`, `scripts/site/` e o resto de `site-src/` e de `site/` |
-| Os textos de Novidades do site, `site-src/novidades/*.md` (liberado pelo Enzo em 27/11/2026, D-130), e as páginas que `node scripts/gerar-site.js` reescreve em `site/` por causa deles. Seguir as regras de `site-src/paginas/` ("como escrevemos") e avisar a sessão do app antes de cada texto | As outras páginas do site, o estilo, os scripts e os textos legais |
+| Os textos de Novidades do site, `site-src/novidades/*.md` (liberado pelo Enzo em 27/11/2026, D-130), e as páginas que `node scripts/gerar-site.js` reescreve em `site/` por causa deles. Seguir `site-src/novidades/como-escrevemos.md` e avisar a sessão do app antes de cada texto | As outras páginas do site, o estilo, os scripts e os textos legais |
 | `docs/24_REDES_SOCIAIS.md`, `docs/25_INSTAGRAM.md`, `docs/referencias/redes-sociais-e-guia-visual.md` e este guia | `docs/telas/`, `docs/manual/` (gerados pela sessão do app) |
 | Documentos novos de redes (por exemplo, `docs/redes/`) | `docs/legal/`, `docs/lojas/`, `CLAUDE.md` |
 | `packages/core/test/instagram.test.ts`, só quando mudar o gerador | O resto de `packages/core/test/` |
@@ -186,6 +186,7 @@ As duas sessões trabalham no mesmo repositório. Para não haver conflito:
 
 - A partir deste guia, `docs/24`, `docs/25`, `scripts/instagram/` e `scripts/gerar-instagram.js` passam a ser desta sessão: a sessão do app só mexe neles combinando antes (o `CLAUDE.md` registra a divisão). O `scripts/gravar-redes.js` continua dividido, porque depende das telas.
 - Use a branch que o sistema da sessão indicar (uma `claude/...` própria). **Nunca** `main` nem `claude/clarevo-app-setup-0r7sxn`.
+- **Textos de Novidades:** escreva o `.md` e só gere o site (`node scripts/gerar-site.js`) com a `main` em dia e sem PR da sessão do app em aberto que mexa em `site/`, para não haver conflito em centenas de páginas geradas. Antes do PR: `npm test` (o teste de sincronia falha se `site/` não estiver regerado) e `npm run test:site`. A capa é `capa: <id>` no cabeçalho, com um id que exista em `scripts/site/imagens.js` (imagem nova se pede à sessão do app). Para prévia, use sempre `--saida <pasta temporária>`. O site passa a ser indexado: cada texto vai para a busca.
 - Antes de começar um trabalho que mexe no repositório, puxe a `main` (`git fetch origin main`) e parta dela: a sessão do app faz merges com frequência.
 - Se a gravação falhar porque uma tela mudou, o gravador acusa qual texto não achou. Ajuste a peça se for só a narração; se a tela mudou de verdade, avise Enzo.
 

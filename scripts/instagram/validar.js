@@ -97,13 +97,40 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     if (!/Conheça a Clarevo pelo link da bio\./.test(txt)) erros.push('P03: a ação é "Conheça a Clarevo pelo link da bio."');
   }
   const n01 = pecas.find((p) => p.id === 'N01');
+  const PRECOS_DOS_PLANOS = ['R$ 29,90', 'R$ 269,90', 'R$ 69,90', 'R$ 629,90'];
   if (n01) {
-    // Os planos antes da abertura (D-130): os preços vêm sempre com a frase do site, sem convite para assinar, sem data e sem falar em economia.
-    const txt = textosPublicos([{ id: 'N01', paginas: n01.paginas, legenda: n01.legenda }]).map((x) => x.texto).join('\n');
-    if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push('N01: os preços só aparecem junto da frase do site "' + FRASE_DA_ASSINATURA + '"');
+    // Os planos antes da abertura (D-130): os preços vêm sempre com a frase do site, sem convite para assinar, sem data e sem falar em
+    // economia. Vale para as páginas, a legenda e o texto alternativo; a frase com "sem" ou "não" não escapa aqui.
+    const junta = (o) => textosPublicos([{ id: 'N01', ...o }]).map((x) => x.texto).join('\n').replace(/\*/g, '');
+    const partes = { 'as páginas': junta({ paginas: n01.paginas }), 'a legenda': junta({ legenda: n01.legenda }) };
+    for (const [onde, txt] of Object.entries(partes)) {
+      if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push(`N01: ${onde} precisam da frase do site "${FRASE_DA_ASSINATURA}"`);
+      for (const preco of PRECOS_DOS_PLANOS) if (!txt.includes(preco)) erros.push(`N01: falta o preço ${preco} em ${onde}`);
+    }
     if (!n01.legenda.endsWith('Conheça a Clarevo pelo link da bio.')) erros.push('N01: a legenda termina com "Conheça a Clarevo pelo link da bio."');
-    for (const re of [/econom/i, /desconto/i, /%/, /equivale/i, /\b20\d{2}\b/, /\d{1,2}\/\d{1,2}/, /fictíci/i]) if (re.test(txt)) erros.push(`N01: a peça dos planos não pode ter ${re}`);
-    for (const preco of ['R$ 29,90', 'R$ 269,90', 'R$ 69,90', 'R$ 629,90']) if (!txt.includes(preco)) erros.push(`N01: falta o preço ${preco}`);
+    const plano = (rotulo, mes, ano) => {
+      const pg = (n01.paginas || []).find((x) => x.rotulo === rotulo);
+      const txt = pg ? junta({ paginas: [pg] }) : '';
+      if (!txt.includes(`${mes} por mês`) || !txt.includes(`${ano} por ano`)) erros.push(`N01: a página do plano ${rotulo} diz "${mes} por mês" e "${ano} por ano"`);
+      if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push(`N01: a página do plano ${rotulo} traz a frase do site junto do preço`);
+      for (const outro of PRECOS_DOS_PLANOS) if (outro !== mes && outro !== ano && txt.includes(outro)) erros.push(`N01: a página do plano ${rotulo} traz o preço de outro plano (${outro})`);
+    };
+    plano('Individual', 'R$ 29,90', 'R$ 269,90');
+    plano('Família', 'R$ 69,90', 'R$ 629,90');
+    const tudo = junta({ paginas: n01.paginas, legenda: n01.legenda, alt: n01.alt }).split(FRASE_DA_ASSINATURA).join(' ');
+    const PROIBIDO_NOS_PLANOS = [
+      /econom/i, /desconto/i, /%/, /por cento/i, /equivale/i, /barat/i, /por menos/i, /\ba menos\b/i, /compensa/i, /vantag/i, /promo[çc]/i, /\boferta/i, /leve \d/i,
+      /\bassin(?:e|em|ar)\b/i, /fa[çc]a (?:a )?sua assinatura/i, /garanta/i, /experimente/i, /aproveite/i, /escolha o seu plano/i,
+      /\b20\d{2}\b/, /\d{1,2}\/\d{1,2}/, /\b(?:janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i, /a partir de/i, /\bdia \d/i, /(?:m[êe]s|semana|ano) que vem/i,
+      /fictíci/i,
+    ];
+    for (const re of PROIBIDO_NOS_PLANOS) if (re.test(tudo)) erros.push(`N01: a peça dos planos não pode ter ${re}`);
+  }
+  // Os preços dos planos só aparecem na N01, que é a peça que os traz com a frase do site.
+  for (const p of pecas) {
+    if (p.id === 'N01') continue;
+    const txt = t(p);
+    for (const preco of PRECOS_DOS_PLANOS) if (txt.includes(preco)) erros.push(`${p.id}: o preço dos planos (${preco}) só aparece na N01`);
   }
   const b01 = pecas.find((p) => p.id === 'B01');
   if (b01) {
