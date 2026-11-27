@@ -164,7 +164,7 @@ A arte final é montada no Canva como design nativo, com camadas editáveis e DM
 - **Tom:** mais solto e humano, menos "robótico". Frases curtas, com humor leve e situações do dia a dia ("quem nunca?"), sem culpa. Toda frase precisa ser entendida por quem nunca ouviu falar do app (a página 6 da P01 antiga não foi entendida).
 - **Conteúdo mais dinâmico:** dia a dia, gente, bicho, meme, vídeo feito por Enzo e pela Elis, e peças que puxam comentário. As regras das seções 5 e 6 continuam valendo.
 - **Imagens:** da galeria do Canva, com escolha da Elis. As ferramentas do Canva desta sessão não buscam fotos na galeria, então cada design traz um **espaço marcado para foto ou meme**, com a ideia da cena e os termos de busca; a Elis escolhe e troca. Sem IA (seção 6).
-- **Peças já na pasta:** "Clarevo | 01 | Comece por aqui | cópia para editar" (P01 ajustada) e "Clarevo | 02 | Quem nunca? | para editar" (carrossel de identificação, com espaço de foto nas páginas 1 e 2).
+- **Peças já na pasta (27/11/2026):** "Clarevo | 01 | Comece por aqui | cópia para editar" (P01 ajustada); "Clarevo | 02 | Quem nunca? | para editar" (identificação, espaço de foto nas páginas 1 e 2); "Clarevo | 03 | Reels dia a dia: chegou dezembro | para gravar" (roteiro de 7 cenas, uns 15 segundos, para a Elis gravar; a orientação de cada cena sai antes de publicar); "Clarevo | 04 | Isso ou aquilo? | para editar" (interativo, pede as respostas nos comentários); "Clarevo | 05 | Expectativa x realidade: dezembro | para editar" (meme, espaço de foto na página 2); "Clarevo | 06 | Quem manda na casa? (pets) | para editar" (gastos com bicho, espaço de foto nas páginas 1 e 2). Cada uma tem a legenda sugerida no comentário do design.
 
 ## 9. Como trabalhar
 
