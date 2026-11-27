@@ -52,7 +52,7 @@ function conferirValoresCitados(textos = textosPublicos()) {
 }
 
 /** Páginas por carrossel, como o Playbook e o Manual definem. */
-const PAGINAS_ESPERADAS = { P01: 6, P03: 5, P04: 5, P07: 5, P10: 6, B01: 5, T01: 5, R01: 5, R02: 6, B: 5, F01: 7, F02: 6 };
+const PAGINAS_ESPERADAS = { N01: 5, P01: 6, P03: 5, P04: 5, P07: 5, P10: 6, B01: 5, T01: 5, R01: 5, R02: 6, B: 5, F01: 7, F02: 6 };
 
 function conferirEstrutura(pecas = PECAS, modelos = null) {
   const erros = [];
@@ -95,6 +95,15 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     for (const re of [/\d{1,2}\/\d{1,2}/, /\b20\d{2}\b/, /\bem breve\b/i, /cadastr/i, /cri(?:e|ar) (?:sua|uma|a) conta/i, /lista de espera/i, /\bgr[áa]tis\b/i, /R\$/]) if (re.test(semFrase)) erros.push(`P03: antes da abertura, a peça não pode ter ${re}`);
     if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push('P03: falta a frase do site "' + FRASE_DA_ASSINATURA + '"');
     if (!/Conheça a Clarevo pelo link da bio\./.test(txt)) erros.push('P03: a ação é "Conheça a Clarevo pelo link da bio."');
+  }
+  const n01 = pecas.find((p) => p.id === 'N01');
+  if (n01) {
+    // Os planos antes da abertura (D-130): os preços vêm sempre com a frase do site, sem convite para assinar, sem data e sem falar em economia.
+    const txt = textosPublicos([{ id: 'N01', paginas: n01.paginas, legenda: n01.legenda }]).map((x) => x.texto).join('\n');
+    if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push('N01: os preços só aparecem junto da frase do site "' + FRASE_DA_ASSINATURA + '"');
+    if (!n01.legenda.endsWith('Conheça a Clarevo pelo link da bio.')) erros.push('N01: a legenda termina com "Conheça a Clarevo pelo link da bio."');
+    for (const re of [/econom/i, /desconto/i, /%/, /equivale/i, /\b20\d{2}\b/, /\d{1,2}\/\d{1,2}/, /fictíci/i]) if (re.test(txt)) erros.push(`N01: a peça dos planos não pode ter ${re}`);
+    for (const preco of ['R$ 29,90', 'R$ 269,90', 'R$ 69,90', 'R$ 629,90']) if (!txt.includes(preco)) erros.push(`N01: falta o preço ${preco}`);
   }
   const b01 = pecas.find((p) => p.id === 'B01');
   if (b01) {
@@ -154,7 +163,8 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     if (/ansiedade|depress/i.test(txt)) erros.push(`${p.id}: cita ansiedade ou depressão`);
     if (/\bjuros\b|\bCET\b/i.test(txt) && !['P07', 'B', 'R01'].includes(p.id)) erros.push(`${p.id}: cita juros ou CET fora das peças de compra parcelada`);
     if (['P07', 'B'].includes(p.id) && /\bjuros\b|\bCET\b/i.test(txt) && !/n[ãa]o (é|corresponde)[^.]*(juros|CET)/i.test(txt)) erros.push(`${p.id}: cita juros ou CET sem dizer que a diferença não é taxa nem CET`);
-    if (p.paginas && /R\$/.test(txt) && !/fictíci/i.test(txt)) erros.push(`${p.id}: tem números sem a indicação "exemplo fictício"`);
+    // A N01 traz os preços reais dos planos, não um exemplo.
+    if (p.id !== 'N01' && p.paginas && /R\$/.test(txt) && !/fictíci/i.test(txt)) erros.push(`${p.id}: tem números sem a indicação "exemplo fictício"`);
   }
   return erros;
 }

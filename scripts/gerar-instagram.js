@@ -233,11 +233,11 @@ function roteiroMd(p) {
 
 function calendarioMd() {
   const l = ['# Calendário do primeiro mês: D1 a D30', ''];
-  l.push('Base: Playbook de Redes Sociais v2.2 (24/10/2026). **D é o dia contado a partir da criação do perfil.** Referência de três peças por semana, sem promessa de alcance. D13 e D20 são posições flexíveis: T01 ou T02 se houver trend adequada na revisão semanal (até 48 horas antes), senão P06 ou P09.', '');
+  l.push('Base: Playbook de Redes Sociais v2.2 (24/10/2026). **D é o dia contado a partir da criação do perfil.** Referência de três peças por semana, sem promessa de alcance. A ordem é a do plano de dezembro (D-130, `docs/redes/plano-do-instagram.md`): D1 é o dia da criação do perfil; com a conta criada em 30/11/2026, D5 é 04/12 e D30 é 29/12.', '');
   l.push('Horários a testar: 12h e 19h de Brasília, anotando horário e formato e comparando várias peças antes de ajustar. Nos dias de publicação, Stories de apoio. Sem parâmetro de rastreamento nos links (D-067); os números vêm do painel do Instagram e das contagens do app, e "não medido" vale onde não houver captura.', '');
   l.push('| Dia | Peça | Formato | Objetivo | Ação | Depende da equipe |', '|---|---|---|---|---|---|');
   for (const c of CALENDARIO) l.push(`| D${c.dia} | ${c.peca} | ${c.formato} | ${c.objetivo} | ${c.acao} | ${c.depende} |`);
-  l.push('', '**Fora do calendário:** P12 (dúvida de acesso) fica nos Stories e no destaque Ajuda; R01, B, F01 e F02 são pautas de reserva para o ciclo seguinte ou para o lugar de uma peça repetida.', '');
+  l.push('', '**Fora do calendário de dezembro (pastas reserva-*):** P11 e a fixada da abertura ficam para depois da abertura; B, F02 e as peças novas, para janeiro; R02 e R03 esperam o teste da leitura com documentos reais; B01 espera o canal comercial, a revisão técnica e o advogado; P06, P09 e P12 esperam pessoas reais com autorização; T01 e T02, a referência e os direitos de uso.', '');
   l.push('**Bloqueios conhecidos hoje:** a B01 (D27) e o destaque Para empresas dependem do canal comercial conferido, da revisão técnica de saúde e NR-1 e da resposta da pergunta 35 ao advogado; a chamada final da P11 e o destaque Ajuda dependem do canal de ajuda; todas as peças de produto dependem do teste na versão que for ao ar.', '');
   return `${l.join('\n')}\n`;
 }
@@ -414,10 +414,10 @@ async function main() {
         ['P01', 'pagina-1.png', 'carrossel', true],
         ['P02', 'capa.png', 'reel', true],
         ['P03', 'pagina-1.png', 'carrossel', true],
-        ['P09', 'capa.png', 'reel', false],
+        ['P10', 'pagina-1.png', 'carrossel', false],
         ['P08', 'capa.png', 'reel', false],
         ['P07', 'pagina-1.png', 'carrossel', false],
-        ['P06', 'capa.png', 'reel', false],
+        ['R01', 'pagina-1.png', 'carrossel', false],
         ['P05', 'capa.png', 'reel', false],
         ['P04', 'pagina-1.png', 'carrossel', false],
       ].map(([id, nome, tipo, fixado]) => ({ arquivo: arq(id, nome), tipo, fixado, codigo: id }));
@@ -508,12 +508,12 @@ O QUE É FOTO, PESSOA E TELA
 - Quadros "[Gravação com integrante real]": gravação da equipe, com a fala revisada pela própria pessoa.
 - Telas do app: capturas e gravações reais da demonstração (dados fictícios, etiqueta "Demonstração"), versão da ficha em docs/24. Refazer o teste na versão que for ao ar.
 
-ORDEM DE PUBLICAÇÃO (calendário do Playbook; o detalhe está em calendario.md e calendario.png)
+ORDEM DE PUBLICAÇÃO (plano de dezembro, D-130; o detalhe está em calendario.md e calendario.png)
 D1 a D4  preparo do perfil: pasta perfil/ (avatar, destaques, nome e bio, prévia)
 ${ordemPub.map((p) => `${dia(p).padEnd(8)} ${p.id.padEnd(4)} ${p.nome}  (${p.pasta}/)`).join('\n')}
-D13 e D20 são posições flexíveis: T01 ou T02 se houver trend adequada, senão P06 ou P09 (as pastas D13-T01 e D20-T02 são as opções de trend).
+D20 é o Reels do mercado, gravado por scripts/gravar-redes.js (ainda sem pasta aqui). D25 fica sem publicação (véspera de Natal).
 P12 (dúvida de acesso) fica nos Stories e no destaque Ajuda (pasta stories-e-ajuda-P12-...).
-Reserva, fora do calendário (ciclo seguinte ou no lugar de uma peça repetida): pastas reserva-*.
+Fora do calendário de dezembro: pastas reserva-* (janeiro, depois da abertura ou à espera de algo; o motivo está na ficha.md de cada uma).
 
 O QUE CADA PASTA CONTÉM
 perfil/                avatar-1080.png (ícone C), avatar-conferencia.png (110 px e 44 px), destaques/ (6 capas 1080 x 1920), previa-do-perfil.png, nome-e-bio.txt

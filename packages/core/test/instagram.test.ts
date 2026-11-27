@@ -341,13 +341,45 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(dias.get(7)).toBe('P03');
     expect(dias.get(9)).toBe('P04');
     expect(dias.get(11)).toBe('P05');
-    expect(dias.get(13)).toBe('P06 ou T01');
+    expect(dias.get(13)).toBe('R01');
     expect(dias.get(16)).toBe('P07');
     expect(dias.get(18)).toBe('P08');
-    expect(dias.get(20)).toBe('P09 ou T02');
+    expect(dias.get(20)).toBe('Reels do mercado');
     expect(dias.get(23)).toBe('P10');
-    expect(dias.get(25)).toBe('P11');
-    expect(dias.get(27)).toBe('B01');
+    expect(dias.get(25)).toBe('Sem publicação');
+    expect(dias.get(27)).toBe('N01');
+    expect(dias.get(30)).toBe('F01');
+  });
+
+  it('a pasta de cada peça diz o dia do calendário, e o que saiu de dezembro fica em reserva', () => {
+    const pecas = conteudo.PECAS as unknown as { id: string; pasta: string; dia?: number | null; reserva?: boolean }[];
+    for (const p of pecas) {
+      if (p.dia) expect(p.pasta.startsWith(`D${String(p.dia).padStart(2, '0')}-${p.id}-`), p.id).toBe(true);
+      if (p.reserva) expect(p.pasta.startsWith(`reserva-${p.id}-`), p.id).toBe(true);
+      expect(Boolean(p.dia) && Boolean(p.reserva), p.id).toBe(false);
+    }
+    const noCalendario = pecas.filter((p) => p.dia).map((p) => p.id).sort();
+    expect(noCalendario).toEqual(['F01', 'N01', 'P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P10', 'R01']);
+    for (const id of ['P06', 'P09', 'P11', 'B01', 'T01', 'T02', 'R02', 'R03', 'B', 'F02']) expect(pecas.find((p) => p.id === id)?.reserva, id).toBe(true);
+  });
+
+  it('a N01 traz os quatro preços dos planos iguais aos do núcleo, com a frase do site e sem convite para assinar', () => {
+    const fonte = readFileSync(join(ROOT, 'packages', 'core', 'src', 'plano-precos.ts'), 'utf8');
+    expect(fonte).toContain('individual: { mensal: 2990, anual: 26990 }');
+    expect(fonte).toContain('familiar: { mensal: 6990, anual: 62990 }');
+    const planos = (calc.EXEMPLOS as unknown as { planos: Record<string, number> }).planos;
+    expect(planos).toEqual({ individualMes: 2990, individualAno: 26990, familiaMes: 6990, familiaAno: 62990 });
+    const n01 = peca('N01');
+    const txt = JSON.stringify(n01.paginas) + (n01.legenda ?? '');
+    for (const preco of ['R$ 29,90', 'R$ 269,90', 'R$ 69,90', 'R$ 629,90']) expect(txt).toContain(preco);
+    expect(txt).toContain(calc.FRASE_DA_ASSINATURA);
+    expect(txt).not.toMatch(/assine|crie sua conta|econom|desconto|equivale|fictíci/i);
+    expect(n01.legenda?.endsWith('Conheça a Clarevo pelo link da bio.')).toBe(true);
+    const semPreco = JSON.parse(JSON.stringify(conteudo.PECAS)) as typeof conteudo.PECAS;
+    const copia = semPreco.find((p) => p.id === 'N01')!;
+    copia.legenda = (copia.legenda ?? '').replace(calc.FRASE_DA_ASSINATURA, '');
+    copia.paginas = copia.paginas?.slice(0, 4);
+    expect(validar.conferirRegrasDasPecas(semPreco).some((e) => e.startsWith('N01:'))).toBe(true);
   });
 });
 

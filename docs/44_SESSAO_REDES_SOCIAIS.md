@@ -176,7 +176,8 @@ As duas sessões trabalham no mesmo repositório. Para não haver conflito:
 
 | Esta sessão pode mexer em | Esta sessão não mexe em |
 |---|---|
-| `scripts/instagram/`, `scripts/gerar-instagram.js` | `apps/`, `packages/core/src/`, `supabase/`, `site-src/`, `scripts/site/`, `site/` |
+| `scripts/instagram/`, `scripts/gerar-instagram.js` | `apps/`, `packages/core/src/`, `supabase/`, `scripts/site/` e o resto de `site-src/` e de `site/` |
+| Os textos de Novidades do site, `site-src/novidades/*.md` (liberado pelo Enzo em 27/11/2026, D-130), e as páginas que `node scripts/gerar-site.js` reescreve em `site/` por causa deles. Seguir as regras de `site-src/paginas/` ("como escrevemos") e avisar a sessão do app antes de cada texto | As outras páginas do site, o estilo, os scripts e os textos legais |
 | `docs/24_REDES_SOCIAIS.md`, `docs/25_INSTAGRAM.md`, `docs/referencias/redes-sociais-e-guia-visual.md` e este guia | `docs/telas/`, `docs/manual/` (gerados pela sessão do app) |
 | Documentos novos de redes (por exemplo, `docs/redes/`) | `docs/legal/`, `docs/lojas/`, `CLAUDE.md` |
 | `packages/core/test/instagram.test.ts`, só quando mudar o gerador | O resto de `packages/core/test/` |
@@ -289,6 +290,7 @@ Em 27/11/2026 o perfil ainda não tinha sido criado. O plano (fases, calendário
 - O gerador do Instagram com o perfil (avatar, destaques, bio, prévia), os carrosséis do calendário (P01, P03, P04, P07, P10, B01 e T01), as peças de reserva (R01, R02 "Organizar as finanças com a câmera do celular", B, F01, F02 e o Reels R03), as capas, os rascunhos em vídeo e o calendário D1 a D30 (`docs/25`).
 - As gravações da demonstração: P02, P05, P08, P11, o Reels da compra de mercado e do orçamento (pedido da Elis em 09/11, D-089 F) e o Reels R03 de nota, comprovante e boleto lidos sem digitar (pedido da Elis em 31/10).
 - A peça "câmera do celular" (R02 e R03) e o vídeo do mercado são os dois pedidos da Elis já atendidos.
+- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
 
 ### 14.2 Perguntas a Enzo: respondidas e abertas
 
@@ -304,10 +306,10 @@ Abertas:
 1. **Quem confere o app antes de cada peça que mostra tela** (o Playbook pede nome, data e versão). Proposta desta sessão: a sessão confere na demonstração e anota a data, e a Elis confirma no app dela, sem print da própria conta. A ficha de afirmações de `docs/24` é de 24/10: depois disso vieram muitas decisões (D-086 em diante).
 2. **E-mail e horário de ajuda** confirmados, para o destaque Ajuda e a P11 (o site fala em resposta em até 1 dia útil, D-126).
 3. **Conta de teste do Telegram**, com nome fictício, criada pelo Enzo.
-4. **Fotos e pessoas reais** (P01, F01, F02, P06, P09 e P12), com autorização.
+4. **Pessoas reais** (P06, P09 e P12), com autorização de imagem e de fala. As capas da P01, da F01 e da F02 ficaram só com texto, sem foto (decisão do Enzo de 27/11/2026).
 5. **Segunda linha da bio:** manter "App para organizar seu mês." ou aproximar do subtítulo do site.
 6. **Empresas:** se o "pedir uma apresentação" do site é o canal comercial conferido; a revisão técnica e a pergunta 35 ao advogado continuam pendentes.
-7. **Outras redes e o site (D-130, item 6):** Facebook, LinkedIn, YouTube com vídeos animados e um espaço no site para publicar conteúdo; a ordem e o que entra em cada um.
+7. **Outras redes (D-130, item 6):** Facebook, LinkedIn e YouTube com vídeos animados; a ordem e o que entra em cada um. O espaço no site é a página Novidades, e a pasta dos textos foi liberada para esta sessão (seção 10).
 
 ### 14.3 Bloqueios conhecidos
 
