@@ -56,6 +56,8 @@ const EXEMPLOS = {
   dezParcelas: { parcelas: 10, valorParcela: R(120), total: R(1200), aVista: R(1000), diferenca: R(200), percentualSobreAVista: 20 },
   // N01: os preços reais dos planos (D-127), em centavos, iguais aos de `packages/core/src/plano-precos.ts` (o teste confere).
   planos: { individualMes: 2990, individualAno: 26990, familiaMes: 6990, familiaAno: 62990 },
+  // N02: a compra de mercado na demonstração (centavos), como a tela escreve; o orçado de Mercado está em `orcamento`.
+  mercado: { compra: 3890, usado: 143890, faltam: 36110 },
   // T01: assinaturas (exemplo fictício, sem rendimentos).
   assinaturas: { hoje: R(200), depois: R(150), diferencaPorMes: R(50), meses: 12, somaNoAno: R(600), meta: R(1200) },
   // P02: orçamento de outubro na demonstração (centavos), como a tela escreve.

@@ -291,7 +291,7 @@ Em 27/11/2026 o perfil ainda não tinha sido criado. O plano (fases, calendário
 - O gerador do Instagram com o perfil (avatar, destaques, bio, prévia), os carrosséis do calendário (P01, P03, P04, P07, P10, B01 e T01), as peças de reserva (R01, R02 "Organizar as finanças com a câmera do celular", B, F01, F02 e o Reels R03), as capas, os rascunhos em vídeo e o calendário D1 a D30 (`docs/25`).
 - As gravações da demonstração: P02, P05, P08, P11, o Reels da compra de mercado e do orçamento (pedido da Elis em 09/11, D-089 F) e o Reels R03 de nota, comprovante e boleto lidos sem digitar (pedido da Elis em 31/10).
 - A peça "câmera do celular" (R02 e R03) e o vídeo do mercado são os dois pedidos da Elis já atendidos.
-- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
+- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, N02, que é o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
 
 ### 14.2 Perguntas a Enzo: respondidas e abertas
 

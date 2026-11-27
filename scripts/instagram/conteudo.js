@@ -93,6 +93,7 @@ const GRAVACOES = {
   p05: { base: 'p05-orcamento-comecar-uma-categoria', quadroDaCapa: 'p05-orcamento-comecar-uma-categoria-conferencia-2.png', recorte: { x: 40, y: 290, w: 1000, h: 960 } },
   p08: { base: 'p08-meta-criar-e-ver-o-progresso', quadroDaCapa: 'p08-meta-criar-e-ver-o-progresso-capa.png', recorte: { x: 40, y: 215, w: 1000, h: 945 } },
   p11: { base: 'p11-primeiro-gasto-anotar', quadroDaCapa: 'p11-primeiro-gasto-anotar-conferencia-3.png', recorte: { x: 40, y: 240, w: 1000, h: 960 } },
+  reels: { base: 'reels-compra-de-mercado-e-orcamento', quadroDaCapa: 'reels-compra-de-mercado-e-orcamento-capa.png', recorte: { x: 40, y: 300, w: 1000, h: 950 } },
   camera: { base: 'camera-nota-comprovante-e-boleto', quadroDaCapa: 'camera-nota-comprovante-e-boleto-capa.png', recorte: { x: 40, y: 200, w: 1000, h: 950 } },
 };
 
@@ -721,6 +722,46 @@ const PECAS = [
   },
   // =============================================================================================================================
   {
+    id: 'N02',
+    pasta: 'D20-N02-reel-a-compra-de-mercado-e-o-orcamento',
+    dia: 20,
+    nome: 'A compra de mercado e o orçamento',
+    formato: 'reel',
+    objetivo: 'Mostrar, na tela real, o que uma compra de mercado muda no orçamento do mês (pedido da Elis de 09/11/2026, D-089 F).',
+    acao: 'Conhecer a Clarevo pelo link da bio.',
+    familia: 'Demonstração real',
+    gravacao: 'reels',
+    capa: { titulo: 'A compra de mercado no orçamento', sub: 'O que uma compra muda no mês', chip: 'Exemplo fictício' },
+    roteiro: [
+      { em: 0, tela: 'Uma compra de mercado e o orçamento do mês, lado a lado', fala: 'Uma compra de mercado e o orçamento do mês, lado a lado.' },
+      { em: 4.0, tela: 'Compra de R$ 38,90 na feira, na categoria Mercado', fala: 'No exemplo fictício, uma compra de R$ 38,90 na feira, já paga, na categoria Mercado.' },
+      { em: 10.0, tela: 'Ao salvar, o aviso mostra o usado do orçamento', fala: 'Ao salvar, o aviso mostra quanto do orçamento de Mercado já foi usado no mês.' },
+      { em: 15.1, tela: 'Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro', fala: 'Neste exemplo, Mercado fica em R$ 1.438,90 de R$ 1.800,00 em outubro: 79% do orçamento.' },
+      { em: 20.8, tela: 'O mesmo número em Orçamento por categoria. Faltam R$ 361,10', fala: 'O mesmo número aparece em Orçamento por categoria. O card de Mercado mostra R$ 1.438,90 de R$ 1.800,00, 79,9%. Faltam R$ 361,10.' },
+      { em: 29.2, tela: 'O orçamento não é saldo nem autorização para gastar. Conheça a Clarevo pelo link da bio', fala: 'O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Conheça a Clarevo pelo link da bio.' },
+    ],
+    legenda:
+      'Uma compra de mercado entra no orçamento do mês quando você anota. No exemplo do vídeo, uma compra de R$ 38,90 na feira leva o usado de Mercado a R$ 1.438,90 de R$ 1.800,00: faltam R$ 361,10. O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar.\n\nOs números são fictícios, usados para demonstrar a tarefa. Conheça a Clarevo pelo link da bio.',
+    alt: 'Gravação da tela da demonstração da Clarevo, com dados fictícios: a pessoa anota um gasto de R$ 38,90 na feira, na categoria Mercado, salva e vê o aviso "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)"; depois abre Orçamento por categoria, em que o card de Mercado mostra R$ 1.438,90 de R$ 1.800,00, 79,9%, faltam R$ 361,10. Legendas na tela repetem a narração.',
+    altCapa: 'Capa do Reels "A compra de mercado no orçamento", com o trecho da tela do gasto salvo: "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)" e o gasto Feira, de R$ 38,90 (dados fictícios).',
+    ajustes: [
+      'Peça que não está no Playbook: nasceu do pedido da Elis de 09/11/2026 (D-089 F). A gravação existe desde então em `scripts/gravar-redes.js` (`--so reels`); a pasta no gerador entrou em 27/11/2026.',
+      'O aviso do app arredonda o percentual (79%) e o card mostra uma casa (79,9%): a narração lê os dois como a tela os mostra.',
+      'O fim convida a conhecer a Clarevo pelo link da bio, e não a usar nem a criar conta (D-130).',
+    ],
+    depende: [
+      'A tela Anotar gasto mostra, por alguns segundos, o botão "Escanear nota fiscal". O vídeo não fala da leitura de nota, que está fora das peças até o teste com documentos reais (D-130): o Enzo decide se a tela pode aparecer assim ou se a gravação deve começar depois dela.',
+      'Edição final no Edits (legendas revisadas, trilha só com direitos de uso) e capa no Canva; "Exemplo fictício" visível enquanto os valores aparecerem.',
+      'Refazer a gravação na versão que for ao ar (`node scripts/gravar-redes.js --so reels`) e conferir o `.srt`.',
+    ],
+    conferencia: [
+      { afirmacao: 'Ao salvar um gasto de R$ 38,90 em Mercado, o aviso mostra "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)".', situacao: 'Confirmado', nota: 'Gravação reels da demonstração da main de 27/11/2026; o gravador lê os números da tela e falha se ela mudar.' },
+      { afirmacao: 'Orçamento por categoria mostra o card de Mercado com R$ 1.438,90 de R$ 1.800,00, 79,9%, faltam R$ 361,10.', situacao: 'Confirmado', nota: 'Mesma gravação. O usado é por competência (D-041).' },
+      { afirmacao: 'O orçamento conta o usado no mês; não é saldo nem autorização para gastar.', situacao: 'Confirmado', nota: 'O orçamento mede o usado no mês, não o dinheiro disponível; o app nunca chama o que falta de "saldo".' },
+    ],
+  },
+  // =============================================================================================================================
+  {
     id: 'N01',
     pasta: 'D27-N01-os-planos-da-clarevo',
     dia: 27,
@@ -1114,7 +1155,7 @@ const CALENDARIO = [
   { dia: 17, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P07.', depende: 'Marketing.' },
   { dia: 18, tipo: 'reel', peca: 'P08', formato: 'Reel', objetivo: 'Demonstrar o fluxo de meta', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Fluxo validado; edição final; publicar.' },
   { dia: 19, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P08.', depende: 'Marketing.' },
-  { dia: 20, tipo: 'reel', peca: 'Reels do mercado', formato: 'Reel', objetivo: 'Mostrar a compra de mercado no orçamento', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Gravação de `scripts/gravar-redes.js --so reels` (ainda sem pasta no gerador); edição final no Edits e capa no Canva; conferir o `.srt`; publicar.' },
+  { dia: 20, tipo: 'reel', peca: 'N02', formato: 'Reel', objetivo: 'Mostrar a compra de mercado no orçamento', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Decisão do Enzo sobre o botão "Escanear nota fiscal" que aparece na tela; edição final no Edits e capa no Canva; conferir o `.srt`; publicar.' },
   { dia: 21, tipo: 'revisao', peca: 'Revisão D21', formato: 'Reunião curta', objetivo: 'Que explicação repetir e que atrito corrigir no acesso ou no app', acao: 'Decidir o que repetir e corrigir.', depende: 'Equipe; produto para o atrito encontrado.' },
   { dia: 22, tipo: 'escuta', peca: 'Stories', formato: 'Stories e escuta', objetivo: 'Recolher dúvidas', acao: 'Caixa de perguntas nativa; transformar dúvidas recorrentes em pauta.', depende: 'Quem responde.' },
   { dia: 23, tipo: 'carrossel', peca: 'P10', formato: 'Carrossel, 6 páginas', objetivo: 'Ensinar a revisar o orçamento', acao: 'Fazer a revisão com seus registros.', depende: 'Conferir período e campos da captura; montar no Canva; publicar.' },

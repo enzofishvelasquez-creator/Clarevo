@@ -261,7 +261,7 @@ describe('Instagram: redação de tudo o que sai', () => {
   });
 
   it('os Reels terminam com "Conheça a Clarevo pelo link da bio" (D-130), sem o texto antigo do acesso nem convite para usar ou criar conta', () => {
-    for (const id of ['P02', 'P05', 'P08', 'P11']) {
+    for (const id of ['P02', 'P05', 'P08', 'N02', 'P11']) {
       const p = peca(id);
       const todos = JSON.stringify([p.roteiro, p.legenda, p.alt]);
       expect(todos, id).toContain('Conheça a Clarevo pelo link da bio');
@@ -344,7 +344,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(dias.get(13)).toBe('R01');
     expect(dias.get(16)).toBe('P07');
     expect(dias.get(18)).toBe('P08');
-    expect(dias.get(20)).toBe('Reels do mercado');
+    expect(dias.get(20)).toBe('N02');
     expect(dias.get(23)).toBe('P10');
     expect(dias.get(25)).toBe('Sem publicação');
     expect(dias.get(26)).toBe('Sem publicação');
@@ -360,7 +360,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
       expect(Boolean(p.dia) && Boolean(p.reserva), p.id).toBe(false);
     }
     const noCalendario = pecas.filter((p) => p.dia).map((p) => p.id).sort();
-    expect(noCalendario).toEqual(['F01', 'N01', 'P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P10', 'R01']);
+    expect(noCalendario).toEqual(['F01', 'N01', 'N02', 'P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P10', 'R01']);
     for (const id of ['P06', 'P09', 'P11', 'B01', 'T01', 'T02', 'R02', 'R03', 'B', 'F02']) expect(pecas.find((p) => p.id === id)?.reserva, id).toBe(true);
   });
 
@@ -401,6 +401,18 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     const p04 = outra.find((p) => p.id === 'P04')!;
     p04.legenda = `${p04.legenda ?? ''} O plano custa R$ 29,90.`;
     expect(validar.conferirRegrasDasPecas(outra).some((e) => e.startsWith('P04:'))).toBe(true);
+  });
+
+  it('o Reels do mercado (N02) usa os números da demonstração e diz que o orçamento não é saldo nem autorização para gastar', () => {
+    const n02 = peca('N02');
+    expect(n02.formato).toBe('reel');
+    const m = (calc.EXEMPLOS as unknown as { mercado: { compra: number; usado: number; faltam: number }; orcamento: unknown }).mercado;
+    expect(m).toEqual({ compra: 3890, usado: 143890, faltam: 36110 });
+    expect(180000 - m.usado).toBe(m.faltam);
+    const txt = JSON.stringify([n02.roteiro, n02.legenda]);
+    for (const v of ['R$ 38,90', 'R$ 1.438,90', 'R$ 1.800,00', 'R$ 361,10']) expect(txt).toContain(v);
+    expect(txt).toContain('não é saldo nem autorização para gastar');
+    expect(txt).not.toMatch(/nota fiscal|comprovante|boleto|holerite/i);
   });
 
   it('cada peça com dia está nesse dia do calendário', () => {

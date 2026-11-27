@@ -151,7 +151,7 @@ function conferirRegrasDasPecas(pecas = PECAS) {
   // Antes da abertura (D-130): os Reels fecham convidando a conhecer a Clarevo pelo link da bio, sem sugerir usar agora. Em P02, P05 e
   // P08 a frase está no último trecho (narração e texto na tela) e no fim da legenda. Na P11, que só sai depois da abertura, a narração
   // traz a frase e o último trecho é "Na sua conta, o primeiro registro começa do zero.".
-  for (const id of ['P02', 'P05', 'P08', 'P11']) {
+  for (const id of ['P02', 'P05', 'P08', 'N02', 'P11']) {
     const r = por(id);
     if (!r) continue;
     const fim = 'Conheça a Clarevo pelo link da bio';
@@ -185,7 +185,7 @@ function conferirRegrasDasPecas(pecas = PECAS) {
   for (const p of pecas) if (p.legenda && /\[[^\]]*\]/.test(p.legenda)) erros.push(p.id + ': a legenda tem um campo entre colchetes; legenda pronta não pode ter marcador a preencher');
   for (const p of pecas) {
     const txt = t(p);
-    if (/\bsaldo\b/i.test(txt) && !['P02', 'P03', 'P04', 'R01', 'P11'].includes(p.id)) erros.push(`${p.id}: cita "saldo"; só as peças que explicam que a diferença não é saldo podem`);
+    if (/\bsaldo\b/i.test(txt) && !['P02', 'P03', 'P04', 'R01', 'P11', 'N02'].includes(p.id)) erros.push(`${p.id}: cita "saldo"; só as peças que explicam que a diferença não é saldo podem`);
     if (/cura|sono|produtividade|tranquilidade/i.test(txt)) erros.push(`${p.id}: promete ou cita cura, sono, produtividade ou tranquilidade`);
     if (/ansiedade|depress/i.test(txt)) erros.push(`${p.id}: cita ansiedade ou depressão`);
     if (/\bjuros\b|\bCET\b/i.test(txt) && !['P07', 'B', 'R01'].includes(p.id)) erros.push(`${p.id}: cita juros ou CET fora das peças de compra parcelada`);
