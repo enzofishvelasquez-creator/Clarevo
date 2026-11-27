@@ -97,7 +97,7 @@ const { markdownParaHtml, MARCADORES } = gerador;
  * repositório não tem retrato (a rede deste ambiente não alcança o Banco Central), e sem ele o `--final` recusa.
  */
 const RETRATO_DE_TESTE: RetratoIndicadores = {
-  consultadoEm: '2026-11-12T16:00:00.000Z',
+  consultadoEm: '2026-11-27T16:00:00.000Z',
   valores: {
     selic: { valor: 12.25, data: '2026-11-12' },
     cdi: { valor: 12.15, data: '2026-11-11', dia: 0.045877 },
@@ -135,13 +135,18 @@ const POSTS_INICIAIS = [
 ];
 /** O texto de novembro de 2026, com o que chegou ao app (aba Investir, metas, Multa e juros com a fatura e as cinco abas). */
 const POST_DE_NOVEMBRO = 'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro.html';
-const POSTS = [...POSTS_INICIAIS, POST_DE_NOVEMBRO];
+/** Os textos de 27/11/2026, da sessão de redes (D-130): janeiro (volta às aulas e contas do ano) e as assinaturas do mês. */
+const POSTS_DE_27_DE_NOVEMBRO = [
+  'novidades/2026-11-27-janeiro-chega-antes-matricula-material-e-contas-do-ano.html',
+  'novidades/2026-11-27-as-assinaturas-do-mes-quanto-somam-e-quando-revisar.html',
+];
+const POSTS = [...POSTS_INICIAIS, POST_DE_NOVEMBRO, ...POSTS_DE_27_DE_NOVEMBRO];
 /**
  * A data de referência dos posts nos testes: a do post mais novo do repositório (nenhum post pode ter data depois dela). Um post novo
  * pede a data dele aqui; o dia seguinte serve para o caso do post com data futura.
  */
-const REFERENCIA_DOS_POSTS = '2026-11-12';
-const DIA_SEGUINTE = '2026-11-13';
+const REFERENCIA_DOS_POSTS = '2026-11-27';
+const DIA_SEGUINTE = '2026-11-28';
 const PAGINAS_BASE = [
   'index.html',
   'comece.html',
@@ -1879,7 +1884,8 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(problemasDeXml(sitemap)).toEqual([]);
     expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/2026-11-12-o-que-chegou-ao-app-em-novembro</loc><lastmod>2026-11-12</lastmod></url>');
     expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/2026-10-23-conheca-a-clarevo</loc><lastmod>2026-10-23</lastmod></url>');
-    expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/</loc><lastmod>2026-11-12</lastmod></url>');
+    for (const novo of POSTS_DE_27_DE_NOVEMBRO) expect(sitemap, novo).toContain(`<url><loc>https://exemplo.test/${novo.replace(/\.html$/, '')}</loc><lastmod>2026-11-27</lastmod></url>`);
+    expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/</loc><lastmod>2026-11-27</lastmod></url>');
     for (const t of TEMAS_DO_SITE) expect(sitemap, t.slug).toContain(`<url><loc>https://exemplo.test/aprender/${t.slug}</loc><lastmod>${t.reviewedOn}</lastmod></url>`);
     const maisRecente = TEMAS_DO_SITE.map((t) => t.reviewedOn).sort().pop();
     expect(sitemap).toContain(`<url><loc>https://exemplo.test/aprender/</loc><lastmod>${maisRecente}</lastmod></url>`);
@@ -2364,9 +2370,11 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect((feed.match(/<item>/g) ?? []).length).toBe(POSTS.length);
     expect((feed.match(/<pubDate>Fri, 23 Oct 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(3);
     expect((feed.match(/<pubDate>Thu, 12 Nov 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(1);
+    expect((feed.match(/<pubDate>Fri, 27 Nov 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(POSTS_DE_27_DE_NOVEMBRO.length);
     // O post mais novo vem primeiro e dá a data do feed.
+    expect(feed.indexOf('2026-11-27-')).toBeLessThan(feed.indexOf('2026-11-12-o-que-chegou-ao-app-em-novembro'));
     expect(feed.indexOf('2026-11-12-o-que-chegou-ao-app-em-novembro')).toBeLessThan(feed.indexOf('2026-10-23-conheca-a-clarevo'));
-    expect(feed).toContain('<lastBuildDate>Thu, 12 Nov 2026 12:00:00 -0300</lastBuildDate>');
+    expect(feed).toContain('<lastBuildDate>Fri, 27 Nov 2026 12:00:00 -0300</lastBuildDate>');
     for (const p of g.posts) expect(feed).toContain(`<title>${esc(p.titulo)}</title>`);
     for (const m of feed.matchAll(/<(?:link|guid isPermaLink="true")>([^<]*)<\/(?:link|guid)>/g)) expect(m[1], 'endereço do feed').toMatch(/^https:\/\/exemplo\.test\//);
     expect(feed).not.toContain('isPermaLink="false"');
@@ -3054,7 +3062,7 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
     expect(painel).toContain('<h1>Indicadores oficiais</h1>');
     expect(painel).toContain(`data-painel data-consultado="${RETRATO_DE_TESTE.consultadoEm}"`);
     expect(painel).toContain(`<span data-campo="hora">${esc(INDICADORES_TEXT.retrato(RETRATO_DE_TESTE.consultadoEm!))}</span> Fonte: Banco Central do Brasil.`);
-    expect(painel).toContain('Retrato de 12/11/2026 às 13:00, horário de Brasília.');
+    expect(painel).toContain('Retrato de 27/11/2026 às 13:00, horário de Brasília.');
     for (const id of INDICADOR_IDS) {
       const ex = exibirIndicador(id, RETRATO_DE_TESTE.valores[id]);
       expect(painel, id).toContain(`data-indicador="${id}"><span class="titulo-cartao">${esc(ex.nome)}</span><span class="indicador-numero"><span data-campo="numero">${esc(ex.numero)}</span>`);
@@ -3083,8 +3091,8 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
     expect(Object.keys(repo.retrato.valores).sort()).toEqual(['cdi', 'ipca', 'poupanca', 'ptax', 'selic']);
     // Com o retrato de teste e tudo preenchido, o retrato não é motivo de recusa; antigo ou incompleto, é.
     expect(comRetrato.problemasFinais.filter((p) => p.includes('retrato'))).toEqual([]);
-    const antigo = gerarSite({ dados: PREENCHIDOS, referencia: '2026-11-30' });
-    expect(antigo.problemasFinais.join('\n')).toContain('o retrato dos indicadores é de 18 dias antes de 2026-11-30 (o limite é 7)');
+    const antigo = gerarSite({ dados: PREENCHIDOS, referencia: '2026-12-15' });
+    expect(antigo.problemasFinais.join('\n')).toContain('o retrato dos indicadores é de 18 dias antes de 2026-12-15 (o limite é 7)');
     const incompleto = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, retrato: { ...RETRATO_DE_TESTE, valores: { selic: RETRATO_DE_TESTE.valores.selic } } });
     expect(incompleto.problemasFinais.join('\n')).toContain('o retrato dos indicadores não tem CDI, IPCA em 12 meses, Rendimento da poupança, Dólar PTAX (Banco Central)');
     // Um retrato com número fora das faixas ou sem a hora da consulta não entra.
@@ -3216,7 +3224,7 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
         ['nome fora do padrão', { 'resumo.json': { itens: [NOTICIA] } }, 'o nome precisa ser semana-AAAA-MM-DD.json'],
         ['JSON ilegível', { 'semana-2026-11-12.json': '{ itens' }, 'não é um JSON válido'],
         ['sem notícias', { 'semana-2026-11-12.json': { itens: [] } }, 'pelo menos uma notícia'],
-        ['data depois da referência', { 'semana-2026-11-13.json': { itens: [{ ...NOTICIA, data: '2026-11-13' }] } }, 'é depois da data de referência'],
+        ['data depois da referência', { [`semana-${DIA_SEGUINTE}.json`]: { itens: [{ ...NOTICIA, data: DIA_SEGUINTE }] } }, 'é depois da data de referência'],
         ['campo faltando', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, autor: '' }] } }, 'falta autor'],
         ['resumo com três frases', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, resumo: 'Uma. Duas. Três.' }] } }, 'mais de duas frases'],
         ['link sem https', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, link: 'http://noticias.exemplo.test/x' }] } }, 'https://'],

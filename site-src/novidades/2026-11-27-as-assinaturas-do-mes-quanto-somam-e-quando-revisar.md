@@ -17,7 +17,7 @@ Na Clarevo, uma assinatura é um gasto fixo mensal que você marca como assinatu
 
 ## Quanto elas somam
 
-As assinaturas aparecem juntas no topo de Gastos fixos e parcelamentos, com o total por mês e por ano. Se uma assinatura tem data para terminar antes de 12 meses, o total do ano conta só os meses até a última. Uma conta que muda de valor entra pelo valor de referência, e a tela avisa que o total inclui valores estimados.
+As assinaturas aparecem juntas no topo de Gastos fixos e parcelamentos, com o total por mês e por ano. Os totais são uma estimativa feita com o que você anotou, e não o valor que cada serviço vai cobrar. Se uma assinatura tem data para terminar antes de 12 meses, o total do ano conta só os meses até a última. Uma conta que muda de valor entra pelo valor de referência, e a tela avisa que o total inclui valores estimados.
 
 ## Quando revisar
 

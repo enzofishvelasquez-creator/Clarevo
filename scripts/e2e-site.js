@@ -47,7 +47,7 @@ const { catalogo } = require('./site/catalogo');
 const RAIZ = path.join(__dirname, '..');
 const HOJE = '2026-10-23';
 /** A data de referência dos posts: a do mais novo (a mesma de REFERENCIA_DOS_POSTS no teste do núcleo), para todas as matérias saírem. */
-const REFERENCIA_DOS_POSTS = '2026-11-12';
+const REFERENCIA_DOS_POSTS = '2026-11-27';
 /** As matérias de Novidades, todas com imagem de capa (D-114). */
 const POSTS = [
   'novidades/2026-10-23-conheca-a-clarevo',
@@ -55,6 +55,8 @@ const POSTS = [
   'novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas',
   'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro',
 ];
+/** Quantas matérias o feed tem: os textos de site-src/novidades, que crescem a cada texto novo (só estes quatro têm a checagem das imagens). */
+const TOTAL_DE_MATERIAS = fs.readdirSync(path.join(RAIZ, 'site-src', 'novidades')).filter((n) => /^\d{4}-\d{2}-\d{2}-.+\.md$/.test(n)).length;
 /** As páginas com vídeos ou imagens novas (D-114), que a varredura do tema escuro percorre. */
 // Desde 27/11/2026, também Use no navegador (os vídeos do computador).
 const PAGINAS_D114 = ['', 'app/', 'web', ...POSTS];
@@ -1492,7 +1494,7 @@ function varrerPagina() {
         const r = await copiando.request.get(`${origem}${caminho}`);
         abrem.push(r.ok() && !/\.html$/.test(caminho) && (await r.text()).includes(`<h1>${i.titulo.replace(/&/g, '&amp;')}</h1>`));
       }
-      ok(`rss: o feed é XML bem formado, com as ${POSTS.length} matérias, e o link de cada item abre a matéria no endereço sem ".html"`, lido.erro === 0 && lido.itens.length === POSTS.length && abrem.every(Boolean), JSON.stringify({ erro: lido.erro, n: lido.itens.length, abrem }));
+      ok(`rss: o feed é XML bem formado, com as ${TOTAL_DE_MATERIAS} matérias, e o link de cada item abre a matéria no endereço sem ".html"`, lido.erro === 0 && lido.itens.length === TOTAL_DE_MATERIAS && abrem.every(Boolean), JSON.stringify({ erro: lido.erro, n: lido.itens.length, abrem }));
       await copiando.close();
       const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
       const q = await semJs.newPage();
