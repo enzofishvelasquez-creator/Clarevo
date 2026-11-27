@@ -185,7 +185,7 @@ Arquivos: `p11-primeiro-gasto-anotar.mp4`, `.srt`, `-capa.png` (o Resumo depois 
 | 9,9 s | Confira os campos que esta versão pede: descrição, valor e categoria. |
 | 15,7 s | Salve e veja se o registro aparece corretamente. |
 | 19,4 s | No Resumo, o Pago vai de R$ 3.900,00 para R$ 3.935,00, e a Diferença do mês, de R$ 2.100,00 para R$ 2.065,00. |
-| 26,4 s | O gasto também aparece em Pagamentos do mês. É o primeiro passo para acompanhar. A orientação de acesso está no perfil. |
+| 26,4 s | O gasto também aparece em Pagamentos do mês. É o primeiro passo para acompanhar. Conheça a Clarevo pelo link da bio. |
 
 A cena de resultado, que o Playbook torna obrigatória, está nos 20 s finais. A gravação usa a conta de demonstração, que já tem registros. A demonstração também deixa criar uma conta nova simulada ("Criar conta" e "Simular abertura do link"), que abre vazia, com o cartão "Primeiros passos", e o mesmo fluxo termina certo nela (conferido, mas **não gravado**): como a conta nova tem R$ 0,00 recebidos, o primeiro gasto de R$ 35,00 deixa a Diferença do mês negativa, de menos R$ 35,00, com o aviso "Pagamentos acima dos recebimentos no período", e a peça teria de explicar isso. A equipe decide se quer essa versão; o script grava de novo com um roteiro novo.
 

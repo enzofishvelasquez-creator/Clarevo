@@ -92,7 +92,7 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     const txt = textosPublicos([{ id: 'P03', paginas: p03.paginas, legenda: p03.legenda }]).map((x) => x.texto).join('\n');
 // Antes da abertura (D-130): sem data, lista de espera, cadastro nem preço; "em breve" e "grátis" só na frase do site.
     const semFrase = txt.split(FRASE_DA_ASSINATURA).join(' ');
-    for (const re of [/\d{1,2}\/\d{1,2}/, /\bem breve\b/i, /cadastre-se/i, /lista de espera/i, /\bgr[áa]tis\b/i, /R\$/]) if (re.test(semFrase)) erros.push(`P03: antes da abertura, a peça não pode ter ${re}`);
+    for (const re of [/\d{1,2}\/\d{1,2}/, /\b20\d{2}\b/, /\bem breve\b/i, /cadastr/i, /cri(?:e|ar) (?:sua|uma|a) conta/i, /lista de espera/i, /\bgr[áa]tis\b/i, /R\$/]) if (re.test(semFrase)) erros.push(`P03: antes da abertura, a peça não pode ter ${re}`);
     if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push('P03: falta a frase do site "' + FRASE_DA_ASSINATURA + '"');
     if (!/Conheça a Clarevo pelo link da bio\./.test(txt)) erros.push('P03: a ação é "Conheça a Clarevo pelo link da bio."');
   }
@@ -112,14 +112,20 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     if (!p11.roteiro.some((x) => x.fala.includes(frase))) erros.push('P11: a narração (roteiro e srt) precisa dizer "' + frase + '"');
     if (!p11.roteiro.some((x) => x.tela.includes(frase))) erros.push('P11: o texto na tela precisa dizer "' + frase + '"');
   }
-  // Antes da abertura (D-130): os quatro Reels terminam convidando a conhecer a Clarevo pelo link da bio, sem sugerir usar agora.
+  // Antes da abertura (D-130): os Reels fecham convidando a conhecer a Clarevo pelo link da bio, sem sugerir usar agora. Em P02, P05 e
+  // P08 a frase está no último trecho (narração e texto na tela) e no fim da legenda. Na P11, que só sai depois da abertura, a narração
+  // traz a frase e o último trecho é "Na sua conta, o primeiro registro começa do zero.".
   for (const id of ['P02', 'P05', 'P08', 'P11']) {
     const r = por(id);
     if (!r) continue;
     const fim = 'Conheça a Clarevo pelo link da bio';
-    const comLink = r.roteiro.filter((x) => /link da bio/i.test(x.tela) || /link da bio/i.test(x.fala));
-    if (comLink.length === 0 || !comLink.every((x) => x.fala.includes(fim + '.') && (!/link da bio/i.test(x.tela) || x.tela.includes(fim)))) erros.push(id + ': o fim do Reel diz "' + fim + '" na narração e no texto na tela');
-    if (id !== 'P11' && !r.legenda.includes(fim + '.')) erros.push(id + ': a legenda diz "' + fim + '."');
+    if (id === 'P11') {
+      if (!r.roteiro.some((x) => x.fala.endsWith(fim + '.'))) erros.push(id + ': a narração diz "' + fim + '."');
+      continue;
+    }
+    const ultimo = r.roteiro[r.roteiro.length - 1];
+    if (!ultimo.fala.endsWith(fim + '.') || !ultimo.tela.endsWith(fim)) erros.push(id + ': o último trecho do Reel termina com "' + fim + '" na narração e no texto na tela');
+    if (!r.legenda.endsWith(fim + '.')) erros.push(id + ': a legenda termina com "' + fim + '."');
   }
   const p02 = por('P02');
   if (p02) {

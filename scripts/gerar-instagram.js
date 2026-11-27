@@ -233,7 +233,7 @@ function roteiroMd(p) {
 
 function calendarioMd() {
   const l = ['# Calendário do primeiro mês: D1 a D30', ''];
-  l.push('Base: Playbook de Redes Sociais v2.2 (24/10/2026). **D é o dia do piloto de criação do perfil.** Referência de três peças por semana, sem promessa de alcance. D13 e D20 são posições flexíveis: T01 ou T02 se houver trend adequada na revisão semanal (até 48 horas antes), senão P06 ou P09.', '');
+  l.push('Base: Playbook de Redes Sociais v2.2 (24/10/2026). **D é o dia contado a partir da criação do perfil.** Referência de três peças por semana, sem promessa de alcance. D13 e D20 são posições flexíveis: T01 ou T02 se houver trend adequada na revisão semanal (até 48 horas antes), senão P06 ou P09.', '');
   l.push('Horários a testar: 12h e 19h de Brasília, anotando horário e formato e comparando várias peças antes de ajustar. Nos dias de publicação, Stories de apoio. Sem parâmetro de rastreamento nos links (D-067); os números vêm do painel do Instagram e das contagens do app, e "não medido" vale onde não houver captura.', '');
   l.push('| Dia | Peça | Formato | Objetivo | Ação | Depende da equipe |', '|---|---|---|---|---|---|');
   for (const c of CALENDARIO) l.push(`| D${c.dia} | ${c.peca} | ${c.formato} | ${c.objetivo} | ${c.acao} | ${c.depende} |`);
@@ -524,7 +524,8 @@ montagem.png           folha de contato com todas as páginas e capas, para revi
 
 BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - B01 e o destaque Para empresas: canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
-- P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento (hoje o e-mail de suporte é marcador).
+- P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento. A P11 só sai depois da abertura (D-130).
+- R02 e R03: fora até a leitura de nota, comprovante, boleto e holerite estar testada com documentos reais (D-130); a R02 espera também o app de celular.
 - P03, a bio e o fim dos Reels: antes da abertura, o convite é só para conhecer (D-130), sem data, lista de espera nem chamada para criar conta. Na abertura, uma fixada nova entra no lugar da P03.
 - Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram.
 - Identificador (@clarevo, D-130) e nome de exibição: conferir na conta se o @ está livre e o limite do nome.

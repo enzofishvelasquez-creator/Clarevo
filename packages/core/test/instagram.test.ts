@@ -192,6 +192,19 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(ruim('Conheça a Clarevo pelo link da bio.')).toBe(0);
     expect(ruim('Assinatura em breve, com 14 dias grátis, sem cartão.')).toBe(0);
     expect(ruim('Comece agora, com 14 dias grátis.')).toBeGreaterThanOrEqual(1);
+    // "grátis", "gratuito" e "em breve" só na frase do site, mesmo em frase com "sem" ou "não".
+    expect(ruim('14 dias grátis, sem cartão.')).toBe(1);
+    expect(ruim('Teste gratuito de 14 dias, sem cartão.')).toBe(1);
+    expect(ruim('Em breve nas lojas.')).toBe(1);
+    expect(ruim('Assinatura em breve, com 14 dias grátis, sem cartão. Cancele quando quiser.')).toBe(0);
+    // Convite para criar conta ou assinar, e as variações do texto antigo do acesso.
+    expect(ruim('Crie sua conta e organize o mês.')).toBe(1);
+    expect(ruim('Assine a Clarevo.')).toBe(1);
+    expect(ruim('A Clarevo está em fase de teste.')).toBe(1);
+    expect(ruim('Acesso em preparação.')).toBe(1);
+    expect(ruim('Acompanhe a disponibilidade da Clarevo.')).toBe(1);
+    expect(ruim('O acesso abre no lançamento.')).toBe(1);
+    expect(ruim('Entrar (quem testa)')).toBe(1);
     expect(ruim('A Clarevo acaba com a ansiedade')).toBe(1);
     expect(ruim('Sem lista de espera nem data de abertura.')).toBe(0);
   });
@@ -253,7 +266,27 @@ describe('Instagram: redação de tudo o que sai', () => {
       const todos = JSON.stringify([p.roteiro, p.legenda, p.alt]);
       expect(todos, id).toContain('Conheça a Clarevo pelo link da bio');
       expect(todos, id).not.toMatch(/fixado Como acessar|como acessar|conhecer o acesso|informações de acesso|fase de testes|cadastr|comece a usar/i);
+      if (id === 'P11') continue;
+      const ultimo = p.roteiro?.[p.roteiro.length - 1];
+      expect(ultimo?.fala.endsWith('Conheça a Clarevo pelo link da bio.'), id).toBe(true);
+      expect(ultimo?.tela?.endsWith('Conheça a Clarevo pelo link da bio'), id).toBe(true);
+      expect(p.legenda?.endsWith('Conheça a Clarevo pelo link da bio.'), id).toBe(true);
     }
+  });
+
+  it('as regras recusam um Reel com outro fecho depois da frase, sem a frase na tela ou com outra chamada no fim da legenda, e uma P03 com data ou convite para criar conta', () => {
+    const copia = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
+    const com = (id: string, muda: (p: (typeof conteudo.PECAS)[number]) => void) => {
+      const pecas = copia(conteudo.PECAS);
+      muda(pecas.find((x) => x.id === id)!);
+      return validar.conferirRegrasDasPecas(pecas).filter((e) => e.startsWith(id + ':'));
+    };
+    expect(validar.conferirRegrasDasPecas()).toEqual([]);
+    expect(com('P02', (p) => p.roteiro!.push({ em: 99, tela: 'Outro fecho', fala: 'Outro fecho.' })).length).toBeGreaterThanOrEqual(1);
+    expect(com('P05', (p) => { p.roteiro!.at(-1)!.tela = 'Depois, confira os registros da categoria'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P08', (p) => { p.legenda = 'Conheça a Clarevo pelo link da bio. Veja também o destaque.'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P03', (p) => { p.legenda = (p.legenda ?? '') + ' A partir de janeiro de 2027.'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P03', (p) => { p.legenda = (p.legenda ?? '') + ' Crie sua conta agora.'; }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('a P02 dá sujeito à frase "não é saldo nem autorização para gastar" no texto na tela dos 17 aos 24 s', () => {

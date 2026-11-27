@@ -98,7 +98,7 @@ No dia da abertura, uma fixada nova entra no lugar da P03 e o destaque Comece aq
 | Publicação | Peça | Situação |
 |---|---|---|
 | O acesso abriu: como começar, com os 14 dias grátis (fixada) | nova | A criar |
-| Primeiro registro de despesa | P11 | Depende do contato de ajuda |
+| Primeiro registro de despesa | P11 | Só depois da abertura; depende do contato de ajuda |
 | As metas mais comuns para o ano | nova | A criar |
 | O dinheiro do negócio separado do da casa | nova | A criar, com conferência própria do Espaço Negócio |
 | Conversar sobre as contas da casa | F02 | Falta foto real |
@@ -139,7 +139,7 @@ Pedido do Enzo: depois do calendário do Instagram, publicar no Facebook e no Li
 
 - Instagram: os números do painel do próprio Instagram, anotados à mão toda sexta, no relatório semanal (`docs/redes/relatorios/`).
 - Site: as visitas do painel do site, sem cookie.
-- App, a partir da abertura: a pergunta opcional "Como você conheceu a Clarevo?" (D-067), que só o Enzo lê e que é aproximada.
+- App, a partir da abertura: a pergunta opcional "Como você conheceu a Clarevo?" (D-067). A equipe só vê contagens por semana, aproximadas.
 - O que não foi medido se escreve "não medido", nunca zero. O plano não promete alcance.
 
 ## 11. O que falta decidir
