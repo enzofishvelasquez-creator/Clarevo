@@ -406,13 +406,33 @@ describe('Instagram: estrutura das peças e do calendário', () => {
   it('o Reels do mercado (N02) usa os números da demonstração e diz que o orçamento não é saldo nem autorização para gastar', () => {
     const n02 = peca('N02');
     expect(n02.formato).toBe('reel');
-    const m = (calc.EXEMPLOS as unknown as { mercado: { compra: number; usado: number; faltam: number }; orcamento: unknown }).mercado;
-    expect(m).toEqual({ compra: 3890, usado: 143890, faltam: 36110 });
-    expect(180000 - m.usado).toBe(m.faltam);
+    const ex = calc.EXEMPLOS as unknown as { mercado: { compra: number; usado: number; faltam: number }; orcamento: { mercado: { orcado: number; usado: number } } };
+    const m = ex.mercado;
+    expect(m).toMatchObject({ compra: 3890, usado: 143890, faltam: 36110, percentualAviso: '79', percentualCard: '79,9' });
+    expect(ex.orcamento.mercado.usado + m.compra).toBe(m.usado);
+    expect(ex.orcamento.mercado.orcado - m.usado).toBe(m.faltam);
     const txt = JSON.stringify([n02.roteiro, n02.legenda]);
     for (const v of ['R$ 38,90', 'R$ 1.438,90', 'R$ 1.800,00', 'R$ 361,10']) expect(txt).toContain(v);
     expect(txt).toContain('não é saldo nem autorização para gastar');
     expect(txt).not.toMatch(/nota fiscal|comprovante|boleto|holerite/i);
+  });
+
+  it('as regras da N02 pegam número, frase ou promessa errados em cada parte da peça', () => {
+    type N02 = { id: string; legenda?: string; alt?: string; altCapa?: string; capa?: { chip?: string }; roteiro?: { fala: string; tela: string }[] };
+    const muda = (f: (n: N02) => void) => {
+      const outra = JSON.parse(JSON.stringify(conteudo.PECAS)) as N02[];
+      f(outra.find((p) => p.id === 'N02')!);
+      return validar.conferirRegrasDasPecas(outra as unknown as typeof conteudo.PECAS).filter((e: string) => e.startsWith('N02:'));
+    };
+    expect(muda(() => {})).toEqual([]);
+    expect(muda((n) => { n.roteiro![3]!.fala = n.roteiro![3]!.fala.replace('79%', '80%'); })).not.toEqual([]);
+    expect(muda((n) => { n.roteiro![4]!.fala = n.roteiro![4]!.fala.replace('R$ 361,10', 'R$ 400,00'); n.roteiro![4]!.tela = n.roteiro![4]!.tela.replace('R$ 361,10', 'R$ 400,00'); })).not.toEqual([]);
+    expect(muda((n) => { for (const r of n.roteiro!) r.fala = r.fala.replace(/No exemplo fictício, /, ''); })).not.toEqual([]);
+    expect(muda((n) => { n.capa = { ...(n.capa || {}), chip: '' }; })).not.toEqual([]);
+    expect(muda((n) => { n.altCapa = `${n.altCapa} O app lê a nota sem digitar.`; })).not.toEqual([]);
+    expect(muda((n) => { n.alt = `${n.alt ?? ''} Escaneie a nota.`; })).not.toEqual([]);
+    expect(muda((n) => { n.legenda = `${n.legenda ?? ''} Você economiza todo mês.`; })).not.toEqual([]);
+    expect(muda((n) => { n.legenda = (n.legenda ?? '').replace(/ Ele não é saldo nem autorização para gastar\./, ''); })).not.toEqual([]);
   });
 
   it('cada peça com dia está nesse dia do calendário', () => {

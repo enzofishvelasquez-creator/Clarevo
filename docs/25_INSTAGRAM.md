@@ -77,7 +77,7 @@ Na ordem do plano de dezembro. O detalhe de cada peça (objetivo, ação, o que 
 |---|---|---|---|---|
 | D5 | P01 O que é a Clarevo | Carrossel fixado, 6 páginas | Ver o fixado Clarevo na prática | 6 páginas; capa e página 5 só com texto (decisão de 27/11/2026); página 4 com a tela de Orçamento por categoria |
 | D6 | P02 Clarevo na prática | Reel fixado | Conhecer a Clarevo pelo link da bio (fixado P03) | Capa, rascunho em MP4 (33 s) com Mercado e Lazer |
-| D7 | P03 Como conhecer a Clarevo | Carrossel fixado, 5 páginas | Conhecer a Clarevo pelo link da bio | 5 páginas, reescritas em 27/11/2026 (D-130) com as frases da página Comece aqui; página 4 com o Resumo; página 5 com "Assinatura em breve, com 14 dias grátis, sem cartão." |
+| D7 | P03 Como conhecer a Clarevo | Carrossel fixado, 5 páginas | Conhecer a Clarevo pelo link da bio | 5 páginas, reescritas em 27/11/2026 (D-130) em tom mais solto, dizendo o mesmo que a página Comece aqui; página 4 com o Resumo; página 5 com "Assinatura em breve, com 14 dias grátis, sem cartão." |
 | D9 | P04 Saldo e compromissos do mês | Carrossel, 5 páginas | Salvar a sequência de conferência | 5 páginas em fundo claro, valores em reais, barras a partir de zero |
 | D11 | P05 Planejar uma categoria | Reel | Conhecer a Clarevo pelo link da bio | Capa, rascunho em MP4 (34 s): Transporte, R$ 600,00 |
 | D13 | R01 O salário entrou | Carrossel, 5 páginas | Usar as perguntas na próxima revisão | 5 páginas: calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível." |

@@ -229,7 +229,7 @@ const PECAS = [
     ajustes: [
       'Tom mais solto nas páginas, depois do retorno da Elis de 27/11/2026; a legenda mantém "Conheça a Clarevo pelo link da bio.".',
       'Reescrita em 27/11/2026 (D-130): a versão anterior era a "com acesso em preparação" do Playbook e dizia "fase de testes" e "abre no piloto", que o site deixou de dizer (D-128).',
-      'As frases vêm da página Comece aqui do site ("A Clarevo é um app para organizar as contas, os cartões e os gastos do mês"; "Veja o que o app faz, tela por tela"; "Assinatura em breve, com 14 dias grátis, sem cartão."). Sem preço: os planos têm peça própria.',
+      'As páginas dizem o mesmo que a página Comece aqui do site, em tom mais solto (o app organiza as contas, os cartões e os gastos do mês; o site mostra o app tela por tela). A frase da assinatura vem com as palavras do site: "Assinatura em breve, com 14 dias grátis, sem cartão.". Sem preço: os planos têm peça própria.',
       'Na abertura, uma fixada nova ("O acesso abriu", a criar) entra no lugar desta, e o destaque Comece aqui é refeito.',
     ],
     depende: [
@@ -238,8 +238,10 @@ const PECAS = [
     ],
     conferencia: [
       { afirmacao: 'A Clarevo é um app para organizar as contas, os cartões e os gastos do mês.', situacao: 'Confirmado', nota: 'Primeira frase da página Comece aqui do site (main de 27/11/2026, D-128).' },
-      { afirmacao: 'Pelo link da bio, você vê o que o app faz, tela por tela, com dados fictícios.', situacao: 'Confirmado', nota: 'comece.html tem "Conheça o app", que leva à página O app, com as telas e os vídeos da demonstração ("As telas e os vídeos usam dados fictícios."). Conferido no repositório; conferir no site publicado antes de publicar.' },
-      { afirmacao: 'O Resumo mostra o que entrou e o que saiu no mês.', situacao: 'Confirmado', nota: 'Captura do Resumo da demonstração: Diferença do mês, Recebido e Pago.' },
+      { afirmacao: 'Tudo em um lugar só.', situacao: 'Confirmado', nota: 'O Resumo junta recebido, pago e o que ainda vence no mês; as contas, os cartões e os gastos ficam no mesmo app.' },
+      { afirmacao: 'No link da bio, dá para ver o app tela por tela. As telas e os vídeos usam dados fictícios.', situacao: 'Confirmado', nota: 'comece.html tem "Conheça o app", que leva à página O app, com as telas e os vídeos da demonstração ("As telas e os vídeos usam dados fictícios."). Conferido no repositório; conferir no site publicado antes de publicar.' },
+      { afirmacao: 'Este é o Resumo: o que entrou e o que saiu no mês.', situacao: 'Confirmado', nota: 'Captura do Resumo da demonstração: Diferença do mês, Recebido e Pago.' },
+      { afirmacao: 'Dá uma olhada: o link está na bio.', situacao: 'Confirmado', nota: 'O link da bio leva ao site (PERFIL.link); a frase "Conheça a Clarevo pelo link da bio." fica na legenda.' },
       { afirmacao: 'Assinatura em breve, com 14 dias grátis, sem cartão.', situacao: 'Confirmado', nota: 'Frase da capa do site e de Comece aqui (D-128); preço e 14 dias liberados por Enzo. Sempre com essas palavras.' },
       { afirmacao: 'Sem cadastro, lista de espera, data de abertura, preço nem plataforma; "grátis" só na frase do site.', situacao: ANTES_DA_ABERTURA, nota: 'Playbook: "não simular cadastro, lista de espera ou data de liberação que ainda não exista".' },
     ],
@@ -745,7 +747,7 @@ const PECAS = [
     legenda:
       'Uma compra de mercado entra no orçamento do mês quando você anota. No exemplo do vídeo, uma compra de R$ 38,90 na feira leva o usado de Mercado a R$ 1.438,90 de R$ 1.800,00: faltam R$ 361,10. O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar.\n\nOs números são fictícios, usados para demonstrar a tarefa. Conheça a Clarevo pelo link da bio.',
     alt: 'Gravação da tela da demonstração da Clarevo, com dados fictícios: a pessoa anota um gasto de R$ 38,90 na feira, na categoria Mercado, salva e vê o aviso "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)"; depois abre Orçamento por categoria, em que o card de Mercado mostra R$ 1.438,90 de R$ 1.800,00, 79,9%, faltam R$ 361,10. Legendas na tela repetem a narração.',
-    altCapa: 'Capa do Reels "A compra de mercado no orçamento", com o trecho da tela do gasto salvo: "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)" e o gasto Feira, de R$ 38,90 (dados fictícios).',
+    altCapa: 'Capa do Reels "A compra de mercado no orçamento", com o trecho da tela do gasto salvo e o aviso "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%)" (dados fictícios).',
     ajustes: [
       'Peça que não está no Playbook: nasceu do pedido da Elis de 09/11/2026 (D-089 F). A gravação existe desde então em `scripts/gravar-redes.js` (`--so reels`); a pasta no gerador entrou em 27/11/2026.',
       'O aviso do app arredonda o percentual (79%) e o card mostra uma casa (79,9%): a narração lê os dois como a tela os mostra.',

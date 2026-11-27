@@ -57,7 +57,7 @@ const EXEMPLOS = {
   // N01: os preços reais dos planos (D-127), em centavos, iguais aos de `packages/core/src/plano-precos.ts` (o teste confere).
   planos: { individualMes: 2990, individualAno: 26990, familiaMes: 6990, familiaAno: 62990 },
   // N02: a compra de mercado na demonstração (centavos), como a tela escreve; o orçado de Mercado está em `orcamento`.
-  mercado: { compra: 3890, usado: 143890, faltam: 36110 },
+  mercado: { compra: 3890, usado: 143890, faltam: 36110, percentualAviso: '79', percentualCard: '79,9' },
   // T01: assinaturas (exemplo fictício, sem rendimentos).
   assinaturas: { hoje: R(200), depois: R(150), diferencaPorMes: R(50), meses: 12, somaNoAno: R(600), meta: R(1200) },
   // P02: orçamento de outubro na demonstração (centavos), como a tela escreve.
@@ -105,6 +105,12 @@ function conferirExemplos(e = EXEMPLOS) {
   igual('P02: Mercado, 1.400 de 1.800 = 77,8%', percentual(o.mercado.usado, o.mercado.orcado, 1), o.mercado.percentual);
   igual('P02: Lazer, 400 − 300 = 100 acima', o.lazer.usado - o.lazer.orcado, o.lazer.acima);
   igual('P02: Lazer, 400 de 300 = 133,3%', percentual(o.lazer.usado, o.lazer.orcado, 1), o.lazer.percentual);
+  const mc = e.mercado;
+  igual('N02: Mercado, 1.400 + 38,90 = 1.438,90', o.mercado.usado + mc.compra, mc.usado);
+  igual('N02: Mercado, 1.800 − 1.438,90 = 361,10', o.mercado.orcado - mc.usado, mc.faltam);
+  // O aviso do app trunca o percentual (percentFloor, packages/core/src/budget.ts); o card mostra uma casa.
+  igual('N02: o aviso mostra 79% (truncado)', String(Math.floor((mc.usado * 100) / o.mercado.orcado)), mc.percentualAviso);
+  igual('N02: o card mostra 79,9%', percentual(mc.usado, o.mercado.orcado, 1), mc.percentualCard);
   const k = e.categoria;
   igual('P05: o total orçado passa de 4.600 para 5.200 com 600', k.totalAntes + k.orcado, k.totalDepois);
   igual('P05 e P10: o total orçado antes do novo orçamento é o da tela (4.600)', o.total.orcado, k.totalAntes);

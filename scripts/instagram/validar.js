@@ -126,6 +126,26 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     ];
     for (const re of PROIBIDO_NOS_PLANOS) if (re.test(tudo)) erros.push(`N01: a peça dos planos não pode ter ${re}`);
   }
+  const n02 = pecas.find((p) => p.id === 'N02');
+  if (n02) {
+    // O Reels do mercado (D20): cada parte confere os números sozinha, para a legenda certa não esconder um roteiro errado.
+    const roteiro = JSON.stringify(n02.roteiro || []);
+    const legenda = n02.legenda || '';
+    const m = EXEMPLOS.mercado;
+    const valores = [m.compra, m.usado, EXEMPLOS.orcamento.mercado.orcado, m.faltam].map((c) => reais(c, { centavos: true }));
+    for (const [onde, txt] of [['o roteiro', roteiro], ['a legenda', legenda]]) {
+      for (const v of valores) if (!txt.includes(v)) erros.push(`N02: falta ${v} em ${onde}`);
+      if (!txt.includes('não é saldo nem autorização para gastar')) erros.push(`N02: ${onde} diz que o orçamento não é saldo nem autorização para gastar`);
+      if (!/fictíci/i.test(txt)) erros.push(`N02: ${onde} diz que os números são fictícios`);
+    }
+    if (!roteiro.includes(`${m.percentualAviso}%`) || !roteiro.includes(`${m.percentualCard}%`)) erros.push(`N02: o roteiro lê ${m.percentualAviso}% no aviso e ${m.percentualCard}% no card`);
+    for (const pct of roteiro.match(/\d+(?:,\d+)?%/g) || []) if (![`${m.percentualAviso}%`, `${m.percentualCard}%`].includes(pct)) erros.push(`N02: o roteiro cita ${pct}, que a tela não mostra`);
+    if (!/fictíci/i.test(JSON.stringify(n02.capa || {}))) erros.push('N02: a capa traz "Exemplo fictício"');
+    if (!legenda.endsWith('Conheça a Clarevo pelo link da bio.')) erros.push('N02: a legenda termina com "Conheça a Clarevo pelo link da bio."');
+    const tudo = JSON.stringify([n02.roteiro, n02.legenda, n02.alt, n02.altCapa, n02.capa]);
+    for (const re of [/nota fiscal/i, /escane/i, /\bnota\b/i, /comprovante/i, /boleto/i, /holerite/i, /sem digitar/i, /\bl[êe] (?:a|o)\b/i, /econom/i])
+      if (re.test(tudo)) erros.push(`N02: a peça não pode ter ${re}`);
+  }
   // Os preços dos planos só aparecem na N01, que é a peça que os traz com a frase do site.
   for (const p of pecas) {
     if (p.id === 'N01') continue;
