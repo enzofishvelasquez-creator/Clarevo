@@ -9,6 +9,13 @@ import type { Cents } from './money';
 
 export type PlanKind = 'individual' | 'familiar';
 
+/**
+ * A assinatura pelo app ainda não está aberta: a compra pelas lojas e pela web entra na fase 2, antes do início da cobrança. Até lá a tela
+ * mostra os planos e os preços, sem botão de assinar. Aqui desde a D-129 (era em `plano.ts`, que a reexporta): a função do servidor da
+ * assinatura na web também lê, e recusa criar Checkout com ela fechada, a não ser com a chave do sandbox do Asaas.
+ */
+export const SUBSCRIBE_OPEN = false;
+
 /** O período da cobrança: mensal ou anual (D-125). O que já existia antes da D-127 é mensal. */
 export type BillingPeriod = 'mensal' | 'anual';
 

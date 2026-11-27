@@ -136,7 +136,7 @@ ${celular(img.beneficio, ARQUIVO)}
     bloco(
       `<h2 id="apresentacao">Solicitar apresentação</h2>
 <p>Para solicitar uma apresentação da proposta, escreva para [E-MAIL DE CONTATO]. Para agilizar, conte o nome da empresa, quantas pessoas poderiam receber o benefício, como é o programa de bem-estar hoje e quem seria a pessoa administradora, que precisa ter conta na Clarevo com o e-mail confirmado.</p>
-<p>Na apresentação, combinamos o escopo, a implantação, a privacidade e as condições comerciais. Ainda não há tabela de preços. Em um piloto, combinamos o número de vagas e o prazo.</p>
+<p>Na apresentação, combinamos o escopo, a implantação, a privacidade e as condições comerciais, com o número de vagas e o prazo. Ainda não há tabela de preços.</p>
 ${blocoDeContato(valores, ARQUIVO)}
 <p class="nota">Não envie dados financeiros nem de pessoas que trabalham na empresa: para convidar, o painel pede só o e-mail de cada pessoa. Dúvidas de quem recebe o convite estão na <a href="${u('ajuda/beneficio.html')}">Ajuda</a>.</p>`,
       { rotulo: 'apresentacao' },

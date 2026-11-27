@@ -21,8 +21,8 @@ const { ligado } = require('../formularios');
 function paginaSobre({ valores, estado = { prazoDeResposta: '' } }) {
   const arquivo = 'sobre.html';
   const u = (d) => rel(arquivo, d);
-  const capa = `<p class="assinatura-marca">Cuidar da vida financeira faz parte de cuidar de você.</p>
-<h1>Sobre a Clarevo</h1>
+  // D-128: sem a frase pequena acima do título, como na página inicial (a frase da marca é o título do início e fica no rodapé).
+  const capa = `<h1>Sobre a Clarevo</h1>
 <p class="lead">Uma empresa brasileira que faz um app para organizar o dinheiro do mês com clareza, sem julgamento e com respeito aos dados de quem usa.</p>`;
   const prazo = estado.prazoDeResposta ? `<li>Respondemos em ${esc(estado.prazoDeResposta)}.</li>\n` : '';
   const brutas = [
@@ -39,7 +39,7 @@ function paginaSobre({ valores, estado = { prazoDeResposta: '' } }) {
 <div class="grade">
 <article class="cartao">
 <h3>Clareza</h3>
-<p>Cada número do app vem com a explicação de onde sai. O que você recebeu, o que já pagou e o que ainda vai vencer ficam separados, e a diferença do mês nunca é apresentada como saldo.</p>
+<p>Cada número do app vem com a explicação de onde sai. O que você recebeu, o que já pagou e o que ainda vence ficam separados, e a diferença do mês nunca é apresentada como saldo.</p>
 </article>
 <article class="cartao">
 <h3>Sem anúncios</h3>

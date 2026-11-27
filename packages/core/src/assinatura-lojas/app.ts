@@ -102,9 +102,13 @@ export const STORE_SUBSCRIPTION_TEXT = {
   /** Antes dos botões de assinar. */
   howItWorks: (store: StoreName) =>
     `A assinatura é feita pela ${STORE_LABEL[store]}, com a forma de pagamento ${STORE_ACCOUNT[store]}. Os dados do pagamento ficam com a loja: a Clarevo não vê nem guarda.`,
-  /** A renovação automática, como a Apple e o Google pedem antes da compra (preço, período, renovação e como cancelar). */
+  /**
+   * A renovação automática, como a Apple e o Google pedem antes da compra (preço, período, renovação e como cancelar). Desde a D-129, também
+   * o dia da primeira cobrança: os produtos das lojas não têm oferta de teste, então a loja cobra no dia da compra, mesmo durante o teste
+   * grátis da conta (na web, quem assina no teste só paga quando ele acaba).
+   */
   autoRenew:
-    'Cada plano é uma assinatura mensal ou anual, com o preço acima. Ela renova sozinha ao fim de cada período, a cada mês ou a cada ano, pelo mesmo preço, até você cancelar. Para evitar a cobrança do período seguinte, cancele nos ajustes de assinatura da loja até 24 horas antes da renovação. O acesso completo continua até o fim do período já pago.',
+    'Cada plano é uma assinatura mensal ou anual, com o preço acima. A primeira cobrança é feita no dia da compra, também durante o teste grátis. Ela renova sozinha ao fim de cada período, a cada mês ou a cada ano, pelo mesmo preço, até você cancelar. Para evitar a cobrança do período seguinte, cancele nos ajustes de assinatura da loja até 24 horas antes da renovação. O acesso completo continua até o fim do período já pago.',
   terms: 'Termos de uso',
   privacy: 'Política de privacidade',
   legalOpenFailed: 'Não foi possível abrir a página. Tente de novo.',

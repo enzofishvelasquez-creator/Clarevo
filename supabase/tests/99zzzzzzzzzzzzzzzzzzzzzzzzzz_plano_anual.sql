@@ -97,7 +97,8 @@ begin
      and to_regprocedure('public.billing_checkout_record(text, uuid, text)') is null
      and to_regprocedure('public.billing_pix_apply(text, uuid, text, text, date, timestamptz)') is null,
     'as assinaturas antigas saíram (a chamada por nome não fica ambígua)';
-  foreach t in array array['billing_apply(text, text, uuid, text, text, timestamptz, timestamptz, text)', 'billing_checkout_record(text, uuid, text, text)',
+  -- billing_apply ganhou p_valid_from na 0048 (D-129, assinar no teste grátis).
+  foreach t in array array['billing_apply(text, text, uuid, text, text, timestamptz, timestamptz, text, timestamptz)', 'billing_checkout_record(text, uuid, text, text)',
                            'billing_pix_apply(text, uuid, text, text, date, timestamptz, text)', 'billing_checkout_person(text)',
                            'billing_person_by_external_ref(text, text)', 'billing_pix_person(text)'] loop
     assert has_function_privilege('service_role', 'public.' || t, 'execute') and not has_function_privilege('authenticated', 'public.' || t, 'execute')

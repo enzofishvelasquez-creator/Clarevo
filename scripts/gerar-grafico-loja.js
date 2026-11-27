@@ -6,10 +6,13 @@
  * O desenho é HTML e CSS no Chromium do Playwright, com o que já existe no repositório (nada é redesenhado):
  *   - fundo azul da marca (`#2457F5`);
  *   - logotipo reverso oficial `docs/marca/clarevo-logotipo-reverso.svg`;
- *   - a mensagem central e a frase de apoio da ficha (`docs/lojas/ficha.md`, campos `mensagem-central` e `frase-de-apoio`, D-068), lidas
- *     do arquivo, e uma linha de recursos;
- *   - a tela Resumo da demonstração (dados fictícios, com a etiqueta "Demonstração") de `docs/lojas/capturas/`, num aparelho simples
- *     desenhado em CSS, saindo pela borda de baixo.
+ *   - a mensagem central da ficha (`docs/lojas/ficha.md`, campo `mensagem-central`, D-068), lida do arquivo, e o benefício concreto, a
+ *     mesma frase do subtítulo da página inicial do site, das boas-vindas do app e da primeira linha das descrições das lojas (`BENEFICIO`
+ *     de `scripts/site/paginas/inicio.js`; desde a análise geral de 26/11/2026, D-129, no lugar da frase de apoio e da linha de recursos
+ *     de antes);
+ *   - a tela Resumo da demonstração (dados fictícios) sem o selo "Demonstração" (`resumo-sem-selo.png` de `docs/lojas/capturas/`, gravada
+ *     com a mesma marca das capturas das lojas, `apps/app/src/lib/capture.ts`, D-129), num aparelho simples desenhado em CSS, saindo pela
+ *     borda de baixo, com a nota "Dados fictícios" embaixo do texto.
  * Texto e aparelho ficam fora de duas zonas livres e longe das bordas (margens de 72 px dos lados e 44 px do alto): o Google pode
  * sobrepor o botão de vídeo no centro e na faixa de baixo ao meio, então nada importante entra em `ZONAS_LIVRES` (o script confere
  * cada linha de texto e o aparelho e recusa o desenho se algo entrar). Sem preço, ranking, "melhor", "grátis", chamada para baixar
@@ -37,7 +40,9 @@ const ZONAS_LIVRES = [
   { nome: 'faixa inferior central', x0: 352, y0: 340, x1: 672, y1: 500 },
 ];
 const MARGEM_MINIMA = { x: 48, topo: 32 };
-const CAPTURA = path.join(RAIZ, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', '01_resumo.png');
+const CAPTURA = path.join(RAIZ, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', 'resumo-sem-selo.png');
+/** O benefício concreto (D-128), o mesmo do site, das boas-vindas do app e da ficha. */
+const { BENEFICIO_DO_INICIO } = require('./site/paginas/inicio');
 
 // ---- PNG sem dependências (o mesmo codificador de `gerar-icones.js`): RGB de 8 bits, filtro 0, zlib no nível máximo. ----
 const TABELA_CRC = (() => {
@@ -116,8 +121,9 @@ body{position:relative;font-family:Manrope,sans-serif;color:#fff}
 .texto img{display:block;width:260px;height:auto}
 .barra{width:56px;height:8px;border-radius:4px;background:#D4F05B;margin:26px 0 18px}
 h1{font-weight:800;font-size:36px;line-height:1.14;letter-spacing:-.01em}
-p{margin-top:16px;max-width:268px;font-weight:600;font-size:19px;line-height:1.4;color:#EEF2FF}
-p.apoio{margin-top:18px;max-width:362px;font-weight:800;font-size:23px;color:#D4F05B}
+p{margin-top:18px;max-width:268px;font-weight:600;font-size:19px;line-height:1.4;color:#EEF2FF}
+p.nota{margin-top:14px;display:flex;align-items:center;gap:8px;font-size:15px;color:#D4F05B}
+p.nota::before{content:"";width:8px;height:8px;border-radius:50%;background:#D4F05B}
 .aparelho{position:absolute;left:676px;top:44px;width:268px;padding:10px;border-radius:44px;background:#0B1330;box-shadow:0 26px 60px rgba(6,16,64,.5),inset 0 0 0 2px #3A4A86}
 .tela{width:100%;border-radius:34px 34px 0 0;overflow:hidden;background:#F6F8FC}
 .tela img{display:block;width:100%;height:auto}
@@ -127,15 +133,15 @@ p.apoio{margin-top:18px;max-width:362px;font-weight:800;font-size:23px;color:#D4
 <img src="data:image/svg+xml;base64,${logo}" alt="Clarevo">
 <div class="barra"></div>
 <h1>${esc(campoDaFicha('mensagem-central'))}</h1>
-<p class="apoio">${esc(campoDaFicha('frase-de-apoio'))}.</p>
-<p>Contas a pagar, cartões, metas e Família.</p>
+<p>${esc(BENEFICIO_DO_INICIO)}</p>
+<p class="nota">Dados fictícios</p>
 </div>
 <div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${b64(CAPTURA)}" alt="Tela Resumo da Clarevo, com dados fictícios de demonstração"></div></div>
 </body></html>`;
 }
 
 (async () => {
-  if (!fs.existsSync(CAPTURA)) throw new Error(`a captura ${path.relative(RAIZ, CAPTURA)} não existe: rode node scripts/capturas-lojas.js`);
+  if (!fs.existsSync(CAPTURA)) throw new Error(`a captura ${path.relative(RAIZ, CAPTURA)} não existe: rode node scripts/capturas-lojas.js --so-resumo-sem-selo`);
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   try {
     const pagina = await browser.newPage({ viewport: { width: LARGURA, height: ALTURA }, deviceScaleFactor: 1 });

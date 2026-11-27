@@ -21,12 +21,13 @@ export const DEMO_URL = 'https://demo.clarevo.app.br';
 export const DEMO_ENTRY_TEST_ID = 'entrar-na-demonstracao';
 
 export const WELCOME_TEXT = {
-  /** A frase central da marca (D-068), agora a assinatura pequena acima do título, como no site (D-126). */
-  brand: 'Cuidar da vida financeira faz parte de cuidar de você.',
-  /** O título do site, escolhido pelo Enzo (D-126): o mesmo nas boas-vindas do app. */
-  title: 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.',
-  /** O que o app mostra, em uma frase concreta (o título já diz para quem). */
-  subtitle: 'Veja o que entrou, o que saiu e o que ainda vai vencer no mês.',
+  /**
+   * O título (D-128, Enzo, 26/11/2026, revisão da D-126): de novo a frase central da marca (D-068), o mesmo título da página inicial do site
+   * e a mensagem central da ficha das lojas, sem nenhuma frase pequena acima dele.
+   */
+  title: 'Cuidar da vida financeira faz parte de cuidar de você.',
+  /** O benefício concreto, logo abaixo do título (D-128): a primeira frase do subtítulo do site e a primeira linha das descrições das lojas. */
+  subtitle: 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.',
   /** O teste grátis (D-083): sem cartão. */
   trial: `${TRIAL_DAYS} dias grátis, sem cartão`,
   /** O que acontece depois do teste, sem pressão (D-083: sem assinatura, só ver e exportar). */

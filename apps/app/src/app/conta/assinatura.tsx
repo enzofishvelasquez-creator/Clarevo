@@ -1,32 +1,34 @@
-import { ACCESS_TEXT, WEB_SUBSCRIPTION_TEXT, accessView, parseWebPaymentReturn } from '@clarevo/core';
+import { ACCESS_TEXT, WEB_SUBSCRIPTION_TEXT, accessView, formatDateBR, parseWebPaymentReturn, todayIn } from '@clarevo/core';
 import { useLocalSearchParams } from 'expo-router';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { PixRenewCard, PlansCard, StoreManageCard, useAccessNow, useAccessTimeZone } from '@/components/access-parts';
+import { PixRenewCard, PlansCard, StoreManageCard, useAccessNow, useAccessTimeZone, useWebSubscriptionState } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { BenefitsCard, SubscriptionHero } from '@/components/subscription-parts';
 import { Banner, Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
 import { useWideLayout } from '@/lib/layout';
-import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
+import { useAccess, useReloadAccess } from '@/state/access';
 import { useRepo } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
 const T = ACCESS_TEXT;
 const W = WEB_SUBSCRIPTION_TEXT;
 
+/** Computador: as notas pequenas param em 560 px (revisão visual de 23/11/2026: com 720 px, a linha passava de 110 letras). */
+const NOTE_WIDE = { maxWidth: 560 } as const;
+
 /**
  * Cancelar a assinatura feita na web (D-084): só na web e só para a assinatura da web (provider 'web'); a das lojas se cancela na loja.
  * A função do servidor remove a assinatura no Asaas; o período já pago continua valendo (o aviso do Asaas recalcula até quando). Já
  * cancelada (`canceled`, lida no Asaas), o botão sai e fica o aviso de que o acesso continua até o fim do período pago (12/11/2026).
+ * `trialEnd`: quem assinou no teste grátis e ainda não pagou a primeira cobrança (D-129): cancelar não cobra nada, e o teste continua até
+ * essa data (os textos da confirmação e do aviso dizem isso).
  */
-/** Computador: as notas pequenas param em 560 px (revisão visual de 23/11/2026: com 720 px, a linha passava de 110 letras). */
-const NOTE_WIDE = { maxWidth: 560 } as const;
-
-function WebCancelCard({ canceled }: { canceled: boolean }) {
+function WebCancelCard({ canceled, trialEnd = null, onTrialCanceled }: { canceled: boolean; trialEnd?: string | null; onTrialCanceled?: (text: string) => void }) {
   const repo = useRepo();
   const reload = useReloadAccess();
   const [open, setOpen] = useState(false);
@@ -40,7 +42,9 @@ function WebCancelCard({ canceled }: { canceled: boolean }) {
       const r = await repo.cancelWebSubscription();
       if (r === 'cancelada' || r === 'sem_assinatura') {
         setDone(true);
-        setMsg({ tone: 'sucesso', text: W.cancelDone });
+        setMsg({ tone: 'sucesso', text: trialEnd ? W.cancelDoneTrial(trialEnd) : W.cancelDone });
+        // No teste, o cartão some com a assinatura (a tela volta aos planos): o aviso fica no alto da tela.
+        if (trialEnd) onTrialCanceled?.(W.cancelDoneTrial(trialEnd));
         void reload();
       } else {
         setMsg({ tone: 'erro', text: W.errors[r] });
@@ -55,7 +59,7 @@ function WebCancelCard({ canceled }: { canceled: boolean }) {
   if (canceled && !done) return null;
   return (
     <Card style={{ gap: space[3] }}>
-      {done ? null : (
+      {done || trialEnd ? null : (
         <Txt variant="caption" color={colors.textSecondary} style={note}>
           {W.changePlan}
         </Txt>
@@ -77,7 +81,7 @@ function WebCancelCard({ canceled }: { canceled: boolean }) {
         onCancel={() => setOpen(false)}
         onConfirm={() => void cancel()}
       >
-        <Txt>{W.cancelConfirmBody}</Txt>
+        <Txt>{trialEnd ? W.cancelConfirmBodyTrial(trialEnd) : W.cancelConfirmBody}</Txt>
       </ConfirmDialog>
     </Card>
   );
@@ -103,12 +107,26 @@ export default function AssinaturaScreen() {
     if (returned) void refetch();
   }, [returned, refetch]);
   const now = useAccessNow();
-  const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
-  const webStatus = useWebSubscriptionStatus(webCard);
-  const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
+  const onWeb = Platform.OS === 'web';
+  // A assinatura no cartão: primeiro o próprio direito, no banco; a situação no Asaas só com um direito pela web que vale (D-129).
+  const web = useWebSubscriptionState(access.data, now);
+  const webStatus = web.status;
+  const webCard = onWeb && access.data?.status === 'assinatura' && access.data.provider === 'web';
+  // Assinou no cartão durante o teste e a primeira cobrança ainda não foi paga (antes do dia dela ou no próprio dia, até a confirmação do
+  // cartão): o cancelamento fica logo abaixo, sem os planos, com os textos do teste (nada é cobrado; o acesso acaba com o teste).
+  const pending = web.firstCharge;
+  const trialEnd = pending
+    ? access.data?.status === 'teste' && access.data.until
+      ? formatDateBR(todayIn(timeZone, new Date(access.data.until)))
+      : formatDateBR(pending)
+    : null;
+  const view = access.data
+    ? accessView(access.data, now, timeZone, { web: onWeb, webSubscription: web.reads ? webStatus.data : null, cancelBelow: true, firstCharge: pending })
+    : null;
   // Voltou do pagamento e o acesso já mudou: o alto da tela dá as boas-vindas, e o aviso da volta sai.
   const welcomed = returned === 'sucesso' && access.data?.status === 'assinatura';
   const subscribed = access.data ? ['assinatura', 'familia', 'beneficio', 'cortesia'].includes(access.data.status) : false;
+  const [trialCanceled, setTrialCanceled] = useState<string | null>(null);
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
@@ -121,6 +139,11 @@ export default function AssinaturaScreen() {
             ) : null}
           </Banner>
         ) : null}
+        {trialCanceled ? (
+          <Banner tone="sucesso" icon={CheckCircle2}>
+            <Txt variant="label">{trialCanceled}</Txt>
+          </Banner>
+        ) : null}
         {access.isPending ? (
           <LoadingState />
         ) : !access.data || !view ? (
@@ -128,7 +151,8 @@ export default function AssinaturaScreen() {
         ) : (
           <>
             <SubscriptionHero access={access.data} view={view} now={now} timeZone={timeZone} justPaid={welcomed} canceled={webCard && webStatus.data?.active === false} />
-            {webCard ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
+            {webCard && !pending ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
+            {onWeb && pending ? <WebCancelCard canceled={false} trialEnd={trialEnd} onTrialCanceled={setTrialCanceled} /> : null}
             {access.data.status === 'assinatura' && access.data.provider === 'pix' && Platform.OS === 'web' ? (
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}

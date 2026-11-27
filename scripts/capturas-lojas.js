@@ -8,9 +8,12 @@
  *    oito; a ordem de envio está em docs/16, seção 7). Nelas, o selo "Demonstração" do app sai, só nas capturas: a marca `__clarevoCaptura`
  *    na página (apps/app/src/lib/capture.ts) esconde o selo e a linha "Fica só nesta demonstração", porque a nota "Dados fictícios" já vai
  *    no desenho. A demonstração aberta no navegador continua com o selo em toda tela.
- * 2. As telas cruas da demonstração (`01_resumo.png` a `10_telegram.png`), com o selo "Demonstração", como antes: são as que o site, o kit de
- *    imprensa, a imagem de compartilhamento do site e o gráfico de recursos do Google Play usam (scripts/site/imagens.js,
- *    scripts/gerar-og-site.js e scripts/gerar-grafico-loja.js). Não são enviadas às lojas.
+ * 2. As telas cruas da demonstração (`01_resumo.png` a `10_telegram.png`), com o selo "Demonstração", como antes: são as que o site e o kit
+ *    de imprensa usam (scripts/site/imagens.js), com a legenda de demonstração ao lado. Não são enviadas às lojas.
+ * 3. O Resumo sem o selo (`resumo-sem-selo.png`, análise geral de 26/11/2026, D-129), com a mesma marca `__clarevoCaptura` das capturas das
+ *    lojas, nos dois tamanhos que as imagens usam: a imagem de compartilhamento do site e o gráfico de recursos do Google Play
+ *    (scripts/gerar-og-site.js e scripts/gerar-grafico-loja.js) montam a tela num aparelho desenhado, com a legenda "Dados fictícios". Não
+ *    é enviado às lojas.
  *
  * As frases seguem as regras de redação (pt-BR, linguagem neutra, sem travessão, sem "faz sentido", sem nome de marca, sem recomendação de
  * produto financeiro, sem pressão nem ranking) e nenhuma fala do Plus, que continua fechado; o script confere antes de gravar.
@@ -29,6 +32,7 @@
  *   node scripts/capturas-lojas.js --saida <pasta>  outra pasta de saída (padrão: docs/lojas/capturas)
  *   node scripts/capturas-lojas.js --tamanho <texto>  só os tamanhos cujo nome de pasta contém o texto
  *   node scripts/capturas-lojas.js --so-lojas       só as seis capturas das lojas (sem as telas cruas)
+ *   node scripts/capturas-lojas.js --so-resumo-sem-selo  só o Resumo sem o selo, para as duas imagens (sem refazer as outras capturas)
  * Porta: E2E_PORT (padrão 8098). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
 const http = require('node:http');
@@ -46,6 +50,9 @@ const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i +
 const SAIDA = path.resolve(opcao('--saida') || path.join(RAIZ, 'docs', 'lojas', 'capturas'));
 const SO_TAMANHO = opcao('--tamanho');
 const SO_LOJAS = argv.includes('--so-lojas');
+const SO_RESUMO = argv.includes('--so-resumo-sem-selo');
+/** As pastas do Resumo sem o selo: as das capturas que a imagem do site (Apple, 6,3 pol.) e o gráfico do Google Play usam. */
+const PASTAS_DO_RESUMO_SEM_SELO = ['apple-iphone-6-3pol-1206x2622', 'google-play-celular-1080x1920'];
 const PORTA = Number(process.env.E2E_PORT || 8098);
 
 /** `largura` e `altura` em pontos (pixels CSS); o PNG sai com largura x escala por altura x escala (o Google ganha uma janela mais alta, 9:16, para as telas não ficarem cortadas). */
@@ -345,7 +352,7 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
 
   try {
     const telas = new Map();
-    for (const tela of LOJA) {
+    for (const tela of SO_RESUMO ? [] : LOJA) {
       const { ctx, f } = await abrirContexto(APARELHO, true);
       try {
         await tela.abrir(f);
@@ -367,7 +374,7 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
         await ctx.close();
       }
     }
-    for (const t of TAMANHOS.filter((x) => !SO_TAMANHO || x.pasta.includes(SO_TAMANHO))) {
+    for (const t of SO_RESUMO ? [] : TAMANHOS.filter((x) => !SO_TAMANHO || x.pasta.includes(SO_TAMANHO))) {
       const pasta = path.join(SAIDA, t.pasta);
       fs.mkdirSync(pasta, { recursive: true });
       const ctx = await browser.newContext({ viewport: { width: t.largura, height: t.altura }, deviceScaleFactor: t.escala });
@@ -408,7 +415,7 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
     // -------------------------------------------------------------------------------------------------------------------------------------
     // 2. As telas cruas da demonstração, com o selo, para o site, o kit de imprensa e as imagens que montam a tela num aparelho desenhado.
     // -------------------------------------------------------------------------------------------------------------------------------------
-    for (const t of SO_LOJAS ? [] : TAMANHOS.filter((x) => !SO_TAMANHO || x.pasta.includes(SO_TAMANHO))) {
+    for (const t of SO_LOJAS || SO_RESUMO ? [] : TAMANHOS.filter((x) => !SO_TAMANHO || x.pasta.includes(SO_TAMANHO))) {
       const { ctx, f } = await abrirContexto(t, false);
       const { p } = f;
       const TELAS = [
@@ -547,6 +554,35 @@ h1 { margin: 0; font-weight: 800; font-size: ${fonte}px; line-height: 1.2; lette
       if (f.fora.length) falhas.push(`${t.pasta}: requisições para fora de localhost bloqueadas: ${[...new Set(f.fora)].slice(0, 3).join(' | ')}`);
       if (f.erros.length) falhas.push(`${t.pasta}: erros na página: ${[...new Set(f.erros)].slice(0, 3).join(' | ')}`);
       await ctx.close();
+    }
+
+    // -------------------------------------------------------------------------------------------------------------------------------------
+    // 3. O Resumo sem o selo (D-129), para a imagem de compartilhamento do site e o gráfico do Google Play, com a marca das capturas das lojas.
+    // -------------------------------------------------------------------------------------------------------------------------------------
+    for (const t of SO_LOJAS ? [] : TAMANHOS.filter((x) => PASTAS_DO_RESUMO_SEM_SELO.includes(x.pasta) && (!SO_TAMANHO || x.pasta.includes(SO_TAMANHO)))) {
+      const { ctx, f } = await abrirContexto(t, true);
+      try {
+        await f.entrar();
+        const texto = await f.corpo();
+        for (const x of ['Diferença do mês', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00']) if (!texto.includes(x)) throw new Error(`faltou "${x}" na tela`);
+        conferirTexto(texto);
+        const selo = await f.p.locator('[aria-label="Demonstração: acesso simulado e dados fictícios"]').count();
+        if (selo > 0 || /Demonstração ·|Fica só nesta demonstração/.test(texto)) throw new Error('a tela ainda mostra o selo "Demonstração"');
+        const pasta = path.join(SAIDA, t.pasta);
+        fs.mkdirSync(pasta, { recursive: true });
+        const arquivo = path.join(pasta, 'resumo-sem-selo.png');
+        await f.p.screenshot({ path: arquivo });
+        const d = conferirPng(arquivo, t);
+        gravadas.push(path.relative(RAIZ, arquivo));
+        console.log(`gravada  ${path.relative(RAIZ, arquivo)}  ${d.largura}x${d.altura}`);
+        if (f.fora.length) throw new Error(`requisições para fora de localhost bloqueadas: ${[...new Set(f.fora)].slice(0, 3).join(' | ')}`);
+        if (f.erros.length) throw new Error(`erros na página: ${[...new Set(f.erros)].slice(0, 3).join(' | ')}`);
+      } catch (e) {
+        falhas.push(`${t.pasta}/resumo-sem-selo: ${e.message}`);
+        console.error(`FALHOU   ${t.pasta}/resumo-sem-selo: ${e.message}`);
+      } finally {
+        await ctx.close();
+      }
     }
   } finally {
     await browser.close();

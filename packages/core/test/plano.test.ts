@@ -73,7 +73,8 @@ describe('assinatura paga (D-083): preços e textos', () => {
     // A escolha: o anual primeiro, sem pressão, sem prazo e sem alarme; sem prometer economia.
     const texts = [
       PLAN_PERIOD_TEXT.choiceLabel,
-      PLAN_PERIOD_TEXT.note,
+      PLAN_PERIOD_TEXT.note.store,
+      PLAN_PERIOD_TEXT.note.neutral,
       ...Object.values(PLAN_PERIOD_TEXT.option),
       ...Object.values(PLAN_PERIOD_TEXT.optionHint),
       ...(['individual', 'familiar'] as const).flatMap((p) => [
@@ -95,8 +96,31 @@ describe('assinatura paga (D-083): preços e textos', () => {
       // para quem já passou do teste (o teste da conta fica em ACCESS_TEXT.plansNote).
       expect(t).not.toMatch(/grátis|teste/i);
     }
-    expect(PLAN_PERIOD_TEXT.note).toBe('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.');
+    // A nota do anual por canal (análise geral de 26/11/2026, D-129): diz que o anual renova (o cartão e as lojas) e que o Pix não. Na web,
+    // o cartão e o Pix; nas lojas, sem Pix nem web, com o cancelamento nos ajustes da loja; a neutra (demonstração e guia), sem canal; a do
+    // site, sem nome de loja. Nenhuma promete teste grátis ao anual nem economia.
+    expect(PLAN_PERIOD_TEXT.note.web).toBe(
+      'No anual, os 12 meses são pagos de uma vez. No cartão, a assinatura renova sozinha a cada período até você cancelar; com Pix, não renova: você paga o próximo período se quiser continuar. Os dois períodos têm os mesmos recursos.',
+    );
+    expect(PLAN_PERIOD_TEXT.note.store).toBe(
+      'No anual, os 12 meses são cobrados de uma vez, e a assinatura renova sozinha a cada período até você cancelar nos ajustes da loja. Os dois períodos têm os mesmos recursos.',
+    );
+    expect(PLAN_PERIOD_TEXT.note.neutral).toBe(
+      'No anual, os 12 meses são cobrados de uma vez. A assinatura renova automaticamente a cada período até você cancelar, e o acesso continua até o fim do período já pago; quem paga um período de cada vez não tem renovação.',
+    );
+    expect(PLAN_PERIOD_TEXT.noteSite).toBe(
+      'No anual, os 12 meses são pagos de uma vez. No cartão e pelas lojas de aplicativos, a assinatura renova sozinha ao fim de cada período, pelo mesmo preço, até você cancelar; com Pix, não há renovação: você paga o próximo período se quiser continuar.',
+    );
+    for (const t of [PLAN_PERIOD_TEXT.note.web, PLAN_PERIOD_TEXT.noteSite]) {
+      expect(t).not.toMatch(/—|–|App Store|Google Play|economi|grátis|teste/i);
+    }
+    expect(PLAN_PERIOD_TEXT.note.web).not.toMatch(/loja/);
     expect(ACCESS_TEXT.plansNote).toContain('Toda conta começa com 14 dias grátis');
+    // A compra fechada, sem falar de lançamento (D-129).
+    expect(ACCESS_TEXT.notOpenYet).toBe('Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.');
+    expect(ACCESS_TEXT.notOpenYetShort).toBe('Assinatura em breve.');
+    expect(SUBSCRIPTION_SCREEN_TEXT.eyebrow.pre_lancamento).toBe('Sem cobrança por enquanto');
+    for (const t of [ACCESS_TEXT.notOpenYet, SUBSCRIPTION_SCREEN_TEXT.eyebrow.pre_lancamento]) expect(t).not.toMatch(/lançamento|Até lá/i);
   });
 
   it('a recusa do banco tem texto próprio em ERROR_TEXT (e, com ele, nos textos de cada formulário)', () => {
@@ -203,13 +227,14 @@ describe('teste grátis: dias que faltam, no fuso da pessoa', () => {
 
 describe('accessView: a tela Assinatura e o card de Conta', () => {
   it('antes do início da cobrança: acesso completo, com a data quando marcada', () => {
+    // Sem falar de lançamento (D-129). O teste de quem já usa conta do início da cobrança (my_access, migração 0047).
     expect(accessView(at('pre_lancamento', null), NOW, TZ)).toEqual({
       situation: 'Acesso completo',
-      body: 'Até o lançamento, o acesso é completo e sem cobrança. Depois, a Clarevo passa a ser paga, com 14 dias grátis para começar.',
+      body: 'Por enquanto, o acesso é completo e sem cobrança. Quando a Clarevo passar a ser paga, você terá 14 dias grátis antes de precisar assinar.',
       showPlans: true,
     });
     expect(accessView(at('pre_lancamento', '2026-12-01T03:00:00.000Z'), NOW, TZ).body).toBe(
-      'A partir de 01/12/2026, a Clarevo passa a ser paga. Quem já usa ganha 14 dias grátis a contar dessa data. Até lá, o acesso é completo e sem cobrança.',
+      'A partir de 01/12/2026, a Clarevo passa a ser paga. Quem já usa ganha 14 dias grátis a contar dessa data. Até essa data, o acesso é completo e sem cobrança.',
     );
   });
 
@@ -224,9 +249,61 @@ describe('accessView: a tela Assinatura e o card de Conta', () => {
     expect(accessView(monthly, NOW, TZ)).toMatchObject({ situation: 'Plano Família mensal', body: expect.stringContaining('Assinatura mensal ativa, renova em 04/12/2026') });
     // O cartão anual na web, com a situação lida no Asaas.
     const card: Access = { ...annual, provider: 'web' };
-    expect(accessView(card, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2027-11-23' } }).body).toBe(
-      'Assinatura anual ativa, renova em 23/11/2027. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+    // D-129: o caminho do cancelamento com o nome do botão. Na tela Assinatura, ele vem logo abaixo; no card de Conta, por "Ver a assinatura".
+    expect(accessView(card, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2027-11-23' }, cancelBelow: true }).body).toBe(
+      'Assinatura anual ativa, renova em 23/11/2027. Para cancelar, toque em Cancelar assinatura, logo abaixo.',
     );
+    expect(accessView(card, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2027-11-23' } }).body).toBe(
+      'Assinatura anual ativa, renova em 23/11/2027. Para cancelar, toque em Ver a assinatura e depois em Cancelar assinatura.',
+    );
+  });
+
+  it('assinou no cartão durante o teste (D-129): continua no teste, com a primeira cobrança no fim dele, sem os planos e sem comemoração', () => {
+    const trial = at('teste', '2026-11-18T13:00:00.000Z');
+    expect(accessView(trial, NOW, TZ, { web: true, firstCharge: '2026-11-18', cancelBelow: true })).toEqual({
+      situation: 'Teste grátis',
+      body: 'O seu teste grátis termina em 14 dias, em 18/11/2026. A assinatura no cartão já está feita: a primeira cobrança é em 18/11/2026, quando o teste grátis acaba. Até lá, nada é cobrado.',
+      showPlans: false,
+      eyebrow: 'Assinatura feita',
+    });
+    // No app das lojas, nada aponta para a web.
+    expect(accessView(trial, NOW, TZ, { firstCharge: '2026-11-18' }).body).toBe(
+      'O seu teste grátis termina em 14 dias, em 18/11/2026. Você já assinou: a primeira cobrança é em 18/11/2026, quando o teste grátis acaba. Para cancelar, use o mesmo lugar onde assinou.',
+    );
+    // Sem a primeira cobrança pendente (cancelada, ou nunca assinou): o teste de sempre, com os planos.
+    expect(accessView(trial, NOW, TZ, { web: true, firstCharge: null })).toMatchObject({ showPlans: true });
+    expect(accessView(trial, NOW, TZ, { web: true })).not.toHaveProperty('eyebrow');
+    // A oeste de Brasília, o teste acaba na véspera do dia da cobrança (as duas datas, sem contradição).
+    const lateTrial = at('teste', '2026-11-18T03:30:00.000Z');
+    expect(accessView(lateTrial, NOW, 'America/Manaus', { web: true, firstCharge: '2026-11-18' }).body).toContain(
+      'em 17/11/2026. A assinatura no cartão já está feita: a primeira cobrança é em 18/11/2026, no dia seguinte ao fim do teste grátis.',
+    );
+  });
+
+  it('o dia da primeira cobrança (D-129): o banco já diz "assinatura", mas nada foi pago; sem "renova em", com o cancelamento sem cobrança', () => {
+    const onDay: Access = { status: 'assinatura', plan: 'individual', until: '2026-11-22T02:59:59.999Z', canWrite: true, provider: 'web', period: 'mensal' };
+    expect(accessView(onDay, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2026-12-18' }, firstCharge: '2026-11-18', cancelBelow: true })).toEqual({
+      situation: 'Plano Individual mensal',
+      body: 'A assinatura no cartão já está feita, e a primeira cobrança, marcada para 18/11/2026, ainda não foi confirmada. Se cancelar antes da confirmação, nada é cobrado. Para cancelar, toque em Cancelar assinatura, logo abaixo.',
+      showPlans: false,
+      eyebrow: 'Assinatura feita',
+    });
+    expect(accessView(onDay, NOW, TZ, { firstCharge: '2026-11-18' }).body).toBe(
+      'Você já assinou, e a primeira cobrança, marcada para 18/11/2026, ainda não foi confirmada. Para cancelar, use o mesmo lugar onde assinou.',
+    );
+    // Paga, a de sempre: "renova em".
+    expect(accessView(onDay, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2026-12-18' }, cancelBelow: true }).body).toContain('renova em 18/12/2026');
+  });
+
+  it('o aviso do fim do teste no Resumo para quem assinou no teste (D-129): o dia da primeira cobrança, com o atalho para a assinatura; no app das lojas, nenhum', () => {
+    const ending = at('teste', '2026-11-06T13:00:00.000Z');
+    expect(accessBanner(ending, NOW, TZ, { web: true, firstCharge: '2026-11-06' })).toEqual({
+      text: 'A primeira cobrança da sua assinatura no cartão é em 06/11/2026, quando o teste grátis acaba.',
+      tone: 'info',
+      action: 'Ver a assinatura',
+    });
+    expect(accessBanner(ending, NOW, TZ, { firstCharge: '2026-11-06' })).toBeNull();
+    expect(accessBanner(ending, NOW, TZ, { web: true })?.text).toContain('Depois, sem assinatura, a conta fica só para ver e exportar.');
   });
 
   it('teste, só leitura e as situações pagas', () => {
@@ -350,8 +427,8 @@ describe('a tela Assinatura com cor e celebração (pedido do Enzo, 12/11/2026)'
 
   it('a assinatura no cartão com a situação lida no Asaas: a renovação de verdade, ou cancelada até o fim do período pago', () => {
     expect(accessView(card(UNTIL), NOW, TZ, { web: true }).body).toContain('renova em 15/12/2026');
-    expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2026-12-12' } }).body).toBe(
-      'Assinatura ativa, renova em 12/12/2026. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+    expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2026-12-12' }, cancelBelow: true }).body).toBe(
+      'Assinatura ativa, renova em 12/12/2026. Para cancelar, toque em Cancelar assinatura, logo abaixo.',
     );
     expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: { active: false } }).body).toBe(
       'Assinatura cancelada: o acesso completo continua até 15/12/2026, sem nova cobrança.',

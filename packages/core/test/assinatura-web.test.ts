@@ -37,8 +37,15 @@ import {
   pixCanPayNext,
   pixNextPaymentFrom,
   pixPaidOn,
+  hasLiveWebEntitlement,
+  paidStartDay,
+  parseOwnWebEntitlements,
+  pendingFirstCharge,
   pixReference,
+  scheduledFirstCharge,
+  trialEndRelation,
   sha256Hex,
+  startOfDayBrasilia,
   webReference,
   webValidity,
   type AsaasPayment,
@@ -75,6 +82,7 @@ const sub = (extra: Partial<AsaasSubscription> = {}): AsaasSubscription => ({
   cycle: 'MONTHLY',
   value: 29.9,
   nextDueDate: '2026-12-06',
+  dateCreated: '2026-11-06',
   externalReference: webReference(ANA, 'individual'),
   checkoutSession: CHECKOUT,
   ...extra,
@@ -804,7 +812,8 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     expect(pre.status).toBe(204);
     expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(APP_URL_DEFAULT);
     // A função leva só o servidor: nenhum texto da tela.
-    expect(src).not.toContain(WEB_SUBSCRIPTION_TEXT.howItWorks);
+    expect(src).not.toContain(WEB_SUBSCRIPTION_TEXT.howItWorks('mensal'));
+    expect(src).not.toContain('A primeira cobrança é em');
     expect(src).not.toContain('respostas.ts');
   });
 
@@ -1114,6 +1123,12 @@ describe('Assinatura na web: o que o app usa', () => {
       W.payNextPix('familiar', 'anual'),
       W.pixNextFrom('01/12/2026'),
       W.pixNextFrom('01/12/2026', 'anual'),
+      W.howItWorks('mensal'),
+      W.howItWorks('anual'),
+      W.firstChargeOn('10/12/2026'),
+      W.pixStartsOn('10/12/2026'),
+      W.cancelConfirmBodyTrial('10/12/2026'),
+      W.cancelDoneTrial('10/12/2026'),
     ];
     expect(texts.length).toBeGreaterThan(10);
     for (const t of texts) {
@@ -1133,6 +1148,274 @@ describe('Assinatura na web: o que o app usa', () => {
     expect(W.payOtherPix('anual', 'individual')).toBe('Pagar um ano com Pix (R$ 269,90)');
     expect(W.payOtherPix('anual', 'familiar')).toBe('Pagar um ano com Pix (R$ 629,90)');
     expect(W.payOtherPix('mensal', 'familiar')).toBe('Pagar um mês com Pix (R$ 69,90)');
-    expect(WEB_SUBSCRIPTION_TEXT.howItWorks).toContain('a Clarevo não vê nem guarda');
+    // Antes dos botões do cartão (D-129, como na tela das lojas): a cobrança do período, a renovação, como cancelar e quem guarda o cartão.
+    const comum =
+      ' Para cancelar, volte a esta tela e toque em Cancelar assinatura, quando quiser: o acesso completo continua até o fim do período já pago, sem nova cobrança. O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo; os dados do cartão ficam só com o Asaas, e a Clarevo não vê nem guarda.';
+    expect(W.howItWorks('anual')).toBe(`No cartão, o plano anual é cobrado de uma vez e renova sozinho a cada 12 meses, pelo mesmo preço, até você cancelar.${comum}`);
+    expect(W.howItWorks('mensal')).toBe(`No cartão, o plano mensal é cobrado todo mês e renova sozinho, pelo mesmo preço, até você cancelar.${comum}`);
+    // O Pix não renova nem cobra sozinho.
+    for (const t of [W.pixHowItWorks, W.pixHowItWorksAnnual]) {
+      expect(t).toContain('Não renova sozinho e nada é cobrado automaticamente: perto do fim do período pago, a Clarevo avisa aqui para você pagar o próximo, se quiser continuar.');
+    }
+    // Quem assina no teste grátis (D-129): a primeira cobrança e o período pago começam no fim do teste.
+    expect(W.firstChargeOn('10/12/2026')).toBe('A primeira cobrança é em 10/12/2026, quando o teste grátis acaba. Se cancelar antes dessa data, nada é cobrado.');
+    expect(W.pixStartsOn('10/12/2026')).toBe('O período pago começa em 10/12/2026, quando o teste grátis acaba.');
+    expect(W.cancelDoneTrial('10/12/2026')).toBe('Assinatura cancelada antes da primeira cobrança: nada foi cobrado. O acesso completo acaba com o teste grátis, em 10/12/2026.');
+    expect(W.cancelConfirmBodyTrial('10/12/2026')).toBe(
+      'Nada é cobrado. O acesso completo acaba com o teste grátis, em 10/12/2026; depois, sem assinatura, a conta fica só para ver e exportar, com os seus dados guardados.',
+    );
+    // A oeste de Brasília, o teste pode acabar na véspera do dia da cobrança (o dia da pessoa); a leste, no dia seguinte (D-129).
+    expect(W.firstChargeOn('10/12/2026', 'dia-seguinte')).toBe('A primeira cobrança é em 10/12/2026, no dia seguinte ao fim do teste grátis. Se cancelar antes dessa data, nada é cobrado.');
+    expect(W.pixStartsOn('10/12/2026', 'vespera')).toBe('O período pago começa em 10/12/2026, na véspera do fim do teste grátis.');
+    // A assinatura feita no teste, quando se tenta assinar de novo: nada de "cobrança em aberto".
+    expect(W.errors.assinatura_marcada).toBe('Você já assinou no cartão: a primeira cobrança é no fim do teste grátis. Para escolher de novo, cancele essa assinatura primeiro.');
+    expect(parseWebSubscriptionStart({ result: 'assinatura_marcada' })).toEqual({ result: 'assinatura_marcada' });
+  });
+});
+
+describe('Assinar na web durante o teste grátis (D-129): a primeira cobrança e o período pago começam no fim do teste', () => {
+  // Dados FICTÍCIOS. A conta foi criada em 03/11/2026, 12h em Brasília: hoje (06/11, 12h) é o 3º dia de um teste que acaba em 17/11, 12h.
+  const TRIAL_END = '2026-11-17T15:00:00.000Z';
+  const user = { 'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA, email: 'ana@exemplo.test' } }) };
+  const access = (status: string, until: string | null) => ({ 'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status, plan: null, until, can_write: status !== 'leitura' } }) });
+  const noSubs = { 'GET /v3/subscriptions': () => ({ status: 200, body: { object: 'list', data: [] } }) };
+  const checkoutNet = (extra: Record<string, () => { status: number; body: unknown }>) =>
+    fakeNet({
+      ...user,
+      ...noSubs,
+      'POST /v3/checkouts': () => ({ status: 200, body: { id: CHECKOUT, link: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` } }),
+      'POST /rest/v1/rpc/billing_checkout_record': () => ({ status: 200, body: { result: 'gravado' } }),
+      ...extra,
+    });
+
+  it('o dia em que começa o período pago: o fim do teste (em Brasília), só no teste e só se ele acaba depois de hoje', () => {
+    expect(paidStartDay('teste', TRIAL_END, NOW)).toBe('2026-11-17');
+    // 17/11, 23h em Brasília já é 18/11 em UTC: o dia é o de Brasília, o mesmo do vencimento no Asaas e do banco.
+    expect(paidStartDay('teste', '2026-11-18T02:00:00.000Z', NOW)).toBe('2026-11-17');
+    // O teste acaba hoje (mais tarde): a primeira cobrança é hoje, como antes.
+    expect(paidStartDay('teste', '2026-11-06T22:00:00.000Z', NOW)).toBeNull();
+    expect(paidStartDay('teste', '2026-11-05T15:00:00.000Z', NOW)).toBeNull();
+    for (const status of ['leitura', 'familia', 'pre_lancamento', 'assinatura']) expect(paidStartDay(status, TRIAL_END, NOW), status).toBeNull();
+    expect(paidStartDay('teste', null, NOW)).toBeNull();
+    expect(paidStartDay('teste', 'amanhã', NOW)).toBeNull();
+  });
+
+  it('cartão assinado no 3º dia do teste: o Checkout marca a primeira cobrança para o fim do teste (o fim vem do my_access, com a sessão da pessoa)', async () => {
+    for (const period of ['mensal', 'anual'] as const) {
+      const net = checkoutNet(access('teste', TRIAL_END));
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+      // O app pode mandar o que quiser além do plano e do período: a data vem só do banco.
+      const res = await h(appReq({ action: 'assinar', plan: 'individual', period, firstDue: '2026-12-31' }).req);
+      expect(JSON.parse(res.body)).toMatchObject({ result: 'checkout' });
+      expect(net.sent.find((s) => s.url.endsWith('/checkouts'))?.body, period).toMatchObject({
+        subscription: { cycle: period === 'anual' ? 'YEARLY' : 'MONTHLY', nextDueDate: '2026-11-17' },
+      });
+    }
+  });
+
+  it('assinar depois do teste (ou sem teste): a primeira cobrança continua hoje, como antes', async () => {
+    for (const [status, until] of [['leitura', '2026-10-20T15:00:00.000Z'], ['familia', null], ['teste', '2026-11-06T22:00:00.000Z']] as const) {
+      const net = checkoutNet(access(status, until));
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+      await h(appReq({ action: 'assinar', plan: 'familiar' }).req);
+      expect(net.sent.find((s) => s.url.endsWith('/checkouts'))?.body, status).toMatchObject({ subscription: { nextDueDate: '2026-11-06' } });
+    }
+  });
+
+  it('a primeira cobrança marcada: só a pendente, de uma assinatura ativa, depois de hoje e em até 31 dias', () => {
+    const due = pay('2026-11-17', 'PENDING');
+    expect(scheduledFirstCharge(sub(), [due], NOW)).toBe('2026-11-17');
+    expect(scheduledFirstCharge(sub(), [pay('2026-11-06', 'PENDING')], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub(), [pay('2026-12-08', 'PENDING')], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub(), [], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub(), [due, pay('2026-10-17', 'OVERDUE')], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub({ deleted: true }), [due], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub({ status: 'INACTIVE' }), [due], NOW)).toBeNull();
+    expect(scheduledFirstCharge(sub(), [{ ...due, deleted: true }], NOW)).toBeNull();
+    expect(startOfDayBrasilia('2026-11-17').toISOString()).toBe('2026-11-17T03:00:00.000Z');
+  });
+
+  it('os avisos da assinatura marcada: antes da primeira cobrança, o direito vale só do dia dela em diante (sem buraco até a confirmação); paga, o período conta do fim do teste', async () => {
+    const scheduled = sub({ nextDueDate: '2026-11-17' }) as unknown as Record<string, unknown>;
+    const before = happyAnswers(scheduled, [pay('2026-11-17', 'PENDING')]);
+    const h1 = createAssinaturaWebHandler({ config, fetch: fakeNet(before.answers).fetcher, now: () => NOW });
+    expect(JSON.parse((await h1(webhookReq(event('PAYMENT_CREATED', { payment: { id: 'pay_1', status: 'PENDING', subscription: SUB } })).req)).body)).toEqual({ received: true, outcome: 'aplicado' });
+    // Do começo de 17/11 (Brasília) ao fim de 20/11 (17/11 mais os 3 dias de tolerância da renovação): antes de 17/11, o banco diz "teste".
+    expect(before.applied).toEqual([
+      expect.objectContaining({ p_valid_from: '2026-11-17T03:00:00.000Z', p_valid_until: '2026-11-21T02:59:59.999Z' }),
+    ]);
+    // 17/11: a primeira cobrança paga. Um mês a partir do fim do teste, mais a tolerância; sem p_valid_from (o banco mantém o começo).
+    const paid = happyAnswers(sub({ nextDueDate: '2026-12-17' }) as unknown as Record<string, unknown>, [pay('2026-11-17', 'CONFIRMED')]);
+    const h2 = createAssinaturaWebHandler({ config, fetch: fakeNet(paid.answers).fetcher, now: () => new Date('2026-11-17T13:00:00.000Z') });
+    await h2(webhookReq(event('PAYMENT_CONFIRMED', { payment: { id: 'pay_1', status: 'CONFIRMED', subscription: SUB } })).req);
+    expect(paid.applied).toHaveLength(1);
+    expect(paid.applied[0]).toMatchObject({ p_valid_until: '2026-12-21T02:59:59.999Z' });
+    expect(paid.applied[0]).not.toHaveProperty('p_valid_from');
+    // O cartão recusado em 17/11: a cobrança de hoje não conta como marcada, e o acesso acaba (o teste já acabou).
+    const refused = happyAnswers(sub({ nextDueDate: '2026-11-17' }) as unknown as Record<string, unknown>, [pay('2026-11-17', 'PENDING')]);
+    const h3 = createAssinaturaWebHandler({ config, fetch: fakeNet(refused.answers).fetcher, now: () => new Date('2026-11-17T13:00:00.000Z') });
+    await h3(webhookReq(event('PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', { payment: { id: 'pay_1', status: 'PENDING', subscription: SUB } })).req);
+    expect(refused.applied[0]).toMatchObject({ p_valid_until: '2026-11-17T13:00:00.000Z' });
+    expect(refused.applied[0]).not.toHaveProperty('p_valid_from');
+  });
+
+  it('cancelar antes da primeira cobrança: a assinatura sai do Asaas, nada é cobrado, e o aviso encerra o direito na hora (o acesso fica no teste até o fim dele)', async () => {
+    const net = fakeNet({
+      ...user,
+      [`GET /v3/subscriptions`]: () => ({ status: 200, body: { object: 'list', data: [sub({ nextDueDate: '2026-11-17' })] } }),
+      [`DELETE /v3/subscriptions/${SUB}`]: () => ({ status: 200, body: { deleted: true, id: SUB } }),
+    });
+    const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+    expect(JSON.parse((await h(appReq({ action: 'cancelar' }).req)).body)).toEqual({ result: 'cancelada' });
+    expect(net.sent.some((s) => s.method === 'DELETE' && s.url.endsWith(`/subscriptions/${SUB}`))).toBe(true);
+    // O aviso da assinatura removida, com a primeira cobrança ainda pendente (o Asaas a remove junto): sem cobrança paga, acaba agora.
+    const gone = happyAnswers(sub({ deleted: true, status: 'INACTIVE', nextDueDate: '2026-11-17' }) as unknown as Record<string, unknown>, [pay('2026-11-17', 'PENDING')]);
+    const h2 = createAssinaturaWebHandler({ config, fetch: fakeNet(gone.answers).fetcher, now: () => NOW });
+    await h2(webhookReq(event('SUBSCRIPTION_DELETED', { subscription: sub({ deleted: true }) })).req);
+    expect(gone.applied).toEqual([expect.objectContaining({ p_valid_until: NOW.toISOString() })]);
+    expect(gone.applied[0]).not.toHaveProperty('p_valid_from');
+    expect(webValidity(sub({ deleted: true }), [pay('2026-11-17', 'PENDING')], NOW)).toEqual({ paidThrough: null, validFrom: null, validUntil: NOW });
+  });
+
+  it('Pix pago no 3º dia do teste: a função manda o dia do pagamento, e o banco começa o período no fim do teste (um mês ou 12 meses depois dele)', async () => {
+    const applied: Record<string, unknown>[] = [];
+    const net = fakeNet({
+      'GET /v3/payments/pay_pix_teste': () => ({
+        status: 200,
+        body: { id: 'pay_pix_teste', status: 'RECEIVED', billingType: 'PIX', dueDate: '2026-11-06', paymentDate: '2026-11-06', externalReference: pixReference(ANA, 'individual', 'anual') },
+      }),
+      'POST /rest/v1/rpc/billing_pix_apply': (init) => {
+        applied.push(JSON.parse(init.body ?? '{}'));
+        return { status: 200, body: { result: 'aplicado', paid_through: '2027-11-17' } };
+      },
+    });
+    const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+    await h(webhookReq(event('PAYMENT_RECEIVED', { payment: { id: 'pay_pix_teste', status: 'RECEIVED' } })).req);
+    // O dia que vai ao banco é o do pagamento (o banco recusa dia no futuro); quem decide o começo é o banco, com o mesmo acesso de my_access.
+    expect(applied).toEqual([expect.objectContaining({ p_paid_on: '2026-11-06', p_period: 'anual' })]);
+    const sql = readFileSync(join(__dirname, '../../../supabase/migrations/20261127000002_assinar_no_teste.sql'), 'utf8');
+    // O fim do teste pela mesma conta de my_access e pelo dia pago (D-129, revisão): não pela situação na hora do aviso.
+    expect(sql).toContain("if v_from is not null and p_paid_on >= (v_from at time zone 'America/Sao_Paulo')::date then");
+    expect(sql).toContain("v_trial_day := ((greatest(coalesce(v_created, now()), v_from) + interval '14 days') at time zone 'America/Sao_Paulo')::date;");
+    expect(sql).not.toContain("v_access ->> 'status' = 'teste'");
+    expect(sql).toContain('select greatest(b.paid_on, coalesce(b.starts_on, b.paid_on)) as day, b.period from public.billing_pix_payments b');
+    expect(sql).toContain("v_months := case r.period when 'anual' then 12 else 1 end;");
+    // A data que a tela mostra é a mesma conta: 17/11/2026, o fim do teste (os períodos de 17/12/2026 e 17/11/2027 estão no teste do banco,
+    // supabase/tests/99zzzzzzzzzzzzzzzzzzzzzzzzzzz_assinar_no_teste.sql).
+    expect(paidStartDay('teste', TRIAL_END, NOW)).toBe('2026-11-17');
+    expect(WEB_SUBSCRIPTION_TEXT.pixStartsOn('17/11/2026')).toBe('O período pago começa em 17/11/2026, quando o teste grátis acaba.');
+  });
+});
+
+describe('Assinar na web durante o teste grátis (D-129, revisão independente): o dia da primeira cobrança, a compra fechada e o próprio direito', () => {
+  // A assinatura criada em 06/11, com a primeira cobrança marcada para 17/11 (o fim do teste).
+  const marcada = (extra: Partial<AsaasSubscription> = {}) => sub({ nextDueDate: '2026-12-17', dateCreated: '2026-11-06', ...extra });
+  const NO_DIA = new Date('2026-11-17T04:00:00.000Z'); // 17/11, 1h em Brasília: antes da confirmação do cartão
+
+  it('no próprio dia da primeira cobrança, antes da confirmação do cartão, a janela continua (qualquer aviso, como a cobrança atualizada ou uma repetição)', () => {
+    expect(scheduledFirstCharge(marcada(), [pay('2026-11-17', 'PENDING')], NO_DIA)).toBe('2026-11-17');
+    const v = webValidity(marcada(), [pay('2026-11-17', 'PENDING')], NO_DIA);
+    expect([v.validFrom?.toISOString(), v.validUntil.toISOString()]).toEqual(['2026-11-17T03:00:00.000Z', '2026-11-21T02:59:59.999Z']);
+    // Em análise de risco no dia: também ainda por acontecer.
+    expect(scheduledFirstCharge(marcada(), [pay('2026-11-17', 'AWAITING_RISK_ANALYSIS')], NO_DIA)).toBe('2026-11-17');
+    // A assinatura criada no próprio dia (quem assina fora do teste, cobrada no Checkout) ou sem a data de criação: nada marcado.
+    expect(scheduledFirstCharge(marcada({ dateCreated: '2026-11-17' }), [pay('2026-11-17', 'PENDING')], NO_DIA)).toBeNull();
+    expect(scheduledFirstCharge(marcada({ dateCreated: null }), [pay('2026-11-17', 'PENDING')], NO_DIA)).toBeNull();
+    // O cartão recusado e a cobrança vencida (no dia seguinte) acabam com o acesso.
+    expect(scheduledFirstCharge(marcada(), [pay('2026-11-17', 'PENDING')], NO_DIA, true)).toBeNull();
+    expect(webValidity(marcada(), [pay('2026-11-17', 'PENDING')], NO_DIA, true)).toEqual({ paidThrough: null, validFrom: null, validUntil: NO_DIA });
+    expect(scheduledFirstCharge(marcada(), [pay('2026-11-17', 'OVERDUE')], new Date('2026-11-18T13:00:00.000Z'))).toBeNull();
+    expect(scheduledFirstCharge(marcada(), [pay('2026-11-17', 'PENDING')], new Date('2026-11-18T13:00:00.000Z'))).toBeNull();
+    expect(asaasSubscriptionFrom({ id: SUB, dateCreated: '2026-11-06' })?.dateCreated).toBe('2026-11-06');
+  });
+
+  it('os avisos do dia da primeira cobrança: a cobrança atualizada mantém a janela; o cartão recusado a encerra', async () => {
+    const atualizada = happyAnswers(marcada() as unknown as Record<string, unknown>, [pay('2026-11-17', 'PENDING')]);
+    await createAssinaturaWebHandler({ config, fetch: fakeNet(atualizada.answers).fetcher, now: () => NO_DIA })(
+      webhookReq(event('PAYMENT_UPDATED', { payment: { id: 'pay_1', status: 'PENDING', subscription: SUB } })).req,
+    );
+    expect(atualizada.applied[0]).toMatchObject({ p_valid_from: '2026-11-17T03:00:00.000Z', p_valid_until: '2026-11-21T02:59:59.999Z' });
+    const recusada = happyAnswers(marcada() as unknown as Record<string, unknown>, [pay('2026-11-17', 'PENDING')]);
+    await createAssinaturaWebHandler({ config, fetch: fakeNet(recusada.answers).fetcher, now: () => NO_DIA })(
+      webhookReq(event('PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', { payment: { id: 'pay_1', status: 'PENDING', subscription: SUB } })).req,
+    );
+    expect(recusada.applied[0]).toMatchObject({ p_valid_until: NO_DIA.toISOString() });
+    expect(recusada.applied[0]).not.toHaveProperty('p_valid_from');
+  });
+
+  it('a compra fechada (SUBSCRIBE_OPEN): com a chave de produção, nenhum Checkout, de cartão nem de Pix, mesmo com "?assinar=teste" na tela; "situacao" e "cancelar" continuam', async () => {
+    const producao: AssinaturaWebConfig = { ...config, apiKey: '$aact_prod_000000000000000000000000000000000000chave_de_teste', apiBase: ASAAS_PRODUCTION_URL, sandbox: false };
+    const net = fakeNet({
+      'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA, email: 'ana@exemplo.test' } }),
+      'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status: 'teste', plan: null, until: '2026-11-17T15:00:00.000Z', can_write: true } }),
+      'GET /v3/subscriptions': () => ({ status: 200, body: { data: [] } }),
+      'POST /v3/checkouts': () => ({ status: 200, body: { id: CHECKOUT } }),
+    });
+    const h = createAssinaturaWebHandler({ config: producao, fetch: net.fetcher, now: () => NOW });
+    for (const action of ['assinar', 'pix']) {
+      const res = await h(appReq({ action, plan: 'individual' }).req);
+      expect([res.status, JSON.parse(res.body)], action).toEqual([503, { result: 'indisponivel' }]);
+    }
+    expect(net.sent.some((x) => x.url.endsWith('/checkouts'))).toBe(false);
+    expect(JSON.parse((await h(appReq({ action: 'situacao' }).req)).body)).toEqual({ result: 'sem_assinatura' });
+    expect(JSON.parse((await h(appReq({ action: 'cancelar' }).req)).body)).toEqual({ result: 'sem_assinatura' });
+  });
+
+  it('no sandbox, a volta da página do Asaas leva "&assinar=teste", para o teste da equipe continuar vendo a área de compra e o cancelamento', async () => {
+    const net = fakeNet({
+      'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA, email: 'ana@exemplo.test' } }),
+      'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status: 'teste', plan: null, until: '2026-11-17T15:00:00.000Z', can_write: true } }),
+      'GET /v3/subscriptions': () => ({ status: 200, body: { data: [] } }),
+      'POST /v3/checkouts': () => ({ status: 200, body: { id: CHECKOUT, link: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` } }),
+      'POST /rest/v1/rpc/billing_checkout_record': () => ({ status: 200, body: { result: 'gravado' } }),
+    });
+    await createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW })(appReq({ action: 'pix', plan: 'individual' }).req);
+    expect(net.sent.find((x) => x.url.endsWith('/checkouts'))?.body).toMatchObject({
+      callback: { successUrl: `${APP_URL_DEFAULT}/conta/assinatura?pagamento=sucesso&assinar=teste`, cancelUrl: `${APP_URL_DEFAULT}/conta/assinatura?pagamento=cancelado&assinar=teste` },
+    });
+    expect((checkoutRequest(ANA, 'individual', APP_URL_DEFAULT, '2026-11-06') as { callback: { successUrl: string } }).callback.successUrl).toBe(
+      `${APP_URL_DEFAULT}/conta/assinatura?pagamento=sucesso`,
+    );
+  });
+
+  it('assinar de novo no teste, com a assinatura feita no teste ainda ativa: "assinatura_marcada" (nada de "cobrança em aberto"), sem Checkout', async () => {
+    const net = fakeNet({
+      'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA, email: 'ana@exemplo.test' } }),
+      'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status: 'teste', plan: null, until: '2026-11-17T15:00:00.000Z', can_write: true } }),
+      'GET /v3/subscriptions': () => ({ status: 200, body: { data: [marcada()] } }),
+    });
+    const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+    for (const action of ['assinar', 'pix']) expect(JSON.parse((await h(appReq({ action, plan: 'individual' }).req)).body), action).toEqual({ result: 'assinatura_marcada' });
+    expect(net.sent.some((x) => x.url.endsWith('/checkouts'))).toBe(false);
+  });
+
+  it('o próprio direito pela web, lido do banco: a assinatura marcada (janela de até 4 dias), a paga e a cancelada; o dia da primeira cobrança ainda não paga', () => {
+    const rows = parseOwnWebEntitlements([
+      { valid_from: '2026-11-17T03:00:00.000Z', valid_until: '2026-11-21T02:59:59.999Z' },
+      { valid_from: 'ontem', valid_until: null },
+      null,
+    ]);
+    expect(rows).toEqual([{ validFrom: '2026-11-17T03:00:00.000Z', validUntil: '2026-11-21T02:59:59.999Z' }]);
+    // Antes do dia (o banco ainda diz "teste") e no dia, até a confirmação: a primeira cobrança é 17/11.
+    expect(pendingFirstCharge(rows, NOW)).toBe('2026-11-17');
+    expect(pendingFirstCharge(rows, NO_DIA)).toBe('2026-11-17');
+    expect(hasLiveWebEntitlement(rows, NOW)).toBe(true);
+    // O Asaas já diz que foi cancelada: nada pendente. Depois da janela, nada.
+    expect(pendingFirstCharge(rows, NOW, true)).toBeNull();
+    expect(pendingFirstCharge(rows, new Date('2026-11-21T04:00:00.000Z'))).toBeNull();
+    // A assinatura paga (um mês) não é a janela da primeira cobrança, mas vale; a cancelada antes da cobrança (o fim antes do começo), não.
+    const paga = [{ validFrom: '2026-11-06T15:00:00.000Z', validUntil: '2026-12-10T02:59:59.999Z' }];
+    expect([pendingFirstCharge(paga, NOW), hasLiveWebEntitlement(paga, NOW)]).toEqual([null, true]);
+    const cancelada = [{ validFrom: '2026-11-17T03:00:00.000Z', validUntil: '2026-11-06T16:00:00.000Z' }];
+    expect([pendingFirstCharge(cancelada, NOW), hasLiveWebEntitlement(cancelada, NOW)]).toEqual([null, false]);
+  });
+
+  it('o dia da cobrança (Brasília) e o fim do teste no dia da pessoa: o mesmo dia, o dia seguinte (a oeste) ou a véspera (a leste)', () => {
+    // O teste acaba em 17/11, 0h30 em Brasília (03h30 UTC).
+    expect(trialEndRelation('2026-11-17', '2026-11-17T03:30:00.000Z', 'America/Sao_Paulo')).toBe('mesmo-dia');
+    expect(trialEndRelation('2026-11-17', '2026-11-17T03:30:00.000Z', 'America/Manaus')).toBe('dia-seguinte');
+    // O teste acaba em 16/11, 23h30 em Brasília: em Fernando de Noronha já é 17/11.
+    expect(trialEndRelation('2026-11-16', '2026-11-17T02:30:00.000Z', 'America/Noronha')).toBe('vespera');
+    expect(trialEndRelation('2026-11-17', null, 'America/Manaus')).toBe('mesmo-dia');
   });
 });

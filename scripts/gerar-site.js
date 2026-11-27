@@ -58,7 +58,8 @@
  *   --estado <arquivo>   lê de um JSON as chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO` em scripts/site/config.js, D-125),
  *                        como {"lancado": true, "lojas": {"appStore": "https://apps.apple.com/..."}}, para ver ou testar o site lançado.
  *                        "lancado": true é recusado com a assinatura pelo app fechada (SUBSCRIBE_OPEN do núcleo); para ver o site
- *                        lançado antes disso, junte "simularAssinaturaAberta": true (a geração avisa, e o --final recusa)
+ *                        lançado antes disso, junte "simularAssinaturaAberta": true (a geração avisa, o --final recusa e, sem --saida
+ *                        para outra pasta, a geração recusa: o site simulado nunca vai para site/, D-129)
  *   --atualizar-indicadores  antes de gerar, consulta o Banco Central (o mesmo código do worker) e grava o retrato dos indicadores; sem
  *                        rede, avisa e gera com o retrato anterior. O `--final` recusa retrato vazio, incompleto ou com mais de 7 dias
  * A imagem de compartilhamento (`site-src/imagens/og-clarevo-1200x630.png`) é feita à parte, por `node scripts/gerar-og-site.js`.
@@ -158,6 +159,10 @@ async function principal(argv) {
   const noticias = opcao('--noticias');
   const arquivoEstado = opcao('--estado');
   const estado = arquivoEstado ? JSON.parse(fs.readFileSync(path.resolve(arquivoEstado), 'utf8')) : undefined;
+  // D-129: o site com a assinatura simulada (só para testes) nunca vai para a pasta do site publicado; com ele, --saida para outra pasta.
+  if (estado && typeof estado === 'object' && 'simularAssinaturaAberta' in estado && destino === SITE) {
+    throw new Error('--estado com "simularAssinaturaAberta" grava um site só para testes: use --saida com outra pasta (nunca a pasta site/, que é publicada)');
+  }
 
   // D-106: o retrato dos indicadores só é refeito quando se pede (gerar sem rede dá sempre o mesmo site).
   if (argv.includes('--atualizar-indicadores')) {

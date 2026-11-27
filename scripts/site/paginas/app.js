@@ -2,11 +2,12 @@
 /**
  * O app: um passeio pelos recursos, cada um com o vídeo de uso ou a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada
  * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível segue
- * o estado do produto (`estado.js`, D-125): antes do lançamento, a web em fase de testes (o link só para a tela de entrar, de quem já
- * testa) e as lojas "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 18/11/2026 (D-115), cada vídeo fica no
+ * o estado do produto (`estado.js`, D-125): antes do lançamento, a web (o link só para a tela de entrar, de quem já tem conta) e as lojas
+ * "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 26/11/2026 (D-128), as chamadas da capa são "Assine aqui"
+ * e "Use no navegador" (`web.html`), e a demonstração fica só como um link de texto discreto, logo abaixo delas. Desde 18/11/2026 (D-115), cada vídeo fica no
  * lugar da captura do recurso que ele mostra e toca sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
  */
-const { chamadas, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
+const { chamadas, linkDaDemonstracao, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
@@ -133,7 +134,7 @@ const RECURSOS = [
     imagem: 'negocio',
     itens: [
       'Categorias próprias do negócio, como "Vendas", "Serviços", "Material e mercadoria", "Taxas e maquininha" e "Impostos e DAS".',
-      'Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
+      'Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, e as maiores saídas.',
       'A Retirada para o Pessoal leva dinheiro do negócio para casa: sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
       'Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
     ],
@@ -210,12 +211,14 @@ ${figura}
   const comTela = MAIS.filter((m) => m.video || m.imagem).map(cartaoMais).join('\n');
   const mais = `${semTela ? `<div class="grade grade-texto">\n${semTela}\n</div>\n` : ''}<div class="mini">\n${comTela}\n</div>`;
 
-  // As chamadas e as lojas seguem o estado do produto (D-125, `estado.js`): antes do lançamento, a demonstração e "Como ter acesso", e as
-  // lojas "em breve"; depois, "Testar 14 dias grátis" e os selos de cada loja com endereço.
+  // As chamadas e as lojas seguem o estado do produto (`estado.js`): "Assine aqui" (antes do lançamento, para os planos, que dizem "Em
+  // breve"; depois, para criar conta) e "Use no navegador" (D-128); a demonstração, só como link de texto; as lojas "em breve" antes do
+  // lançamento e, depois, os selos de cada loja com endereço.
   const capa = `<h1>A Clarevo por dentro</h1>
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
-${chamadas(ARQUIVO, estado)}
-${estado.lancado ? selosDasLojas(estado) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
+${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
+${linkDaDemonstracao()}
+${estado.lancado ? selosDasLojas(estado, { pequenos: true }) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
 ${faixaDeConfianca(ARQUIVO)}`;
   const lojas = lojasPublicadas(estado);
   const noCelular = estado.lancado && lojas.length
@@ -225,7 +228,7 @@ ${faixaDeConfianca(ARQUIVO)}`;
 ${selosDasLojas(estado)}
 </article>`
     : `<article class="cartao">
-<h3>No celular, em breve</h3>
+<h3>No celular</h3>
 <p><span class="etiqueta">Em breve</span> O app para iPhone e Android será publicado na App Store e no Google Play. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
 </article>`;
 
@@ -234,20 +237,20 @@ ${selosDasLojas(estado)}
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">
 <article class="cartao">
-<h3>${estado.lancado ? 'Na web' : 'Na web, em fase de testes'}</h3>
-<p>A versão web da Clarevo funciona no navegador do celular ou do computador. ${linkDaVersaoWeb(estado)}</p>
+<h3>Na web</h3>
+<p>A versão web da Clarevo funciona no navegador do computador ou do celular, sem instalar nada, com a mesma conta do app para celular. <a href="${u('web.html')}">Use a Clarevo no navegador</a>. ${linkDaVersaoWeb(estado)}</p>
 </article>
 ${noCelular}
 <article class="cartao">
 <h3>Painel da empresa, só na web</h3>
-<p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
+<p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja como funciona para empresas</a>.</p>
 </article>
 </div>`,
       { rotulo: 'onde' },
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. As telas e os vídeos usam dados fictícios. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
 <div class="recursos">
 ${linhas}
 </div>`,

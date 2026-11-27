@@ -165,7 +165,8 @@ Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play),
 - [ ] **Você:** o roteiro de `docs/42`, seção 4 (acordos de apps pagos, produtos nas duas lojas, chave de compras da Apple, conta de serviço do Google, RevenueCat, segredos no Supabase, chaves públicas no Expo)
 - [ ] **Você (Claude Chrome):** publicar a função `assinatura-lojas` (docs/05, passo 12u), sem mexer nos segredos
 - [ ] **Você:** teste com compras de teste no Android (faixa de teste interno) e no iPhone (TestFlight), `docs/42`, passo 9
-- [ ] Abrir a compra (`SUBSCRIBE_OPEN`) junto com a web e o início da cobrança, num build `production` novo
+- [ ] **Trava antes de abrir a compra (D-129, assinar na web no teste grátis):** no sandbox do Asaas, os itens (l) e (m) de `docs/39`, seção 8, conferidos e anotados: um Checkout com a primeira cobrança no futuro não cobra nem pré-autoriza o cartão no dia; a primeira cobrança fica PENDING, com o vencimento no fim do teste; cancelar (DELETE da assinatura) remove a cobrança pendente, e nada é cobrado. Sem isso anotado, a compra não abre
+- [ ] Abrir a compra (`SUBSCRIBE_OPEN`, em `packages/core/src/plano-precos.ts` desde a D-129) junto com a web e o início da cobrança, num build `production` novo e com a `assinatura-web` publicada de novo (com a chave de produção, ela só cria Checkout com a compra aberta)
 - [ ] Respostas de privacidade das lojas: "Compras, histórico de compras" passa a Sim quando a compra abrir (`docs/lojas/privacidade.md`)
 
 ## Pacote antes do lançamento (D-093, 11/11/2026)

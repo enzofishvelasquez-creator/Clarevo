@@ -115,27 +115,31 @@ main:focus{outline:none}
 .menu-movel[open] summary::after{transform:translateY(2px) rotate(-135deg)}
 .menu-movel ul{list-style:none;margin:.5rem 0 0;padding:.5rem;position:absolute;right:0;top:100%;width:min(18rem,calc(100vw - 32px));background:var(--topo);border:2px solid var(--sobre-topo);border-radius:16px;box-shadow:0 18px 40px rgba(6,16,64,.35)}
 .menu-movel li a{display:flex;width:100%}
-.menu .menu-cta{display:none}
+/* No site lançado (D-129), "Entrar" fica ao lado de "Assine aqui", como link de texto; no celular, os dois estão dentro do menu. */
+.menu .menu-cta,.menu .menu-entrar{display:none}
 @media (min-width:70rem){
   .menu-lista{display:flex}
   .menu-movel{display:none}
+  .menu .menu-entrar{display:inline-flex}
   .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none}
   .menu .menu-cta:hover{text-decoration:underline}
 }
 
-/* Tema do site no rodapé (D-115): três opções (Igual ao aparelho, Claro e Escuro) com ícone, 44 px de altura, a escolhida em lima; o
-   foco aparece no lima do rodapé. Começa escondido e só aparece com o script do tema. */
-.tema-site{border:0;margin:0 0 1rem;padding:0;min-width:0}
-.tema-site legend{padding:0;margin:0 0 .4rem;font-weight:700;font-size:.875rem;color:var(--sobre-rodape)}
-.tema-opcoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem;max-width:22rem}
+/* Tema do site no rodapé (D-115). Desde 26/11/2026 (D-128, pedido do Enzo: estava em evidência demais), um controle discreto na linha de
+   baixo do rodapé, ao lado da razão social: três ícones num grupo só, com um contorno fino, sem texto à vista (o nome de cada opção e o do
+   grupo ficam para o leitor de tela e na dica do mouse). Cada opção tem 44 px de área de toque; a escolhida fica em lima, com um fundo
+   suave; o foco aparece no lima do rodapé. Começa escondido e só aparece com o script do tema. */
+.rodape-linha{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1.25rem}
+.rodape .rodape-linha>p{margin:0}
+.tema-site{border:0;margin:0;padding:0;min-width:0}
+.tema-opcoes{display:flex;padding:2px;border:1px solid #2B3857;border-radius:999px}
 .tema-opcao{position:relative;display:flex}
 .tema-opcao input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
-.tema-opcao span{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;min-height:44px;padding:.45rem .5rem;border:1px solid var(--sobre-rodape-2);border-radius:14px;color:var(--sobre-rodape);font-size:.875rem;font-weight:700;line-height:1.25;text-align:center}
-/* No celular, as três opções em colunas iguais, com o ícone em cima (o grupo nunca quebra linha); a partir de 30 rem, uma linha de pílulas. */
-@media (min-width:30rem){.tema-opcoes{display:flex;flex-wrap:wrap;max-width:none}.tema-opcao span{flex-direction:row;gap:.4rem;padding:0 .9rem;border-radius:999px}}
-.tema-opcao input:checked+span{background:var(--lima);border-color:var(--lima);color:var(--sobre-lima)}
-.tema-opcao input:focus-visible+span{outline:3px solid var(--link-rodape);outline-offset:3px}
-.tema-opcao:hover span{border-color:var(--link-rodape)}
+.tema-icone{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:999px;color:var(--sobre-rodape-2)}
+.tema-opcao input:checked+.tema-icone{color:var(--link-rodape);background:rgba(234,240,255,.1)}
+.tema-opcao input:focus-visible+.tema-icone{outline:3px solid var(--link-rodape);outline-offset:-1px}
+.tema-opcao:hover .tema-icone{color:var(--sobre-rodape)}
+.tema-opcao:hover input:checked+.tema-icone{color:var(--link-rodape)}
 
 /* Faixa de confiança da capa (D-115): três frases curtas com ícone, num link só para Segurança e privacidade, sem caixas. */
 .confianca{margin:1rem 0 0;font-size:.9375rem;line-height:1.4}
@@ -161,6 +165,10 @@ main:focus{outline:none}
 }
 .capa-simples{padding-bottom:2.5rem}
 .acoes{display:flex;flex-wrap:wrap;gap:.75rem;margin:1.25rem 0 .75rem}
+/* O texto logo embaixo dos botões (a linha do teste na capa, os links de texto da chamada final, o link da demonstração em O app): o mesmo
+   respiro de cima dos botões, no celular e no computador, nunca colado neles (D-128, pedido do Enzo). */
+.acoes+:is(p,.selos-lojas){margin-top:1rem}
+@media (min-width:48rem){.acoes+:is(p,.selos-lojas){margin-top:1.25rem}}
 .botao{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 1.35rem;border-radius:999px;font-weight:800;text-decoration:none;border:2px solid transparent;text-align:center}
 .botao-principal{background:var(--botao);color:var(--sobre-botao)}
 .capa .botao-principal{background:var(--lima);color:var(--sobre-lima)}
@@ -404,6 +412,8 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .duvida-corpo ul{margin:0 0 .75rem;padding-left:1.2rem}
 .duvida-corpo li{margin:.3rem 0}
 .duvidas+p{max-width:52rem}
+/* As perguntas frequentes no fim de um bloco (início, D-128): sem somar a margem de baixo ao respiro do bloco. */
+.bloco .duvidas:last-child{margin-bottom:0}
 
 /* Tabelas dos textos jurídicos */
 .tabela table{width:100%;border-collapse:collapse;font-size:.9375rem}
@@ -697,9 +707,9 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
    duas colunas, e a conta fecha em duas, três ou quatro colunas (vale enquanto a quantidade não for múltipla de três; o teste de navegador
    confere). Os temas relacionados de um tema de Aprender ficam um embaixo do outro, na coluna do texto. O `:where` deixa estas regras com
    o peso de uma classe só, para a coluna do texto (`.artigo .temas`) continuar valendo. */
-:is(.grade,.temas,.mini):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)),.artigo .temas{grid-template-columns:minmax(0,1fr)}
+:is(.grade,.temas,.mini,.passos):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)),.artigo .temas{grid-template-columns:minmax(0,1fr)}
 @media (min-width:40rem){:is(.grade,.temas,.passos):where(:has(>:nth-child(4):last-child)){grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (min-width:48rem){:is(.grade,.temas,.mini):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:48rem){:is(.grade,.temas,.mini,.passos):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
 .grade-3:where(:has(>:nth-child(3):last-child)){grid-template-columns:minmax(0,1fr)}
 @media (min-width:56rem){.grade-3:where(:has(>:nth-child(3):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (min-width:64rem){:is(.temas,.passos):where(:has(>:nth-child(4):last-child)){grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -709,18 +719,31 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 @media (min-width:40.75rem){.miolo>.temas:where(:has(>:nth-child(5)):has(>:last-child:nth-child(odd)))>:first-child{grid-column:span 2}}
 
 /* Vitrine de 25/11/2026 (D-125): a página inicial em seis blocos, a página do MEI e o estado do produto. */
-/* A assinatura da marca ("Cuidar da vida financeira faz parte de cuidar de você."), pequena, acima do título: o texto no azul claro da capa
-   (4,9:1) e um traço lima decorativo; o lima no azul tem 4,4:1 e só serve para texto grande. */
-.assinatura-marca{display:flex;align-items:center;gap:.6rem;margin:0 0 .85rem;font-weight:700;font-size:.9375rem;line-height:1.4;color:var(--sobre-topo-suave)}
-.assinatura-marca::before{content:"";flex:none;width:1.75rem;height:3px;border-radius:3px;background:var(--lima)}
-/* A linha do acesso embaixo das chamadas (fase de testes ou "14 dias grátis, sem cartão"). */
-.estado-produto{margin:.25rem 0 0;color:var(--sobre-topo-suave);font-size:.9375rem;font-weight:700;line-height:1.45}
+/* A linha curta embaixo das chamadas ("Assinatura em breve, com 14 dias grátis, sem cartão." antes do lançamento; depois, "14 dias grátis,
+   sem cartão. Cancele quando quiser."). */
+.estado-produto{color:var(--sobre-topo-suave);font-size:.9375rem;font-weight:700;line-height:1.45}
+/* A demonstração como link de texto discreto (D-128), só em O app e em Use no navegador: letra menor, sem botão. */
+.link-demo{font-size:.9375rem;font-weight:700}
+.capa .link-demo a{color:var(--sobre-topo-suave)}
+.capa .link-demo a:hover{color:var(--sobre-topo)}
 /* Os selos das lojas (só depois do lançamento e com o endereço de cada uma): pílulas escuras com o nome oficial, sem imagem de terceiros. */
 .selos-lojas{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0 0}
 .selo-loja{display:inline-flex;align-items:center;min-height:44px;padding:0 1.1rem;border-radius:12px;background:var(--aparelho);color:#FFFFFF!important;border:1px solid #3A4A86;font-weight:800;text-decoration:none}
 .selo-loja:hover{text-decoration:underline;text-underline-offset:.2em}
-.etiqueta-precos{margin:0 0 1rem}
+/* Nas capas (D-129), os selos numa linha pequena de texto, embaixo da linha do teste: a capa fica com no máximo dois botões. */
+.selos-pequenos{align-items:center;gap:0 .35rem;margin-top:.25rem;color:var(--sobre-topo-suave);font-size:.9375rem;font-weight:700}
+.selos-pequenos .selo-loja{min-height:44px;padding:0;border:0;border-radius:0;background:none;color:var(--sobre-topo)!important;font-weight:800;text-decoration:underline;text-underline-offset:.2em}
+/* A linha dos planos antes do lançamento (D-129), na seção Planos do início, à vista: por que ainda não há botão de assinar. */
+.aviso-assinatura{margin:-.75rem 0 1.5rem;font-weight:800;color:var(--texto)}
 .etiqueta-capa{vertical-align:middle;margin-left:.35rem}
+/* A fita "Em breve" dos cartões de plano (D-128), só antes do lançamento: uma faixa vermelha fina na diagonal do canto de cima, à direita,
+   longe do nome e do preço, com o texto branco (5,6:1) nos dois temas. É só desenho (`aria-hidden`): o "em breve" também está no título do
+   cartão, para o leitor de tela. Não pega o clique: o cartão inteiro continua sendo o link. */
+.com-fita{overflow:hidden}
+.com-fita h3{padding-right:3.5rem}
+.fita-em-breve{position:absolute;top:1.15rem;right:-2.6rem;width:10rem;padding:.2rem 0;transform:rotate(45deg);background:#C62828;color:#FFFFFF;font-size:.75rem;font-weight:800;line-height:1.35;letter-spacing:.06em;text-transform:uppercase;text-align:center;pointer-events:none;box-shadow:0 1px 3px rgba(6,16,64,.25)}
+/* A linha do teste embaixo dos cartões dos planos (D-128): uma linha só, com o link do passo a passo da assinatura. */
+.nota-planos{margin-top:1rem}
 /* As três portas: um cartão por público, com ícone, título, uma frase e um link só, que cobre o cartão inteiro. Uma coluna no celular e
    três a partir de 52 rem (dois e um nunca: um cartão sozinho na última linha). */
 .portas{list-style:none;margin:0;padding:0;display:grid;gap:1rem;grid-template-columns:minmax(0,1fr)}
@@ -764,6 +787,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .chamada-final p{max-width:46rem;color:var(--sobre-topo-suave)}
 .chamada-final a{color:var(--sobre-topo)}
 .chamada-final .acoes{margin-bottom:0}
+.chamada-final .acoes+p{margin-bottom:0}
 .chamada-final>:last-child{margin-bottom:0}
 .chamada-final .botao-principal{background:var(--lima);color:var(--sobre-lima)}
 .chamada-final .botao-suave{border-color:var(--sobre-topo);color:var(--sobre-topo)}
@@ -776,6 +800,22 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 @media (min-width:56rem){.colunas-mei{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .colunas-mei h2{margin-top:0}
 .colunas-mei ul{margin-bottom:0}
+
+/* D-128: o link de cada passo de Comece aqui, embaixo do texto. */
+.passos .passo-link{margin-top:.6rem;font-weight:700}
+/* "Use no navegador ou no celular" na página inicial (D-128): o texto com a lista e, a partir de 56 rem, a tela do computador ao lado. No
+   celular a captura larga ficaria pequena demais para ler: fica escondida (e, com loading="lazy", nem é baixada). */
+.na-web{display:grid;gap:1.5rem 3rem;align-items:center}
+.na-web .larga{margin:0}
+.so-tela-larga{display:none}
+@media (min-width:56rem){.na-web{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.so-tela-larga{display:block}}
+.na-web .acoes{margin-bottom:0}
+/* Use no navegador (web.html, D-128): as telas do computador, uma embaixo da outra no celular e lado a lado a partir de 64 rem. */
+.telas-web{display:grid;gap:1.5rem 2rem}
+@media (min-width:64rem){.telas-web{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.telas-web .larga{margin:0}
+.pagar-web{max-width:46rem}
+.pagar-web h2 .etiqueta{vertical-align:middle;margin-left:.5rem;font-size:.875rem}
 
 /* Rodapé */
 .rodape{background:var(--rodape);color:var(--sobre-rodape-2);padding:2.5rem 0 2rem;font-size:.9375rem;margin-top:0}
@@ -813,11 +853,11 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 @media print{
-  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg,.recurso-acao{display:none!important}
+  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg,.recurso-acao,.fita-em-breve{display:none!important}
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa .assinatura-marca,.capa .estado-produto,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor,.preco-capa-anual,.preco-capa-anual .preco-valor-anual{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa .estado-produto,.capa .link-demo a,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor,.preco-capa-anual,.preco-capa-anual .preco-valor-anual{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

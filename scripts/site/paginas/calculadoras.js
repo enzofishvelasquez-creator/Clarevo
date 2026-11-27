@@ -263,10 +263,10 @@ function paginaDaCalculadora(info, { valores, estado = estadoEmVigor() }) {
   const arquivo = arquivoDaCalculadora(info.slug);
   const grupo = c.CALC_GRUPOS.find((g) => g.id === info.group);
   const u = (d) => rel(arquivo, d);
-  // O app que qualquer pessoa pode abrir agora, pelo estado do produto (D-125): antes do lançamento, a demonstração, porque a tela inicial
-  // do app web convida a criar conta (D-064); depois, a versão web.
+  // O app que qualquer pessoa pode abrir agora, pelo estado do produto: depois do lançamento, a versão web; antes, nenhum (D-128: a
+  // demonstração só aparece em O app e em Use no navegador, e a tela inicial do app web convida a criar conta, D-064).
   const outroApp = appParaUsar(estado);
-  const linkDoOutroApp = `<a href="${esc(outroApp.href)}" rel="noopener noreferrer">${esc(outroApp.texto)}</a>`;
+  const linkDoOutroApp = outroApp ? `<a href="${esc(outroApp.href)}" rel="noopener noreferrer">${esc(outroApp.texto)}</a>` : '';
   const tambemFaz = TAMBEM_FAZ[info.slug] ? `${TAMBEM_FAZ[info.slug]} ` : '';
   const ex = exemploDa(info.slug);
   const temas = temasDaCalculadora(info.slug);
@@ -277,7 +277,7 @@ function paginaDaCalculadora(info, { valores, estado = estadoEmVigor() }) {
 
   const sem = `<noscript>
 <div class="calc-sem-js">
-<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a ${linkDoOutroApp} da Clarevo.</p>
+<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede${linkDoOutroApp ? `, ou use a ${linkDoOutroApp} da Clarevo` : ''}.</p>
 <h3>O que ela pede</h3>
 <ul>
 ${listaDeCampos(info.slug)}
@@ -316,7 +316,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
 <div class="aviso-edu calc-aviso"><p>${esc(c.avisoDaCalculadora(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
 ${NOTA_DO_NUMERO[info.slug] ? `${NOTA_DO_NUMERO[info.slug](u)}\n` : ''}
 <div class="calc" data-calculadora="${esc(info.slug)}">
-<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a ${linkDoOutroApp} da Clarevo.</p>
+<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site.${linkDoOutroApp ? ` Você também pode usar a ${linkDoOutroApp} da Clarevo.` : ''}</p>
 </div>
 ${sem}`,
       { rotulo: 'calcular' },

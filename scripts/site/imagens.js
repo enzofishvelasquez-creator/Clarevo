@@ -45,7 +45,7 @@ const LARGURA_LARGA = 960;
 
 /** `id` vira `imagens/<id>.png`. `alt` descreve a tela sem repetir a legenda. */
 const IMAGENS = [
-  { id: 'resumo', origem: `${LOJA}/01_resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo da Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vai vencer e o botão Anotar gasto.' },
+  { id: 'resumo', origem: `${LOJA}/01_resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo da Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vence e o botão Anotar gasto.' },
   { id: 'anotar', origem: `${LOJA}/02_anotar_gasto.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto, com descrição, valor, forma de pagamento, categoria e data.' },
   { id: 'contas', origem: `${LOJA}/03_contas_a_pagar.png`, largura: LARGURA_CELULAR, alt: 'Tela Contas a pagar, com as contas do mês, os vencimentos e o total que ainda falta pagar.' },
   { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
@@ -63,6 +63,10 @@ const IMAGENS = [
   // só nela, o tema escuro mostrava um celular escuro entre os claros).
   { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela do negócio Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
+  // A versão web no computador (D-128: o bloco "Use no navegador ou no celular" do início e a página `web.html`): as telas que o roteiro de
+  // telas grava a 1280 px (`scripts/e2e-web.js`, "Computador"), com o menu ao lado.
+  { id: 'computador-resumo', origem: `${TELAS}/630_computador_resumo.png`, largura: LARGURA_LARGA, alt: 'A Clarevo no navegador do computador: o menu ao lado, com Anotar gasto, Resumo, Movimentos, Metas, Investir e Aprender, e o Resumo de outubro com a diferença do mês, o recebido, o pago, as contas a pagar, as metas e o orçamento por categoria.' },
+  { id: 'computador-movimentos', origem: `${TELAS}/631_computador_movimentos.png`, largura: LARGURA_LARGA, alt: 'Movimentos no navegador do computador: o menu ao lado, os atalhos Buscar, Seu mês em 30 segundos, Evolução e Análises, o recebido e o pago de outubro e a tabela dos lançamentos com data, descrição, categoria, conta e valor.' },
 ];
 
 /**

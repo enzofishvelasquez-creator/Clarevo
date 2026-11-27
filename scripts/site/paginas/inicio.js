@@ -1,59 +1,69 @@
 'use strict';
 /**
- * Início. Desde 25/11/2026 (D-125, estudo "Clarevo frente ao mercado"), a página diz numa frase o que o app faz e tem seis blocos, no lugar
- * dos dez de antes (cerca de 11.800 px no celular):
- *   1. a capa: o título com o benefício concreto (contas, cartões e gastos do mês, com o pessoal, a família e o negócio separados), a frase de
- *      marca "Cuidar da vida financeira faz parte de cuidar de você." como assinatura pequena acima dele, as duas chamadas que dizem aonde
- *      levam (pelo estado do produto, `estado.js`), a linha do acesso, a faixa de confiança e o vídeo do Resumo;
+ * Início. Desde 25/11/2026 (D-125, estudo "Clarevo frente ao mercado"), a página diz numa frase o que o app faz, em poucos blocos. Desde
+ * 26/11/2026 (D-128, pedido do Enzo), a capa ficou mais leve e a página ganhou dois blocos antes da chamada final:
+ *   1. a capa: o título "Cuidar da vida financeira faz parte de cuidar de você." (de novo a frase da marca, sem a assinatura pequena acima;
+ *      revisão da D-126), o benefício concreto como primeira frase do subtítulo, as duas chamadas ("Assine aqui" e "Conheça o app", pelo
+ *      estado do produto, `estado.js`), a linha curta do teste, a faixa de confiança e o vídeo do Resumo;
  *   2. as três portas: pessoas e famílias, quem trabalha por conta e MEI (`mei.html`) e empresas (`empresas/index.html`);
  *   3. como funciona, em três passos, com o vídeo da fatura por print;
- *   4. "Você decide o que entra": a privacidade e o modelo de negócio (a Clarevo ganha com a assinatura, sem anúncios nem venda de dados, e a
- *      empresa nunca vê as finanças de ninguém);
- *   5. os planos, com os textos do núcleo e, antes do lançamento, a etiqueta "Preços no lançamento";
- *   6. a chamada final.
- * O que saiu foi para as páginas próprias, sem apagar nada: "Seus dados" e "A empresa nunca vê suas finanças" estão inteiros em Segurança e
- * privacidade e em Para empresas; "Indicadores de hoje" é o painel de `indicadores/index.html` (no rodapé); "Bem-estar financeiro, com apoio
- * prático" virou "Por que a Clarevo existe", em Sobre; "O que o app faz" está em O app; os atalhos de Aprender, Calculadoras, Novidades e
- * Ajuda estão no menu e no rodapé; o contato está em Sobre e em Suporte.
+ *   4. "Você decide o que entra": a privacidade e o modelo de negócio;
+ *   5. os planos, com os textos do núcleo, a fita "Em breve" em cada cartão antes do lançamento e uma linha só com o teste, o cancelamento e o
+ *      "só ver e exportar";
+ *   6. "Use no navegador ou no celular" (D-128): a mesma conta na web e no celular, com o link para `web.html`;
+ *   7. "Perguntas frequentes" (D-128): seis perguntas recolhidas, com os dados estruturados FAQPage;
+ *   8. a chamada final.
+ * O que saiu em 25/11/2026 foi para as páginas próprias: "Seus dados" e "A empresa nunca vê suas finanças" estão em Segurança e privacidade
+ * e em Para empresas; "Indicadores de hoje" é o painel de `indicadores/index.html`; "Bem-estar financeiro, com apoio prático" virou "Por que
+ * a Clarevo existe", em Sobre; "O que o app faz" está em O app.
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, faixaDeConfianca, dominioDe, icone } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, faixaDeConfianca, dominioDe, icone, telaLarga } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
-const { PAGINA_DO_PLANO, dadosDoApp, linhaDoAnual, pessoasNaFamilia } = require('./planos');
-const { avisoDaAssinatura, chamadas, estadoEmVigor, linhaDaCapa, rotuloDosPrecos, selosDasLojas, textoDoAcesso } = require('../estado');
+const { PAGINA_DO_PLANO, dadosDoApp, linhaDoAnual, linhaDosPlanos, pessoasNaFamilia } = require('./planos');
+const { assinaturaEmBreve, chamadas, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, linhaDaCapa, noCelular, selosDasLojas, textoDoAcesso } = require('../estado');
 
 const ARQUIVO = 'index.html';
 /**
- * O título da página (D-125): o benefício concreto, numa frase. As duas alternativas para o Enzo escolher estão em `docs/22_SITE.md`,
- * seção 19.
+ * O título da página (D-128, Enzo, 26/11/2026, revisão da D-126): de novo a frase da marca (Manual v2.2, seção 19, a mensagem central da ficha
+ * das lojas), sem frase pequena acima. O mesmo título das boas-vindas do app (`WELCOME_TEXT.title`, `packages/core/src/welcome.ts`).
  */
-const TITULO = 'Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar.';
-/** A mensagem central de antes (Manual v2.2, seção 19), agora a assinatura da marca, pequena, acima do título. A mesma da ficha das lojas. */
-const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você.';
+const TITULO = 'Cuidar da vida financeira faz parte de cuidar de você.';
+const BENEFICIO = 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.';
+/** A mensagem central (D-068): o título, o `slogan` dos dados estruturados e a ficha das lojas. */
+const MENSAGEM_CENTRAL = TITULO;
 /** A frase de apoio (D-067): continua na ficha das lojas e nas imagens de compartilhamento, e saiu da capa. */
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
-const SUBTEXTO = 'Anote por mensagem, pela câmera ou importando o extrato e veja o que entrou, o que saiu e o que ainda vai vencer. Cada espaço com as suas contas, e o seu Pessoal só você vê.';
+/**
+ * O subtítulo (D-128): o benefício concreto primeiro (o mesmo subtítulo das boas-vindas do app e a primeira linha das descrições das lojas) e
+ * uma frase curta com o que o app mostra, com as mesmas palavras da primeira captura das lojas ("o que ainda vence", D-129).
+ */
+const SUBTEXTO = `${BENEFICIO} Veja o que entrou, o que saiu e o que ainda vence.`;
 /** A descrição completa, nos dados estruturados. */
-const DESCRICAO = `${TITULO} ${SUBTEXTO} ${MENSAGEM_CENTRAL}`;
+const DESCRICAO = `${SUBTEXTO} ${TITULO}`;
 /** A descrição da página para as buscas e o compartilhamento, em até 160 caracteres, com o termo que as pessoas buscam. */
 const DESCRICAO_CURTA = 'Controle de gastos sem planilha: contas, cartões e gastos do mês num app, com o pessoal, a família e o negócio separados. Você decide o que entra.';
 
 /**
  * A seção Planos (pedido do Enzo, 16/11/2026): os dois planos com os nomes, os preços e as frases da tela Assinatura do app, lidos do
  * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Cada cartão tem um link só, que cobre o cartão inteiro, para a página
- * do plano. Enquanto a assinatura não abre (o SUBSCRIBE_OPEN do app, pelo estado do produto: `avisoDaAssinatura`), a frase da tela
- * Assinatura diz que nada é cobrado até o lançamento; o site lançado exige a assinatura aberta, então a frase nunca aparece nele. Desde
- * 25/11/2026 (D-125), antes do lançamento os preços levam a etiqueta "Preços no lançamento" (`estado.js`), e a seção termina em "Comparar
- * os planos". Desde 27/11/2026 (D-127), cada cartão mostra também o preço anual, com o equivalente por mês. `u` monta o caminho relativo.
+ * do plano. Desde 27/11/2026 (D-127), cada cartão mostra também o preço anual, com o equivalente por mês. Desde 26/11/2026 (D-128), antes
+ * do lançamento cada cartão leva a fita "Em breve" no canto de cima (`fitaEmBreve`, só desenho, com o mesmo "em breve" no título para o
+ * leitor de tela), no lugar da etiqueta "Preços no lançamento" e da frase "A assinatura pelo app abre no lançamento. Até lá, nada é
+ * cobrado."; embaixo dos cartões, uma linha só (`linhaDosPlanos`). Desde a D-129, antes do lançamento, logo abaixo do título (é aqui que
+ * "Assine aqui" da capa chega), à vista: "A assinatura abre em breve, na web e nas lojas." (`assinaturaEmBreve`). `u` monta o caminho
+ * relativo.
  */
 function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
+  const fita = fitaEmBreve(estado);
+  const aviso = assinaturaEmBreve(estado);
   const cartoes = PLANOS.texto.plans
     .map(
-      (p) => `<article class="cartao plano plano-link">
-<h3>${esc(PLANOS.nome[p.plan])}</h3>
+      (p) => `<article class="cartao plano plano-link${fita ? ' com-fita' : ''}">
+${fita ? `${fita}\n` : ''}<h3>${esc(PLANOS.nome[p.plan])}${emBreveNoTitulo(estado)}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
 ${linhaDoAnual(p.plan)}
 <p>${esc(p.who)}</p>
@@ -61,16 +71,12 @@ ${linhaDoAnual(p.plan)}
 </article>`,
     )
     .join('\n');
-  const rotulo = rotuloDosPrecos(estado);
-  // Enquanto a assinatura não abre (SUBSCRIBE_OPEN, pelo estado do produto), a mesma frase da tela Assinatura do app: nada é cobrado até o
-  // lançamento.
-  const aviso = avisoDaAssinatura(estado);
-  const aindaNao = aviso ? ` ${esc(aviso)}` : '';
   return `<h2 id="planos">${esc(PLANOS.texto.plansTitle)}</h2>
-${rotulo ? `<p class="etiqueta-precos"><span class="etiqueta">${esc(rotulo)}</span></p>\n` : ''}<div class="grade">
+<p class="lead-bloco">${esc(PLANOS.texto.plansNote.split('. ')[0])}. O que muda é para quem é a assinatura.</p>
+${aviso ? `<p class="aviso-assinatura">${esc(aviso)}</p>\n` : ''}<div class="grade">
 ${cartoes}
 </div>
-<p class="nota">${esc(PLANOS.texto.plansNote)} Depois do teste, sem assinatura, a conta fica só para ver e exportar: os seus dados continuam guardados.${aindaNao} Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u('ajuda/conta.html')}#guia-assinatura">Ajuda</a>.</p>
+${linhaDosPlanos(u)}
 <p class="acoes"><a class="botao botao-suave" href="${u('planos.html')}">Comparar os planos</a></p>`;
 }
 
@@ -82,18 +88,80 @@ const porta = (u, { icone: ic, titulo, texto, href, link }) => `<li class="porta
 <p class="porta-link"><a href="${u(href)}">${esc(link)}</a>${icone('seta', 18, 2)}</p>
 </li>`;
 
+/**
+ * "Use no navegador ou no celular" (D-128): a mesma conta e os mesmos dados na web e no celular, sem instalar nada no computador, a tela larga
+ * com o menu ao lado e o pagamento na web com cartão ou Pix, pelo serviço de pagamento. O celular segue o estado do produto (`noCelular`).
+ * A tela do computador (a demonstração, `docs/telas/630_computador_resumo.png`) só aparece a partir de 56 rem: no celular, a captura larga
+ * ficaria pequena demais para ler. O detalhe está em `web.html`.
+ */
+function blocoNaWeb(u, img, estado) {
+  const itens = [
+    'A mesma conta na web e no celular, com os mesmos dados: o que você anota num aparece no outro.',
+    'No computador, nada para instalar: é só abrir o navegador. A tela larga mostra o menu ao lado e o mês inteiro.',
+    noCelular(estado),
+    'Na web, a assinatura é paga com cartão ou Pix, pelo serviço de pagamento, com os mesmos preços das lojas.',
+  ];
+  return `<div class="na-web">
+<div>
+<h2 id="na-web">Use no navegador ou no celular</h2>
+<ul class="como-funciona lista-marcada">
+${itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}
+</ul>
+<p class="acoes"><a class="botao botao-suave" href="${u('web.html')}">Ver como é usar no navegador</a></p>
+</div>
+${telaLarga(img['computador-resumo'], ARQUIVO, { classe: 'so-tela-larga' })}
+</div>`;
+}
+
+/**
+ * As perguntas frequentes da página inicial (D-128): respostas curtas e verdadeiras, conferidas no app (`plano.ts`, o guia de uso, D-055,
+ * D-056, D-083, D-113 e Segurança), sem prometer recurso futuro. Texto fixo e sem marcação, escrito aqui: entra na página e nos dados
+ * estruturados (FAQPage) igual.
+ */
+function perguntasDoInicio() {
+  const { PLANOS } = catalogo();
+  return [
+    { id: 'cancelar', pergunta: 'Posso cancelar quando quiser?', resposta: 'Sim. A assinatura no cartão feita na web se cancela na tela Assinatura do app, e a das lojas, na App Store ou no Google Play. O acesso completo continua até o fim do período já pago, sem nova cobrança. O Pix não renova sozinho: basta não pagar o próximo período.' },
+    { id: 'quem-ve', pergunta: 'Quem vê os meus dados?', resposta: 'O seu Pessoal é só seu: ninguém mais no app vê, nem as pessoas da sua Família. Se a sua empresa oferece a Clarevo como benefício, ela vê convites, licenças, datas e contagens, nunca os seus valores, categorias ou metas.' },
+    { id: 'banco', pergunta: 'A Clarevo se conecta ao meu banco?', resposta: 'Não. A Clarevo não se conecta a bancos e não pede senha bancária. Você decide o que entra: anota no app, importa o extrato ou a fatura (arquivo ou print) ou manda por mensagem.' },
+    { id: 'familia', pergunta: 'Como funciona o plano Família?', resposta: `Até ${pessoasNaFamilia()} pessoas na mesma assinatura, paga pela pessoa titular. A Família tem as contas da casa em comum, e o Pessoal de cada pessoa continua só dela.` },
+    { id: 'mei', pergunta: 'Tenho MEI ou trabalho por conta. Serve para mim?', resposta: 'Sim. O Espaço Negócio vem nos dois planos, sem custo a mais: o dinheiro do negócio fica separado do Pessoal, com a retirada para o Pessoal, o A receber e o limite do MEI. A Clarevo não calcula imposto nem faz contabilidade.' },
+    { id: 'depois', pergunta: `O que acontece depois dos ${PLANOS.diasDeTeste} dias grátis?`, resposta: 'Sem assinatura, a conta fica só para ver e exportar: os seus dados continuam guardados, você vê e exporta tudo e pode excluir a conta, mas não anota nem muda nada. Nada é cobrado sem você assinar.' },
+  ];
+}
+
+/** As perguntas recolhidas (`<details>`, sem JavaScript), no desenho das de Segurança. */
+function blocoDasPerguntas() {
+  return `<h2 id="perguntas">Perguntas frequentes</h2>
+<div class="duvidas">
+${perguntasDoInicio().map((q) => `<details class="duvida" id="pergunta-${q.id}">
+<summary>${esc(q.pergunta)}</summary>
+<div class="duvida-corpo"><p>${esc(q.resposta)}</p></div>
+</details>`).join('\n')}
+</div>`;
+}
+
+/** As mesmas perguntas como dados estruturados (FAQPage, D-128). */
+function dadosDasPerguntas() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: perguntasDoInicio().map((q) => ({ '@type': 'Question', name: q.pergunta, acceptedAnswer: { '@type': 'Answer', text: q.resposta } })),
+  };
+}
+
 function paginaInicial({ valores, img, videos, estado }) {
   const u = (d) => rel(ARQUIVO, d);
   const { PLANOS } = catalogo();
 
+  // D-128: o título sem frase pequena acima, o benefício no subtítulo e as chamadas "Assine aqui" e "Conheça o app".
   const capa = `<div class="capa-grade">
 <div>
-<p class="assinatura-marca">${esc(MENSAGEM_CENTRAL)}</p>
 <h1>${esc(TITULO)}</h1>
 <p class="lead">${esc(SUBTEXTO)}</p>
-${chamadas(ARQUIVO, estado)}
+${chamadas(ARQUIVO, estado, { secundaria: 'app' })}
 <p class="estado-produto">${esc(linhaDaCapa(estado))}</p>
-${selosDasLojas(estado)}
+${selosDasLojas(estado, { pequenos: true })}
 ${faixaDeConfianca(ARQUIVO)}
 </div>
 ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
@@ -106,19 +174,19 @@ ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
   const portas = [
     { icone: 'pessoas', titulo: 'Pessoas e famílias', texto: `O seu Pessoal e, se quiser, uma Família de até ${pessoasNaFamilia()} pessoas, com as contas da casa em comum e o Pessoal de cada pessoa só dela.`, href: PAGINA_DO_PLANO.familiar, link: 'Ver o plano Família' },
     { icone: 'negocio', titulo: 'Quem trabalha por conta e MEI', texto: 'O dinheiro do negócio separado do da casa, com o fiado, a retirada para o Pessoal e o limite do MEI. Incluído na assinatura.', href: 'mei.html', link: 'Ver o Espaço Negócio' },
-    { icone: 'empresa', titulo: 'Empresas', texto: 'A Clarevo como benefício para a equipe. A empresa acompanha convites e licenças e nunca vê as finanças de ninguém.', href: 'empresas/index.html', link: 'Ver Para empresas' },
+    { icone: 'empresa', titulo: 'Empresas', texto: 'A Clarevo como benefício para a equipe. A empresa acompanha convites e licenças e nunca vê as finanças de ninguém.', href: 'empresas/index.html', link: 'Ver a Clarevo para empresas' },
   ];
 
   const passos = [
     { titulo: 'Anote do jeito mais fácil', texto: 'Uma mensagem no Telegram, a câmera na nota ou no boleto, o extrato e a fatura importados, ou poucos toques no app.' },
-    { titulo: 'Veja o mês', texto: 'O Resumo mostra o que entrou, o que saiu e o que ainda vai vencer, com contas a pagar, cartões e metas no mesmo lugar.' },
+    { titulo: 'Veja o mês', texto: 'O Resumo mostra o que entrou, o que saiu e o que ainda vence, com contas a pagar, cartões e metas no mesmo lugar.' },
     { titulo: 'Família e Negócio no mesmo app', texto: `No plano Família, até ${pessoasNaFamilia()} pessoas dividem as contas da casa. O Espaço Negócio vem nos dois planos. Cada espaço fica separado do outro.` },
   ];
 
   const brutas = [
     secao(
       `<h2 id="para-quem">Para quem é</h2>
-<p class="lead-bloco">Uma promessa para três jeitos de viver o dinheiro: o mês organizado, cada coisa no seu lugar.</p>
+<p class="lead-bloco">Para a vida pessoal e da família, para quem trabalha por conta e para empresas que oferecem a Clarevo à equipe.</p>
 <ul class="portas" role="list">
 ${portas.map((p) => porta(u, p)).join('\n')}
 </ul>`,
@@ -156,11 +224,13 @@ ${celularComVideo('importar-fatura-print', { videos, img }, ARQUIVO)}
       'voce-decide',
     ),
     secao(conteudoPlanos(PLANOS, u, estado), 'planos'),
+    secao(blocoNaWeb(u, img, estado), 'na-web'),
+    secao(blocoDasPerguntas(), 'perguntas'),
     secao(
       `<div class="chamada-final">
-<h2 id="comecar">${estado.lancado ? 'Comece pelo seu mês' : 'Veja a Clarevo funcionando'}</h2>
-<p>${estado.lancado ? esc(`Crie a conta, anote os gastos de hoje e veja o mês tomar forma. ${textoDoAcesso(estado)}`) : `A demonstração abre o app com dados fictícios, no navegador, sem criar conta. O acesso para pessoas e famílias abre no lançamento; até lá, acompanhe as <a href="${u('novidades/index.html')}">Novidades</a>.`}</p>
-${chamadas(ARQUIVO, estado)}
+<h2 id="comecar">Comece pelo seu mês</h2>
+<p>${esc(`Escolha o plano, anote os gastos de hoje e veja o mês tomar forma, no navegador ou no celular.${estado.lancado ? ` ${textoDoAcesso(estado)}` : ''}`)}</p>
+${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
 </div>`,
       'comecar',
     ),
@@ -189,11 +259,11 @@ ${chamadas(ARQUIVO, estado)}
     corpo: secoes.join('\n'),
     fonte,
     valores,
-    jsonld: [organizacao, dadosDoApp(valores, estado, DESCRICAO_CURTA)],
+    jsonld: [organizacao, dadosDoApp(valores, estado, DESCRICAO_CURTA), dadosDasPerguntas()],
     scripts: [SCRIPT_DOS_VIDEOS],
     // A capa do vídeo do Resumo é a primeira imagem grande da página: o navegador pede logo no começo (D-115).
     cabecalho: `<link rel="preload" as="image" href="${u(img['video-resumo-do-mes'].caminho)}" fetchpriority="high">`,
   });
 }
 
-module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, TITULO_DO_INICIO: TITULO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };
+module.exports = { paginaInicial, conteudoPlanos, perguntasDoInicio, DESCRICAO_INICIO: DESCRICAO, TITULO_DO_INICIO: TITULO, BENEFICIO_DO_INICIO: BENEFICIO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };

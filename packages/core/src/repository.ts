@@ -58,6 +58,7 @@ import type {
 import type { LegalAcceptance } from './aceite';
 import type { PublicPrices } from './investment-prices';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
+import type { OwnWebEntitlement } from './assinatura-web/primeira-cobranca';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { AccountLevelState, AccountMarks } from './levels';
 import type { Access } from './plano';
@@ -1139,6 +1140,11 @@ export interface RecordsRepository {
   startPixPayment(plan: PlanKind, period?: BillingPeriod): Promise<WebSubscriptionStart>;
   /** "situacao": se a assinatura no cartão ainda está ativa no Asaas (e quando renova) ou foi cancelada; null quando não deu para saber. */
   getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null>;
+  /**
+   * O próprio direito pela web (`plan_entitlements`, provedor "web", lido com a RLS: só as linhas da pessoa), sem chamar o Asaas (D-129):
+   * para saber se há assinatura no cartão (paga ou marcada para o fim do teste) antes de perguntar ao Asaas e antes de excluir a conta.
+   */
+  getOwnWebEntitlements(): Promise<OwnWebEntitlement[]>;
 
   // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
 
