@@ -44,13 +44,16 @@ const read = (text: string) => readWhatsAppMessage(text, TODAY);
 const BIZ: WhatsAppSpace = { kind: 'negocio', name: 'Sacolé da Maria' };
 
 describe('Negócio pelo Telegram: a palavra "negócio" no começo da mensagem', () => {
-  it('em qualquer caixa, com ou sem acento, com ":" ou "," depois; só como primeira palavra inteira', () => {
+  it('em qualquer caixa, com ou sem acento, com ":", "," ou "." depois; só como primeira palavra inteira', () => {
     for (const t of ['negócio material 120', 'Negócio material 120', 'NEGÓCIO material 120', 'negocio material 120', 'Negocio: material 120',
-      'negócio, material 120', 'negócio:material 120', '  negócio   material 120', 'negócio material 120']) {
+      'negócio, material 120', 'negócio:material 120', '  negócio   material 120', 'negócio material 120',
+      // O ponto logo depois da palavra, como ":" e "," (o celular põe o ponto sozinho depois de dois espaços).
+      'Negócio. material 120', 'negócio.material 120', 'negocio . material 120']) {
       expect(businessMessageRest(t)?.trim(), t).toBe('material 120');
       expect(read(t), t).toMatchObject({ type: 'anotar', business: true, description: 'Material', amountCents: 12000 });
     }
-    for (const t of ['negócios 50', 'negociação 50', 'material negócio 120', 'negócio.material 120', 'mercado 52,30']) {
+    expect(read('Negócio. Vendi 80 no cartão')).toMatchObject({ type: 'anotar', kind: 'receita', business: true, description: 'Vendas', card: null });
+    for (const t of ['negócios 50', 'negociação 50', 'material negócio 120', 'negócios. material 120', 'mercado 52,30']) {
       expect(businessMessageRest(t), t).toBeNull();
       expect(read(t), t).not.toHaveProperty('business');
     }
@@ -111,6 +114,74 @@ describe('Negócio pelo Telegram: a palavra "negócio" no começo da mensagem', 
     }
     expect([...BUSINESS_NOT_ON_CARD]).toEqual([...BUSINESS_OUTSIDE_CATEGORIES.despesa]);
     expect(cardCategories(BUSINESS_CATEGORIES.despesa).filter((c) => BUSINESS_NOT_ON_CARD.includes(c))).toEqual([]);
+  });
+
+  it('o DAS no negócio: "das" é a guia, com a categoria Impostos e DAS, e não a palavra de ligação que sai das pontas', () => {
+    const das = (description: string, amountCents: number) => ({
+      type: 'anotar', kind: 'despesa', amountCents, occurredOn: TODAY, daysAgo: 0, description, category: 'Impostos e DAS', card: null, business: true,
+    });
+    expect(read('negócio DAS 76,60')).toEqual(das('DAS', 7660));
+    expect(read('negócio paguei o DAS 76')).toEqual(das('DAS', 7600));
+    expect(read('negócio guia do das 76')).toEqual(das('Guia do DAS', 7600));
+    expect(read('negócio das do mei 76')).toEqual(das('DAS do MEI', 7600));
+    expect(read('negócio das 76')).toEqual(das('DAS', 7600));
+    expect(read('negócio pagamento do das 76')).toEqual(das('Pagamento do DAS', 7600));
+    expect(read('negócio das de novembro 76')).toEqual(das('DAS de novembro', 7600));
+    expect(read('negócio impostos e das 76')).toEqual(das('Impostos e DAS', 7600));
+    // A regra que vem antes continua valendo ("juros do DAS" é Juros e multas); o MEI é escrito em maiúsculas no negócio.
+    expect(read('negócio juros do das 12')).toMatchObject({ description: 'Juros do DAS', category: 'Juros e multas' });
+    expect(read('negócio contador do mei 150')).toMatchObject({ description: 'Contador do MEI', category: 'Contabilidade e sistemas' });
+    // "das" como palavra de ligação, no meio ou no começo antes de outra palavra, segue como antes, também com a mensagem em maiúsculas.
+    expect(read('negócio venda das camisetas 300')).toMatchObject({ kind: 'receita', description: 'Venda das camisetas', category: 'Vendas' });
+    expect(read('NEGÓCIO VENDA DAS CAMISETAS 300')).toMatchObject({ kind: 'receita', description: 'VENDA DAS CAMISETAS', category: 'Vendas' });
+    expect(read('negócio 300 das vendas')).toMatchObject({ kind: 'receita', description: 'Vendas', category: 'Vendas' });
+    expect(read('negócio taxa das vendas 12')).toMatchObject({ kind: 'despesa', description: 'Taxa das vendas', category: 'Taxas e maquininha' });
+    expect(whatsappCategory('DAS', 'despesa', 'negocio')).toBe('Impostos e DAS');
+    expect(whatsappCategory('Venda das camisetas', 'despesa', 'negocio')).toBeNull();
+    // No Pessoal, nada muda: "das" segue palavra de ligação.
+    expect(read('almoço das crianças 50')).toEqual({
+      type: 'anotar', kind: 'despesa', amountCents: 5000, occurredOn: TODAY, daysAgo: 0, description: 'Almoço das crianças', category: null, card: null,
+    });
+    expect(read('das do mei 76')).toMatchObject({ description: 'Mei', category: null });
+    expect(read('DAS 76,60')).toEqual({ type: 'erro', reason: 'sem_descricao' });
+    expect(read('paguei o das 76')).toEqual({ type: 'erro', reason: 'sem_descricao' });
+  });
+
+  it('venda paga no cartão é entrada do negócio (Vendas), nunca compra no cartão do negócio', () => {
+    const venda = (description: string) => ({
+      type: 'anotar', kind: 'receita', amountCents: 8000, occurredOn: TODAY, daysAgo: 0, description, category: 'Vendas', card: null, business: true,
+    });
+    expect(read('negócio vendi 80 no cartão')).toEqual(venda('Vendas'));
+    expect(read('negócio venda 80 cartão')).toEqual(venda('Venda'));
+    expect(read('negócio vendas 80 no cartão')).toEqual(venda('Vendas'));
+    expect(read('negócio vendi 80 no cartão azul')).toEqual(venda('Vendas'));
+    expect(read('negócio vendi 80 no cartão de crédito')).toEqual(venda('Vendas'));
+    expect(read('negócio venda 80 cartão azul')).toEqual(venda('Venda'));
+    expect(read('negócio vendido 80 no cartão')).toEqual(venda('Vendido'));
+    expect(read('negócio cartão venda 80')).toEqual(venda('Venda'));
+    // "vendi" decide o tipo e sai da descrição, como "recebi"; a categoria fica Vendas quando a descrição não diz outra.
+    expect(read('negócio vendi 80')).toEqual(venda('Vendas'));
+    expect(read('negócio vendi 80 bolo de pote')).toEqual(venda('Bolo de pote'));
+    expect(read('negócio bolo vendido 80')).toEqual(venda('Bolo vendido'));
+    expect(read('negócio vendi 80 conserto')).toMatchObject({ kind: 'receita', description: 'Conserto', category: 'Serviços' });
+    // Outra entrada paga no cartão: a palavra sai; sem nada além do cartão, as palavras escritas, como antes.
+    expect(read('negócio recebi 300 conserto no cartão')).toMatchObject({ kind: 'receita', description: 'Conserto', category: 'Serviços', card: null });
+    expect(read('negócio recebi 300 cartão')).toMatchObject({ kind: 'receita', description: 'Cartão', category: null, card: null });
+    expect(read('negócio +80 venda cartão')).toEqual(venda('Venda'));
+    // Saída com palavra de venda continua saída, no cartão quando escrito.
+    expect(read('negócio taxa da venda 5')).toMatchObject({ kind: 'despesa', category: 'Taxas e maquininha', card: null });
+    expect(read('negócio taxa da venda 5 cartão')).toMatchObject({ kind: 'despesa', category: 'Taxas e maquininha', card: { hint: null } });
+    expect(read('negócio material para venda 120 cartão')).toMatchObject({ kind: 'despesa', category: 'Material e mercadoria', card: { hint: null } });
+    expect(read('negócio frete do produto vendido 20')).toMatchObject({ kind: 'despesa', category: 'Combustível e transporte' });
+    expect(read('negócio paguei 50 venda cartão')).toMatchObject({ kind: 'despesa', card: { hint: null } });
+    // Nenhuma entrada do negócio sai com cartão.
+    for (const t of ['negócio vendi 80 no cartão', 'negócio venda 80 cartão', 'negócio recebi 80 cartão azul', 'negócio +80 conserto cartão', 'negócio vendas 80 no crédito']) {
+      expect(read(t), t).toMatchObject({ type: 'anotar', kind: 'receita', card: null });
+    }
+    // No Pessoal, nada muda: venda no cartão segue compra no cartão, e "vendi" não é palavra de recebimento.
+    expect(read('vendi 80 no cartão')).toMatchObject({ kind: 'despesa', description: 'Vendi', card: { hint: null } });
+    expect(read('venda 80 cartão')).toMatchObject({ kind: 'despesa', description: 'Venda', card: { hint: null } });
+    expect(read('recebi 300 cartão')).toMatchObject({ kind: 'receita', description: 'Cartão', card: null });
   });
 
   it('depois da palavra, só anotar vale (e DESFAZER, que é a última anotação do canal); ligar, desligar e ajuda recebem a ajuda', () => {

@@ -15361,7 +15361,8 @@ setInterval(async () => {
           (await cp.getByRole('heading', { name: 'Criar conta', exact: true }).filter({ visible: true }).count()) === 1 && criar.texto.includes(CRIAR_TESTE) && criar.texto.includes(AVISO_DEMO),
         JSON.stringify({ ...criar, texto: criar.texto.slice(0, 500) }));
       await cpShot('619e_criar_conta_pelo_link_do_site');
-      ok('Plano do site (item 15): "?plano=empresa" não guarda nada; "?plano=familia&periodo=anual" fica só no aparelho, como "familia:anual"', invalido === null && guardado === 'familia:anual', JSON.stringify({ invalido, guardado }));
+      // Revisão independente da D-131: guardada com o instante, para valer só por 24 horas ("familia:anual@<milissegundos>").
+      ok('Plano do site (item 15): "?plano=empresa" não guarda nada; "?plano=familia&periodo=anual" fica só no aparelho, como "familia:anual" com o instante em que foi guardada', invalido === null && /^familia:anual@\d{13}$/.test(guardado ?? ''), JSON.stringify({ invalido, guardado }));
       // Voltar, de Criar conta aberta direto, leva às boas-vindas; "Já tenho conta · Entrar", a Entrar, como antes.
       await cp.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).first().click();
       await cpWait('Cuidar da vida financeira'); await cp.waitForTimeout(300);

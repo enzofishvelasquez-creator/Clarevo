@@ -75,7 +75,7 @@ const PAGAR = [
 function fimDaPagina(estado) {
   return estado.lancado
     ? 'Abra a Clarevo no computador, anote os gastos de hoje e veja o mês tomar forma.'
-    : `Crie a sua conta, anote os gastos de hoje e veja o mês tomar forma no computador. ${linhaDoConvite()}`;
+    : `Crie a sua conta, anote os gastos de hoje e veja o mês tomar forma no computador. ${linhaDoConvite(estado)}`;
 }
 /** Os botões da chamada final: lançado, "Assine aqui" e "Conheça o app"; antes do lançamento, "Criar conta grátis" e "Conheça o app". */
 function chamadasDaChamadaFinal(estado) {

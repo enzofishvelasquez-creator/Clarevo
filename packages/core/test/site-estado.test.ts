@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { NOTICIAS_TEXT } from '../src/noticias/fontes';
 import { ACCESS_TEXT, BILLING_PERIODS, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSCRIBE_OPEN, TRIAL_DAYS, planPeriodPriceAmount, planPriceAmount } from '../src/plano';
+import { WELCOME_TEXT } from '../src/welcome';
 
 /**
  * O estado do produto (D-125, `scripts/site/estado.js`, `docs/22_SITE.md`, seção 19): UM interruptor, `ESTADO_DO_PRODUTO.lancado` em
@@ -368,6 +369,34 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     // A linha é a do app com a compra fechada (ACCESS_TEXT.notOpenYet), sem o "Assinatura em breve." do começo.
     expect(AVISO_DOS_PLANOS).toBe(`A assinatura abre em breve. ${ACCESS_TEXT.notOpenYet.replace(/^Assinatura em breve\. /, '')}`);
     expect(SUBSCRIBE_OPEN).toBe(false);
+  });
+
+  it('com a compra já aberta e o site ainda antes do lançamento (revisão independente da D-131), o convite vai com o teste grátis, nunca com "a assinatura abre em breve"', () => {
+    const aberta = gerarSite({ referencia: REFERENCIA, estado: { lancado: false, simularAssinaturaAberta: true } });
+    const linha = `${WELCOME_TEXT.trial}.`;
+    expect(linha).toBe(`${TRIAL_DAYS} dias grátis, sem cartão.`);
+    const { linhaDoConvite } = require(join(ROOT, 'scripts', 'site', 'estado.js')) as { linhaDoConvite: (e: Estado) => string };
+    expect(linhaDoConvite(estadoDoProduto({ simularAssinaturaAberta: true }))).toBe(linha);
+    expect(linhaDoConvite(estadoDoProduto({ simularAssinaturaAberta: false }))).toBe(AVISO_DOS_PLANOS);
+    // Os mesmos lugares do convite, com a linha nova ao lado de "Criar conta grátis".
+    const blocos = [
+      /<div class="convite-conta">[\s\S]*?<\/div>/.exec(texto(aberta, 'index.html'))![0],
+      /<li><h3>Crie a sua conta<\/h3>[\s\S]*?<\/li>/.exec(texto(aberta, 'comece.html'))![0],
+      /<div class="chamada-final">[\s\S]*?<\/div>\n<p class="ja-tem-conta">/.exec(texto(aberta, 'web.html'))![0],
+      ...['planos.html', 'planos/individual.html', 'planos/familia.html'].map((n) => /<div class="acoes">\n<a class="botao botao-principal"[\s\S]*?<p class="estado-produto">[^<]+<\/p>/.exec(texto(aberta, n))![0]),
+      /<p class="ponte">[\s\S]*?<\/p>/.exec(texto(aberta, 'aprender/index.html'))![0],
+    ];
+    for (const b of blocos) {
+      expect(b).toMatch(/Criar conta grátis|crie a sua conta na Clarevo/);
+      expect(b).toContain(linha);
+    }
+    // Em página nenhuma, a frase da compra fechada nem "nada é cobrado".
+    for (const nome of lidos(aberta)) {
+      expect(texto(aberta, nome), nome).not.toContain(AVISO_DOS_PLANOS);
+      expect(texto(aberta, nome), nome).not.toContain('nada é cobrado');
+    }
+    // Com a compra fechada (o caso de hoje), a linha de sempre.
+    expect(/<div class="convite-conta">[\s\S]*?<\/div>/.exec(texto(pre, 'index.html'))![0]).toContain(AVISO_DOS_PLANOS);
   });
 
   it('as páginas de conteúdo terminam com uma linha calma para o app (jornada de compra de 27/11/2026, S2): o cadastro, antes do lançamento com a linha do convite, lançado com o teste grátis', () => {

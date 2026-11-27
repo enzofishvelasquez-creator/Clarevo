@@ -48,7 +48,7 @@ ${selosDasLojas(estado, { pequenos: true })}`;
       : {
           // Antes do lançamento (desde 27/11/2026): o convite ao cadastro, com a linha honesta e o botão; os planos, só no texto, sem preço.
           titulo: 'Crie a sua conta',
-          texto: `${linhaDoConvite()} Os planos Individual, para uma pessoa, e Família, para até ${pessoasNaFamilia()} pessoas, têm todos os recursos.`,
+          texto: `${linhaDoConvite(estado)} Os planos Individual, para uma pessoa, e Família, para até ${pessoasNaFamilia()} pessoas, têm todos os recursos.`,
           link: { href: u('planos.html'), texto: 'Ver os planos' },
           botao: botaoDoConvite(estado),
         },

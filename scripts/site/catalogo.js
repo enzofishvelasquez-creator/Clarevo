@@ -46,7 +46,7 @@ function carregarTs(ts, entradas) {
 function catalogo() {
   if (guardado) return guardado;
   const ts = carregarTypescript();
-  const [learn, guide, calc, datas, plano, indicadores, mercado, noticias, dinheiro] = carregarTs(ts, [
+  const [learn, guide, calc, datas, plano, indicadores, mercado, noticias, dinheiro, boasVindas] = carregarTs(ts, [
     'learn/index.ts',
     'guide/index.ts',
     'calculators/index.ts',
@@ -56,6 +56,7 @@ function catalogo() {
     'indicadores/conteudo.ts',
     'noticias/fontes.ts',
     'money.ts',
+    'welcome.ts',
   ]);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
@@ -123,6 +124,8 @@ function catalogo() {
       nomeDoPeriodo: plano.PERIOD_NAME,
       /** Os dias do teste grátis (TRIAL_DAYS), para a pergunta da página Planos. */
       diasDeTeste: plano.TRIAL_DAYS,
+      /** O teste grátis nas palavras das boas-vindas do app ("14 dias grátis, sem cartão", `WELCOME_TEXT.trial`). */
+      teste: boasVindas.WELCOME_TEXT.trial,
       /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */
       aberta: plano.SUBSCRIBE_OPEN === true,
     },

@@ -68,7 +68,7 @@ function linhaDoAnual(plano, classe = 'preco-anual') {
   const { PLANOS } = catalogo();
   const equivale = PLANOS.equivalente(plano).replace(/^E/, 'e');
   // Desde 27/11/2026 (jornada de compra, item S6), com a diferença para 12 mensalidades, como a tela Assinatura do app: "(equivale a R$ 22,49
-  // por mês, R$ 88,90 a menos que 12 mensalidades)". A ordem (o mensal em destaque) espera a decisão do Enzo.
+  // por mês, R$ 88,90 a menos que 12 mensalidades)". A ordem é a da D-131 (B): o mensal primeiro e em destaque, e o anual logo abaixo.
   return `<p class="${classe}">ou <span class="preco-valor-anual">${esc(PLANOS.precoAnual(plano))}</span>${esc(PLANOS.porAno)} (${esc(equivale)}, ${esc(PLANOS.diferencaDoAnual(plano))})</p>`;
 }
 

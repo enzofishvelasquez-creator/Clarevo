@@ -1,9 +1,11 @@
 import {
+  CHOSEN_PLAN_MAX_AGE_MS,
   CHOSEN_PLAN_STORAGE_KEY,
   chosenPlanFromSearch,
+  chosenPlanStillUseful,
   parseChosenPlan,
   parseStoredChosenPlan,
-  serializeChosenPlan,
+  serializeStoredChosenPlan,
   type ChosenPlan,
 } from '@clarevo/core';
 import { Platform } from 'react-native';
@@ -14,8 +16,11 @@ import { Platform } from 'react-native';
  * porque os links do site abrem a versão web) e usado uma vez, na primeira abertura da tela Assinatura. Nunca vai ao servidor. Ler ou gravar
  * pode falhar (navegação privada, armazenamento bloqueado): fica a cópia em memória, e nada quebra. Sem `periodo` no endereço, a tela abre
  * no mensal, o período marcado de sempre (`PLAN_PERIOD_DEFAULT`).
+ * Revisão independente da D-131: a escolha é guardada ao abrir a página, mesmo sem ninguém criar conta, então vale só por 24 horas
+ * (`CHOSEN_PLAN_MAX_AGE_MS`, com o instante guardado junto) e sai do aparelho ao ser lida depois disso, ao sair da conta e ao entrar numa
+ * conta que já não escolhe plano (`forgetChosenPlanUnlessUseful`, chamada quando o acesso chega).
  */
-let memory: ChosenPlan | null = null;
+let memory: { choice: ChosenPlan; savedAt: number } | null = null;
 
 function storage(): Storage | null {
   if (Platform.OS !== 'web') return null;
@@ -27,9 +32,10 @@ function storage(): Storage | null {
 }
 
 function save(choice: ChosenPlan): void {
-  memory = choice;
+  const savedAt = Date.now();
+  memory = { choice, savedAt };
   try {
-    storage()?.setItem(CHOSEN_PLAN_STORAGE_KEY, serializeChosenPlan(choice));
+    storage()?.setItem(CHOSEN_PLAN_STORAGE_KEY, serializeStoredChosenPlan(choice, savedAt));
   } catch {
     // Sem armazenamento: fica a memória.
   }
@@ -57,12 +63,23 @@ export function rememberChosenPlanFromLocation(): void {
   }
 }
 
-/** A escolha guardada, sem apagar. */
+/** A escolha guardada há menos de 24 horas, sem apagar; a velha, a do formato de antes (sem o instante) e a ilegível saem do aparelho. */
 export function peekChosenPlan(): ChosenPlan | null {
-  if (memory) return memory;
+  const now = Date.now();
+  if (memory) {
+    if (memory.savedAt <= now && now - memory.savedAt < CHOSEN_PLAN_MAX_AGE_MS) return memory.choice;
+    clearChosenPlan();
+    return null;
+  }
   try {
-    const stored = parseStoredChosenPlan(storage()?.getItem(CHOSEN_PLAN_STORAGE_KEY) ?? null);
-    if (stored) memory = stored;
+    const raw = storage()?.getItem(CHOSEN_PLAN_STORAGE_KEY) ?? null;
+    if (raw === null) return null;
+    const stored = parseStoredChosenPlan(raw, now);
+    if (!stored) {
+      clearChosenPlan();
+      return null;
+    }
+    memory = { choice: stored, savedAt: Number(raw.slice(raw.lastIndexOf('@') + 1)) };
     return stored;
   } catch {
     return null;
@@ -77,4 +94,12 @@ export function clearChosenPlan(): void {
   } catch {
     // Sem armazenamento: nada a apagar.
   }
+}
+
+/**
+ * Quando o acesso da conta chega (ao entrar e ao abrir o app): se a conta já não escolhe plano (assinatura própria, Plano Família de outra
+ * pessoa, benefício ou cortesia, `chosenPlanStillUseful`), a escolha sai do aparelho sem ser usada, sem esperar a tela Assinatura.
+ */
+export function forgetChosenPlanUnlessUseful(status: string): void {
+  if (!chosenPlanStillUseful(status)) clearChosenPlan();
 }

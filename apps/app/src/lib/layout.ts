@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
 
 /**
@@ -33,12 +34,57 @@ export function useWideLayout(): boolean {
 export const SHORT_MAX_HEIGHT = 500;
 
 /**
+ * A decisão de `useShortLandscape`, sem React: deitada (`landscape`; sem ela, mais larga que alta) e com menos de 500 px de altura.
+ */
+export function isShortLandscape(width: number, height: number, landscape: boolean = width > height): boolean {
+  return landscape && height > 0 && height < SHORT_MAX_HEIGHT;
+}
+
+/**
+ * Na web, a janela de layout (`document.documentElement`) e a orientação de `matchMedia('(orientation: landscape)')`, que o teclado da tela
+ * não muda no Safari do iPhone nem no Chrome atual do Android. `useWindowDimensions` do react-native-web segue a `visualViewport`, que
+ * encolhe quando o teclado abre: com ela, um celular em pé virava "deitado" ao tocar num campo (a busca de Movimentos, o código do convite
+ * nas boas-vindas), e o cabeçalho, a barra de baixo e a arte trocavam de versão, com a página pulando. null fora do navegador ou sem medida.
+ */
+function webShortLandscape(): boolean | null {
+  try {
+    if (typeof document === 'undefined' || !document.documentElement) return null;
+    const { clientWidth, clientHeight } = document.documentElement;
+    if (!clientWidth || !clientHeight) return null;
+    const media = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
+    return isShortLandscape(clientWidth, clientHeight, media ? media.matches : clientWidth > clientHeight);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Celular deitado (a versão web, no navegador ou instalada; o app das lojas fica sempre em pé): mais largo que alto e com menos de 500 px de
  * altura. Com o cabeçalho de duas linhas e a barra de baixo fixos, sobrava pouco mais da metade da tela para o conteúdo (227 de 390 px):
  * deitado, o cabeçalho das telas internas fica numa linha só, a barra de baixo fica mais baixa e a arte das boas-vindas, menor. Em pé, nada
- * muda.
+ * muda. Na web, decide pela janela de layout (`webShortLandscape`), de novo a cada mudança de tamanho ou de orientação; no celular, pelas
+ * medidas da tela, como antes.
  */
 export function useShortLandscape(): boolean {
   const { width, height } = useWindowDimensions();
-  return width > height && height < SHORT_MAX_HEIGHT;
+  const web = Platform.OS === 'web';
+  const [webShort, setWebShort] = useState<boolean | null>(() => (web ? webShortLandscape() : null));
+  useEffect(() => {
+    if (!web || typeof window === 'undefined') return;
+    const update = () => setWebShort(webShortLandscape());
+    const media = typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    // Safari antes do 14 só tem addListener.
+    if (media?.addEventListener) media.addEventListener('change', update);
+    else media?.addListener?.(update);
+    update();
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+      if (media?.removeEventListener) media.removeEventListener('change', update);
+      else media?.removeListener?.(update);
+    };
+  }, [web]);
+  return webShort ?? isShortLandscape(width, height);
 }

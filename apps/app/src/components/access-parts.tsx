@@ -19,6 +19,7 @@ import {
   isStoreSubscription,
   paidStartDay,
   pendingFirstCharge,
+  pendingFirstChargePlan,
   periodSuffix,
   pixCanPayNext,
   pixNextPaymentFrom,
@@ -117,7 +118,7 @@ function mayHaveWebSubscription(access: Access | undefined): boolean {
  * A assinatura no cartão da web de quem pode ter uma (D-129): primeiro o próprio direito, no banco (`useOwnWebEntitlements`, sem gastar a
  * cota do Asaas); a situação no Asaas (`situacao`) só na web e só com um direito pela web que vale (ou quem o banco já diz assinar pela web).
  * `firstCharge`: o dia da primeira cobrança ainda não paga de quem assinou no teste (antes do dia e no próprio dia, até a confirmação do
- * cartão); cancelada no Asaas, nenhum.
+ * cartão); cancelada no Asaas, nenhum. `firstChargePlan`: o plano dessa assinatura (quando a linha do banco traz).
  */
 export function useWebSubscriptionState(access: Access | undefined, now: Date) {
   const may = mayHaveWebSubscription(access);
@@ -126,7 +127,9 @@ export function useWebSubscriptionState(access: Access | undefined, now: Date) {
   const reads = Platform.OS === 'web' && may && (live || (access?.status === 'assinatura' && access.provider === 'web'));
   const status = useWebSubscriptionStatus(reads);
   const firstCharge = may && entitlements.data ? pendingFirstCharge(entitlements.data, now, status.data?.active === false) : null;
-  return { entitlements, live, reads, status, firstCharge };
+  // O plano dessa assinatura marcada: quem assinou o Família no teste já vê o próximo passo (criar a Família e convidar).
+  const firstChargePlan = may && entitlements.data ? pendingFirstChargePlan(entitlements.data, now, status.data?.active === false) : null;
+  return { entitlements, live, reads, status, firstCharge, firstChargePlan };
 }
 
 /** Card "Assinatura" em Conta: a situação, a explicação curta e o botão da tela Assinatura. */

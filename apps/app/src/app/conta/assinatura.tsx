@@ -9,6 +9,7 @@ import {
   parseWebPaymentReturn,
   todayIn,
   type Access,
+  type PlanKind,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, CheckCircle2, Info, UserPlus, Users } from 'lucide-react-native';
@@ -102,11 +103,12 @@ function WebCancelCard({ canceled, trialEnd = null, onTrialCanceled }: { cancele
 
 /**
  * O próximo passo de quem paga o plano Família (jornada de compra de 27/11/2026): sem Família, criar; sem ninguém convidado, convidar.
- * Calmo e sem prazo; some quando a Família tem outra pessoa ou um convite válido (`familyPlanNextStep`).
+ * Calmo e sem prazo; some quando a Família tem outra pessoa ou um convite válido (`familyPlanNextStep`). Também logo depois de assinar o
+ * Família no cartão durante o teste grátis (D-129), quando o banco ainda diz "teste" (`scheduledPlan`, o plano da assinatura marcada).
  */
-function FamilyNextStep({ access, now }: { access: Access; now: Date }) {
+function FamilyNextStep({ access, now, scheduledPlan }: { access: Access; now: Date; scheduledPlan: PlanKind | null }) {
   const family = useFamily();
-  const step = familyPlanNextStep(access, family.isSuccess ? family.data : undefined, now);
+  const step = familyPlanNextStep(access, family.isSuccess ? family.data : undefined, now, scheduledPlan);
   if (!step) return null;
   const create = step === 'criar';
   return (
@@ -207,7 +209,7 @@ export default function AssinaturaScreen() {
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}
             {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
-            <FamilyNextStep access={access.data} now={now} />
+            <FamilyNextStep access={access.data} now={now} scheduledPlan={web.firstChargePlan} />
             {/* Quem ainda escolhe um plano: os planos primeiro e o que a assinatura libera depois deles (jornada de compra de 27/11/2026). */}
             {view.showPlans ? null : <BenefitsCard subscribed={subscribed} />}
             {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} chosen={chosen} /> : null}

@@ -2,11 +2,12 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as core from '../src';
 import { APP_DIR, loadApp } from './app-sandbox';
 import {
   ACCESS_TEXT,
+  CHOSEN_PLAN_MAX_AGE_MS,
   CHOSEN_PLAN_PARAMS,
   CHOSEN_PLAN_STORAGE_KEY,
   CHOSEN_PLAN_TEXT,
@@ -24,6 +25,7 @@ import {
   parseChosenPlan,
   parseStoredChosenPlan,
   serializeChosenPlan,
+  serializeStoredChosenPlan,
   signedOutScreen,
   signupEntryFrom,
   signupTrialLine,
@@ -92,7 +94,8 @@ describe('o plano escolhido no site (item 15)', () => {
     expect(chosenPlanFromSearch('?email=ana%40exemplo.com')).toBeNull();
   });
 
-  it('o texto guardado no aparelho volta igual, e um texto fora do formato não vale', () => {
+  it('o texto guardado no aparelho volta igual, com o instante em que foi guardado, e um texto fora do formato não vale', () => {
+    const SALVO = Date.UTC(2026, 10, 27, 15, 0);
     for (const c of [
       { plan: 'individual', period: 'mensal' },
       { plan: 'individual', period: 'anual' },
@@ -100,18 +103,100 @@ describe('o plano escolhido no site (item 15)', () => {
       { plan: 'familiar', period: 'anual' },
       { plan: 'familiar', period: null },
     ] as const) {
-      expect(parseStoredChosenPlan(serializeChosenPlan(c))).toEqual(c);
+      expect(parseStoredChosenPlan(serializeStoredChosenPlan(c, SALVO), SALVO + 60_000)).toEqual(c);
     }
     expect(serializeChosenPlan({ plan: 'familiar', period: 'anual' })).toBe('familia:anual');
-    for (const raw of [null, undefined, 1, '', 'familia:', 'familia:anual:x', 'familiar:anual', '{"plan":"familiar"}', `familia:${'x'.repeat(50)}`]) {
-      expect(parseStoredChosenPlan(raw), String(raw)).toBeNull();
+    expect(serializeStoredChosenPlan({ plan: 'familiar', period: 'anual' }, SALVO)).toBe(`familia:anual@${SALVO}`);
+    for (const raw of [null, undefined, 1, '', 'familia:', 'familia:anual:x', 'familiar:anual', '{"plan":"familiar"}', `familia:${'x'.repeat(50)}`,
+      `familia:@${SALVO}`, `familia:anual:x@${SALVO}`, `familiar:anual@${SALVO}`, `familia:anual@`, `familia:anual@-1`, `familia:anual@${SALVO}@${SALVO}`]) {
+      expect(parseStoredChosenPlan(raw, SALVO + 60_000), String(raw)).toBeNull();
     }
     expect(CHOSEN_PLAN_STORAGE_KEY).toMatch(/^clarevo\./);
+  });
+
+  it('a escolha vale no aparelho por 24 horas (revisão independente da D-131); o formato de antes, sem o instante, e o instante no futuro não valem', () => {
+    const SALVO = Date.UTC(2026, 10, 27, 15, 0);
+    const guardado = serializeStoredChosenPlan({ plan: 'familiar', period: 'anual' }, SALVO);
+    expect(CHOSEN_PLAN_MAX_AGE_MS).toBe(24 * 60 * 60 * 1000);
+    expect(parseStoredChosenPlan(guardado, SALVO)).toEqual({ plan: 'familiar', period: 'anual' });
+    expect(parseStoredChosenPlan(guardado, SALVO + CHOSEN_PLAN_MAX_AGE_MS - 1)).toEqual({ plan: 'familiar', period: 'anual' });
+    expect(parseStoredChosenPlan(guardado, SALVO + CHOSEN_PLAN_MAX_AGE_MS)).toBeNull();
+    expect(parseStoredChosenPlan(guardado, SALVO + 3 * CHOSEN_PLAN_MAX_AGE_MS)).toBeNull();
+    // O relógio do aparelho voltou: o instante guardado ficou no futuro.
+    expect(parseStoredChosenPlan(guardado, SALVO - 1)).toBeNull();
+    // O texto de antes de 27/11/2026, sem o instante, não vale (e o app o apaga ao ler).
+    expect(parseStoredChosenPlan('familia:anual', SALVO)).toBeNull();
   });
 
   it('só vale para quem ainda escolhe um plano (antes do início da cobrança, no teste e em só ver e exportar)', () => {
     expect(['pre_lancamento', 'teste', 'leitura'].map(chosenPlanStillUseful)).toEqual([true, true, true]);
     expect(['assinatura', 'familia', 'beneficio', 'cortesia'].map(chosenPlanStillUseful)).toEqual([false, false, false, false]);
+  });
+
+  describe('no aparelho (apps/app/src/lib/chosen-plan.ts, na web)', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+    /** O módulo do app, carregado de novo a cada teste, com um localStorage de mentira e o endereço da primeira carga. */
+    function carregar(endereco = { pathname: '/', search: '' }) {
+      const guardado = new Map<string, string>();
+      const localStorage = {
+        getItem: (k: string) => guardado.get(k) ?? null,
+        setItem: (k: string, v: string) => void guardado.set(k, v),
+        removeItem: (k: string) => void guardado.delete(k),
+      };
+      vi.stubGlobal('window', { localStorage, location: endereco });
+      const lib = loadApp(path.join(APP_DIR, 'src', 'lib', 'chosen-plan.ts'), {
+        platform: 'web',
+        mocks: { '@clarevo/core': core, 'react-native-web/dist/exports/Platform': { __esModule: true, default: { OS: 'web' } } },
+      });
+      return { lib, guardado };
+    }
+    const AGORA = new Date('2026-11-27T15:00:00.000Z');
+
+    it('guarda com o instante, devolve por 24 horas e depois ignora e apaga', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(AGORA);
+      const { lib, guardado } = carregar({ pathname: '/criar-conta', search: '?plano=familia&periodo=anual' });
+      lib.rememberChosenPlanFromLocation();
+      expect(guardado.get(CHOSEN_PLAN_STORAGE_KEY)).toBe(`familia:anual@${AGORA.getTime()}`);
+      vi.setSystemTime(AGORA.getTime() + CHOSEN_PLAN_MAX_AGE_MS - 60_000);
+      expect(lib.peekChosenPlan()).toEqual({ plan: 'familiar', period: 'anual' });
+      vi.setSystemTime(AGORA.getTime() + CHOSEN_PLAN_MAX_AGE_MS);
+      expect(lib.peekChosenPlan()).toBeNull();
+      expect(guardado.has(CHOSEN_PLAN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('a escolha guardada antes (outra aba ou outra abertura) vale pelo instante dela; a velha e a do formato de antes saem ao ler', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(AGORA);
+      const fresca = carregar();
+      fresca.guardado.set(CHOSEN_PLAN_STORAGE_KEY, `individual@${AGORA.getTime() - 60 * 60 * 1000}`);
+      expect(fresca.lib.peekChosenPlan()).toEqual({ plan: 'individual', period: null });
+      const velha = carregar();
+      velha.guardado.set(CHOSEN_PLAN_STORAGE_KEY, `familia:mensal@${AGORA.getTime() - CHOSEN_PLAN_MAX_AGE_MS - 1}`);
+      expect(velha.lib.peekChosenPlan()).toBeNull();
+      expect(velha.guardado.has(CHOSEN_PLAN_STORAGE_KEY)).toBe(false);
+      const antiga = carregar();
+      antiga.guardado.set(CHOSEN_PLAN_STORAGE_KEY, 'familia:anual');
+      expect(antiga.lib.peekChosenPlan()).toBeNull();
+      expect(antiga.guardado.has(CHOSEN_PLAN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('ao entrar numa conta que já não escolhe plano (assinatura, Família de outra pessoa, benefício, cortesia), a escolha sai; no teste, fica', () => {
+      for (const status of ['assinatura', 'familia', 'beneficio', 'cortesia', 'teste', 'leitura', 'pre_lancamento']) {
+        const { lib, guardado } = carregar();
+        lib.rememberChosenPlan({ plano: 'individual', periodo: 'mensal' });
+        lib.forgetChosenPlanUnlessUseful(status);
+        expect(guardado.has(CHOSEN_PLAN_STORAGE_KEY), status).toBe(chosenPlanStillUseful(status));
+        expect(lib.peekChosenPlan() !== null, status).toBe(chosenPlanStillUseful(status));
+      }
+      // O acesso da conta, quando chega, passa por aí: na entrada e ao abrir o app, sem esperar a tela Assinatura.
+      const acesso = ler('apps/app/src/state/access.ts');
+      expect(acesso).toContain("import { forgetChosenPlanUnlessUseful } from '@/lib/chosen-plan';");
+      expect(acesso).toMatch(/if \(status\) forgetChosenPlanUnlessUseful\(status\);/);
+    });
   });
 
   it('o app guarda a escolha só no aparelho e a apaga depois de usar ou ao esquecer o aparelho; nada vai ao servidor', () => {
@@ -230,6 +315,46 @@ describe('o próximo passo do plano Família (item 4)', () => {
     for (const status of ['teste', 'leitura', 'pre_lancamento', 'familia', 'beneficio', 'cortesia'] as const) {
       expect(familyPlanNextStep({ ...paid, status }, null, NOW), status).toBeNull();
     }
+  });
+
+  it('logo depois de assinar o Família no cartão durante o teste grátis (D-129: o banco segue dizendo "teste" até a primeira cobrança), também', () => {
+    const trial: Access = { status: 'teste', plan: null, until: '2026-12-10T12:00:00.000Z', canWrite: true, provider: null };
+    // A assinatura marcada para o fim do teste, lida do próprio direito no banco: janela de até 4 dias, a partir do dia da primeira cobrança.
+    const marcada = core.parseOwnWebEntitlementsWithPlan([{ valid_from: '2026-12-10T03:00:00.000Z', valid_until: '2026-12-14T02:59:59.999Z', plan: 'familiar' }]);
+    expect(marcada).toEqual([{ validFrom: '2026-12-10T03:00:00.000Z', validUntil: '2026-12-14T02:59:59.999Z', plan: 'familiar' }]);
+    expect(core.pendingFirstCharge(marcada, NOW)).toBe('2026-12-10');
+    const scheduled = core.pendingFirstChargePlan(marcada, NOW);
+    expect(scheduled).toBe('familiar');
+    expect(familyPlanNextStep(trial, null, NOW, scheduled)).toBe('criar');
+    expect(familyPlanNextStep(trial, family(), NOW, scheduled)).toBe('convidar');
+    // Com outra pessoa ou um convite válido, sem ser titular ou com a Família ainda não lida, nada (como depois de pagar).
+    const davi = { ...me, personId: 'b', firstName: 'Davi', role: 'membro' as const, isMe: false };
+    expect(familyPlanNextStep(trial, family({ members: [me, davi] }), NOW, scheduled)).toBeNull();
+    expect(familyPlanNextStep(trial, family({ invites: [invite()] as never }), NOW, scheduled)).toBeNull();
+    expect(familyPlanNextStep(trial, family({ role: 'membro' }), NOW, scheduled)).toBeNull();
+    expect(familyPlanNextStep(trial, undefined, NOW, scheduled)).toBeNull();
+    // Só o plano Família: o Individual marcado, sem assinatura marcada, cancelada no Asaas ou sem o plano na linha, nada.
+    const individual = core.parseOwnWebEntitlementsWithPlan([{ valid_from: '2026-12-10T03:00:00.000Z', valid_until: '2026-12-14T02:59:59.999Z', plan: 'individual' }]);
+    expect(familyPlanNextStep(trial, null, NOW, core.pendingFirstChargePlan(individual, NOW))).toBeNull();
+    expect(familyPlanNextStep(trial, null, NOW)).toBeNull();
+    expect(core.pendingFirstChargePlan(marcada, NOW, true)).toBeNull();
+    expect(core.pendingFirstChargePlan(core.parseOwnWebEntitlementsWithPlan([{ valid_from: '2026-12-10T03:00:00.000Z', valid_until: '2026-12-14T02:59:59.999Z', plan: 'outro' }]), NOW)).toBeNull();
+    // O leitor de antes (o da função do servidor) continua sem o plano; o do app lê as mesmas linhas, com o plano.
+    expect(core.parseOwnWebEntitlements([{ valid_from: '2026-12-10T03:00:00.000Z', valid_until: '2026-12-14T02:59:59.999Z', plan: 'familiar' }])).toEqual([
+      { validFrom: '2026-12-10T03:00:00.000Z', validUntil: '2026-12-14T02:59:59.999Z' },
+    ]);
+    expect(core.parseOwnWebEntitlementsWithPlan([null, { valid_from: 'ontem' }, 'x'])).toEqual([]);
+    expect(core.parseOwnWebEntitlementsWithPlan('x')).toEqual([]);
+    // Uma assinatura já paga (um mês) não é a marcada; o plano dela vem do próprio acesso, em "assinatura".
+    expect(core.pendingFirstChargePlan(core.parseOwnWebEntitlementsWithPlan([{ valid_from: '2026-11-20T03:00:00.000Z', valid_until: '2026-12-21T02:59:59.999Z', plan: 'familiar' }]), NOW)).toBeNull();
+    // O plano marcado só vale no teste: em só leitura, Família de outra pessoa, benefício ou cortesia, nada.
+    for (const status of ['leitura', 'pre_lancamento', 'familia', 'beneficio', 'cortesia'] as const) {
+      expect(familyPlanNextStep({ ...trial, status }, null, NOW, 'familiar'), status).toBeNull();
+    }
+    // A tela pede o plano junto com o começo e o fim do direito, e passa o plano marcado ao próximo passo.
+    expect(ler('apps/app/src/lib/supabase-repository.ts')).toContain(".select('valid_from, valid_until, plan').eq('provider', 'web')");
+    expect(ler('apps/app/src/lib/supabase-repository.ts')).toContain('return parseOwnWebEntitlementsWithPlan(data);');
+    expect(ler('apps/app/src/app/conta/assinatura.tsx')).toContain('scheduledPlan={web.firstChargePlan}');
   });
 
   it('textos calmos, com o número de pessoas do plano, e a tela leva à criação e ao convite que já existem', () => {

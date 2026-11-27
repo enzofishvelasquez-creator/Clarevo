@@ -13,7 +13,7 @@
  *     jornada de compra de 27/11/2026, pergunta 1) o site CONVIDA a criar a conta antes do lançamento: "Criar conta grátis", para a tela de
  *     criar conta do app web (`/criar-conta`, com `?plano=individual|familia` quando a página é de um plano), sempre com a linha honesta "A
  *     assinatura abre em breve. Por enquanto, o acesso é completo e nada é cobrado." (`linhaDoConvite`, a mesma frase do app,
- *     `ACCESS_TEXT.notOpenYet`). O convite fica na seção Planos do início, em `planos.html` e na página de cada plano, em Comece aqui, em Use
+ *     `ACCESS_TEXT.notOpenYet`; com a compra já aberta e o site ainda antes do lançamento, "14 dias grátis, sem cartão."). O convite fica na seção Planos do início, em `planos.html` e na página de cada plano, em Comece aqui, em Use
  *     no navegador e na linha do fim das páginas de conteúdo (`ponteParaOProduto`); o menu continua só com "Entrar". A regra: antes do
  *     lançamento, o site pode levar a `/criar-conta`, mas nunca a uma compra (a venda continua fechada, `SUBSCRIBE_OPEN`) nem com uma
  *     promessa de preço além do "Em breve" dos planos. Como antes, nenhum link para a tela inicial do app web: o convite leva direto à
@@ -79,6 +79,7 @@ function estadoDoProduto(sobrescrever = {}) {
     }
   }
   if (typeof estado.indexar !== 'boolean') throw new Error('estado do produto: "indexar" precisa ser true ou false (scripts/site/config.js)');
+  if (typeof estado.noticiasLigadas !== 'boolean') throw new Error('estado do produto: "noticiasLigadas" precisa ser true ou false (scripts/site/config.js)');
   if (typeof estado.prazoDeResposta !== 'string') throw new Error('estado do produto: "prazoDeResposta" é um texto (vazio, nenhuma página promete prazo)');
   if (simularAssinaturaAberta !== undefined && typeof simularAssinaturaAberta !== 'boolean') throw new Error('estado do produto: "simularAssinaturaAberta" precisa ser true ou false');
   const doNucleo = assinaturaAbertaNoNucleo();
@@ -229,12 +230,16 @@ function chamadas(arquivo, estado, { secundaria = null, plano = null, periodo = 
 
 /**
  * O convite ao cadastro antes do lançamento (decisão do Enzo de 27/11/2026, jornada de compra de 27/11/2026, pergunta 1, depois da D-129 A,
- * que deixou o cadastro aberto): o texto do botão e a linha honesta que vai sempre ao lado dele. A segunda frase da linha é a do app com a
- * compra fechada (`ACCESS_TEXT.notOpenYet`, "Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.", sem o começo), a
+ * que deixou o cadastro aberto): o texto do botão e a linha honesta que vai sempre ao lado dele. Com a compra fechada, a segunda frase da
+ * linha é a do app (`ACCESS_TEXT.notOpenYet`, "Assinatura em breve. Por enquanto, o acesso é completo e nada é cobrado.", sem o começo), a
  * mesma que a tela de criar conta mostra (`signupTrialLine`): o site nunca promete mais do que o app diz. Sem preço e sem prazo.
+ * Com a compra já aberta (`SUBSCRIBE_OPEN`) e o site ainda antes do lançamento (o plano é abrir a compra antes de mudar `lancado`; revisão
+ * independente da D-131), aquela frase seria falsa: a linha passa a ser o teste grátis, nas palavras das boas-vindas do app ("14 dias
+ * grátis, sem cartão.", `WELCOME_TEXT.trial`).
  */
 const TEXTO_DO_CONVITE = 'Criar conta grátis';
-function linhaDoConvite() {
+function linhaDoConvite(estado = estadoEmVigor()) {
+  if (estado.assinaturaAberta) return `${require('./catalogo').catalogo().PLANOS.teste}.`;
   const doApp = require('./catalogo').catalogo().PLANOS.texto.notOpenYet;
   const porEnquanto = doApp.replace(/^Assinatura em breve\. /, '');
   if (porEnquanto === doApp || !/^Por enquanto, /.test(porEnquanto)) {
@@ -249,7 +254,7 @@ function linhaDoConvite() {
  * assinatura abre em breve, na web e nas lojas.", sem ação nenhuma ao lado). Depois do lançamento, nada.
  */
 function assinaturaEmBreve(estado) {
-  return estado.lancado ? '' : linhaDoConvite();
+  return estado.lancado ? '' : linhaDoConvite(estado);
 }
 
 /**
@@ -268,7 +273,7 @@ function botaoDoConvite(estado, { plano = null } = {}) {
  */
 function conviteAoCadastro(estado, { plano = null } = {}) {
   if (estado.lancado) return '';
-  return `<div class="convite-conta">\n<p class="aviso-assinatura">${esc(linhaDoConvite())}</p>\n<p class="acoes acoes-convite">${botaoDoConvite(estado, { plano })}</p>\n</div>`;
+  return `<div class="convite-conta">\n<p class="aviso-assinatura">${esc(linhaDoConvite(estado))}</p>\n<p class="acoes acoes-convite">${botaoDoConvite(estado, { plano })}</p>\n</div>`;
 }
 
 /**
@@ -279,7 +284,7 @@ function conviteAoCadastro(estado, { plano = null } = {}) {
  */
 function chamadasDosPlanos(arquivo, estado, { plano = null, periodo = null } = {}) {
   if (estado.lancado) return `${chamadas(arquivo, estado, { secundaria: 'app', plano, periodo })}\n<p class="estado-produto">${esc(linhaDaCapa(estado))}</p>`;
-  return `${chamadasDoConvite(arquivo, estado, { plano })}\n<p class="estado-produto">${esc(linhaDoConvite())}</p>`;
+  return `${chamadasDoConvite(arquivo, estado, { plano })}\n<p class="estado-produto">${esc(linhaDoConvite(estado))}</p>`;
 }
 
 /**
@@ -302,7 +307,7 @@ function chamadasDoConvite(arquivo, estado, { secundaria = 'app', plano = null }
  */
 function ponteParaOProduto(arquivo, estado) {
   const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
-  const depois = estado.lancado ? `Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.` : linhaDoConvite();
+  const depois = estado.lancado ? `Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.` : linhaDoConvite(estado);
   return `<p class="ponte">${esc(inicio)} <a href="${esc(urlDoCadastro())}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. ${esc(depois)}</p>`;
 }
 

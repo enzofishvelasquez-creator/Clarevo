@@ -317,12 +317,20 @@ export const SUBSCRIPTION_SCREEN_TEXT = {
 
 /**
  * O próximo passo de quem paga o plano Família (jornada de compra de 27/11/2026, item 4): depois de pagar, nada levava a criar a Família e
- * convidar as pessoas, e sem isso o plano não entrega o que vendeu. Só com a assinatura Família em vigor da própria pessoa: sem Família,
- * "criar"; na Família em que é titular, sem mais ninguém e sem convite válido, "convidar"; nos outros casos (ou enquanto a Família não foi
- * lida), nada. `family`: a leitura da Família (null: não tem; undefined: ainda não chegou ou falhou).
+ * convidar as pessoas, e sem isso o plano não entrega o que vendeu. Só com a assinatura Família da própria pessoa: em vigor ou, no teste
+ * grátis, assinada no cartão para a primeira cobrança no fim do teste (D-129: o banco segue dizendo "teste" até lá; `scheduledPlan`, o plano
+ * dessa assinatura marcada, `pendingFirstChargePlan`). Sem Família, "criar"; na Família em que é titular, sem mais ninguém e sem convite
+ * válido, "convidar"; nos outros casos (ou enquanto a Família não foi lida), nada. `family`: a leitura da Família (null: não tem;
+ * undefined: ainda não chegou ou falhou).
  */
-export function familyPlanNextStep(access: Access, family: FamilyOverview | null | undefined, now: Date): 'criar' | 'convidar' | null {
-  if (access.status !== 'assinatura' || access.plan !== 'familiar' || family === undefined) return null;
+export function familyPlanNextStep(
+  access: Access,
+  family: FamilyOverview | null | undefined,
+  now: Date,
+  scheduledPlan: PlanKind | null = null,
+): 'criar' | 'convidar' | null {
+  const paysFamily = (access.status === 'assinatura' && access.plan === 'familiar') || (access.status === 'teste' && scheduledPlan === 'familiar');
+  if (!paysFamily || family === undefined) return null;
   if (family === null) return 'criar';
   if (family.role !== 'titular') return null;
   const others = family.members.filter((m) => m.status === 'ativo' && !m.isMe).length;

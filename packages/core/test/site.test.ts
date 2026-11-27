@@ -188,8 +188,12 @@ const PAGINAS_DE_MERCADO = [
   'noticias/index.html',
   'noticias/materia.html',
 ];
-/** As páginas fora do mapa do site e com `noindex` mesmo com tudo preenchido: a 404 e a página de leitura das notícias (o texto é da fonte). */
-const SEM_INDEXAR = ['404.html', 'noticias/materia.html'];
+/**
+ * As páginas fora do mapa do site e com `noindex` mesmo com tudo preenchido: a 404, a página de leitura das notícias (o texto é da fonte) e,
+ * enquanto as notícias estão desligadas (`noticiasLigadas: false` em `scripts/site/config.js`, revisão independente da D-131), a lista de
+ * notícias, que só diz "Em breve".
+ */
+const SEM_INDEXAR = ['404.html', 'noticias/materia.html', 'noticias/index.html'];
 const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...PAGINAS_DE_MERCADO, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /**
  * As páginas do menu principal (a página atual é marcada com aria-current). Desde 25/11/2026 (D-125), Planos e a página do MEI entraram;
@@ -785,7 +789,8 @@ describe('site público: as páginas geradas', () => {
       expect(sitemap).toContain('<loc>https://exemplo.test/aprender/decimo-terceiro</loc>');
       expect(sitemap).not.toContain('404');
       expect(sitemap).not.toContain('/noticias/materia');
-      // Sem a 404 e a página de leitura das notícias, e com a página do feed RSS (D-115), que só existe com domínio.
+      expect(sitemap).not.toContain('<loc>https://exemplo.test/noticias/</loc>');
+      // Sem a 404, a página de leitura das notícias e a lista de notícias desligada, e com a página do feed RSS (D-115), que só existe com domínio.
       expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length - SEM_INDEXAR.length + 1);
       expect(sitemap).toContain('<loc>https://exemplo.test/novidades/rss</loc>');
       const robots = texto(g.arquivos.get('robots.txt'));
@@ -3190,7 +3195,9 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
       expect(h(g, 'indicadores/index.html')).toContain('href="../noticias/index.html"');
       const sitemap = h(g, 'sitemap.xml');
       expect(sitemap).toContain('<url><loc>https://exemplo.test/noticias/semana-2026-11-12</loc><lastmod>2026-11-12</lastmod></url>');
-      expect(sitemap).toContain('<loc>https://exemplo.test/noticias/</loc>');
+      // A lista de notícias, com as notícias desligadas (o padrão), fica fora; o resumo da semana, escrito pela Clarevo, entra.
+      expect(sitemap).not.toContain('<loc>https://exemplo.test/noticias/</loc>');
+      expect(h(g, 'noticias/semana-2026-11-12.html')).not.toContain('noindex');
       for (const nome of ['noticias/index.html', 'noticias/semana-2026-11-12.html']) {
         expect(h(g, nome).match(/<h1[\s>]/g)?.length, nome).toBe(1);
         expect(gerador.problemasDeTitulos(h(g, nome)), nome).toEqual([]);
@@ -3268,9 +3275,28 @@ describe('site público: notícias de fontes públicas (D-117), prontas e deslig
     expect(pagina).toContain(`data-estado="em-breve" hidden>${esc(NOTICIAS_TEXT.emBreve)}</p>`);
     expect(pagina).toContain(`data-estado="nao-encontrada" hidden>${esc(NOTICIAS_TEXT.materiaNaoEncontrada)}</p>`);
     expect(pagina).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
-    expect(h(comDominio, 'sitemap.xml')).toContain('<loc>https://exemplo.test/noticias/</loc>');
     expect(h(comDominio, 'sitemap.xml')).not.toContain('noticias/materia');
     expect(main(pagina)).not.toMatch(/<img\b|<iframe\b/);
+  });
+
+  it('a lista de notícias só entra na busca com as notícias ligadas (noticiasLigadas em scripts/site/config.js, junto com NOTICIAS=ligado na Cloudflare)', () => {
+    // Desligadas (o padrão, até a resposta do advogado): a página só diz "Em breve", então fica com noindex e fora do sitemap.
+    const config = require(join(ROOT, 'scripts', 'site', 'config.js')) as { ESTADO_DO_PRODUTO: { noticiasLigadas: unknown } };
+    expect(config.ESTADO_DO_PRODUTO.noticiasLigadas).toBe(false);
+    expect(h(comDominio, 'noticias/index.html')).toContain('<meta name="robots" content="noindex">');
+    expect(h(comDominio, 'sitemap.xml')).not.toContain('<loc>https://exemplo.test/noticias/</loc>');
+    // Ligadas: a lista entra no sitemap e perde o noindex; a página de leitura continua fora (o texto é da fonte).
+    const ligadas = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, estado: { noticiasLigadas: true } });
+    expect(h(ligadas, 'noticias/index.html')).not.toContain('noindex');
+    expect(h(ligadas, 'noticias/index.html')).toContain('<link rel="canonical" href="https://exemplo.test/noticias/">');
+    expect(h(ligadas, 'sitemap.xml')).toContain('<loc>https://exemplo.test/noticias/</loc>');
+    expect(h(ligadas, 'sitemap.xml')).not.toContain('noticias/materia');
+    expect(h(ligadas, 'noticias/materia.html')).toContain('<meta name="robots" content="noindex">');
+    // Só o interruptor muda: o resto do site é o mesmo, e o mapa ganha só a lista.
+    const locs = (g: Gerado): string[] => [...(h(g, 'sitemap.xml').match(/<loc>[^<]+<\/loc>/g) ?? [])];
+    expect(locs(ligadas).filter((l) => !locs(comDominio).includes(l))).toEqual(['<loc>https://exemplo.test/noticias/</loc>']);
+    expect(locs(comDominio).filter((l) => !locs(ligadas).includes(l))).toEqual([]);
+    expect(() => gerarSite({ referencia: REFERENCIA_DOS_POSTS, estado: { noticiasLigadas: 'sim' } })).toThrow(/"noticiasLigadas" precisa ser true ou false/);
   });
 
   it('"Notícias" no rodapé de todas as páginas; o menu principal não muda; as páginas das fontes são os únicos links novos para fora', () => {

@@ -4,8 +4,9 @@ import { parseBillingPeriod, type BillingPeriod, type PlanKind } from './plano-p
  * O plano escolhido no site, levado ao app (jornada de compra de 27/11/2026, item 15). As páginas de plano do site mandam a escolha no
  * endereço do cadastro: `/criar-conta?plano=individual|familia&periodo=mensal|anual` (os mesmos nomes no link de Entrar, se a pessoa passar
  * por ele). O app lê o endereço, confere os valores com rigor e guarda a escolha só no aparelho (nunca no servidor: não é rastreamento e
- * nada vai ao banco). Na primeira vez que a pessoa abre a tela Assinatura, a escolha marca o período e destaca o plano, sem assinar nem
- * marcar mais nada por ela; depois disso, ou quando já há assinatura, a escolha sai do aparelho.
+ * nada vai ao banco), por no máximo 24 horas. Na primeira vez que a pessoa abre a tela Assinatura, a escolha marca o período e destaca o
+ * plano, sem assinar nem marcar mais nada por ela; depois disso, quando já há assinatura (também ao entrar numa conta que já assina) ou
+ * passadas as 24 horas, a escolha sai do aparelho.
  */
 export interface ChosenPlan {
   plan: PlanKind;
@@ -25,6 +26,12 @@ const PARAM_FROM_PLAN: Readonly<Record<PlanKind, string>> = { individual: 'indiv
 
 /** A chave do aparelho (localStorage na web). */
 export const CHOSEN_PLAN_STORAGE_KEY = 'clarevo.plano-escolhido.v1';
+/**
+ * Quanto tempo a escolha vale no aparelho (revisão independente da D-131): 24 horas. O app guarda a escolha ao abrir a página, mesmo sem
+ * ninguém criar conta; depois de um dia, ela é ignorada e sai do aparelho, para não aparecer marcada para outra pessoa que entrar no mesmo
+ * navegador.
+ */
+export const CHOSEN_PLAN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Um valor do endereço: só texto simples (o roteador entrega lista quando o parâmetro se repete, e isso é recusado). */
 function single(v: unknown): string | null | 'invalido' {
@@ -64,10 +71,23 @@ export function serializeChosenPlan(choice: ChosenPlan): string {
   return choice.period ? `${PARAM_FROM_PLAN[choice.plan]}:${choice.period}` : PARAM_FROM_PLAN[choice.plan];
 }
 
-/** Lê o texto guardado no aparelho, com as mesmas regras do endereço. Fora do formato: null. */
-export function parseStoredChosenPlan(raw: unknown): ChosenPlan | null {
+/** O texto guardado no aparelho: a escolha e o instante em que foi guardada, em milissegundos ("familia:anual@1764244800000"). */
+export function serializeStoredChosenPlan(choice: ChosenPlan, savedAt: number): string {
+  return `${serializeChosenPlan(choice)}@${Math.floor(savedAt)}`;
+}
+
+/**
+ * Lê o texto guardado no aparelho, com as mesmas regras do endereço, e só se foi guardado há menos de 24 horas (`CHOSEN_PLAN_MAX_AGE_MS`)
+ * antes de `now`. Fora do formato, sem o instante (o formato de antes de 27/11/2026), guardado "no futuro" (o relógio do aparelho mudou) ou
+ * velho: null, e quem lê apaga.
+ */
+export function parseStoredChosenPlan(raw: unknown, now: number): ChosenPlan | null {
   if (typeof raw !== 'string' || raw.length > 40) return null;
-  const [plan, period, extra] = raw.split(':');
+  const m = /^([^@]*)@(\d{1,15})$/.exec(raw);
+  if (!m) return null;
+  const savedAt = Number(m[2]);
+  if (!Number.isFinite(now) || savedAt > now || now - savedAt >= CHOSEN_PLAN_MAX_AGE_MS) return null;
+  const [plan, period, extra] = m[1]!.split(':');
   if (extra !== undefined) return null;
   return parseChosenPlan({ [CHOSEN_PLAN_PARAMS.plan]: plan, [CHOSEN_PLAN_PARAMS.period]: period });
 }
