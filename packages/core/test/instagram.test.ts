@@ -226,7 +226,7 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(semFrase).not.toMatch(/lista de espera|gr[áa]tis|teste gratuito|cadastre|R\$|\d{1,2}\/\d{1,2}|\bem breve\b/i);
     expect(txt).not.toMatch(/fase de testes|piloto|informações de acesso/i);
     expect(txt).toMatch(/Conheça a Clarevo pelo link da bio\./);
-    expect(p03.paginas?.[0]).toMatchObject({ titulo: 'Como conhecer a Clarevo' });
+    expect(p03.paginas?.[0]).toMatchObject({ titulo: 'Quer conhecer a Clarevo *por dentro*?' });
   });
 
   it('a B01 traz a ressalva da NR-1 e nenhum serviço que o produto não tem', () => {
