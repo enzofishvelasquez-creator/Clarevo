@@ -18,6 +18,7 @@
 | `+200 freela` | Recebimento, sem categoria |
 | `farmácia 41 cartão` | Compra à vista no cartão de crédito (D-089 C), na fatura da data; com um cartão só, é ele |
 | `mercado 120 cartão azul` | Compra no cartão chamado "azul" (sem acento e sem caixa): primeiro o apelido igual, depois um só que contenha o nome escrito ou esteja nele; o nome vem depois de "cartão", até o valor ou até o fim (`cartão azul 50 mercado`, `mercado 120 no cartão nubank`); "de crédito" logo depois de "cartão" não é nome; com mais de um cartão e sem o nome, a Clarevo pergunta qual. Com estorno, reembolso, devolução, fatura, pagamento, recarga ou anuidade na mensagem, "cartão" é parte da descrição |
+| `negócio material 120` | Saída no espaço Negócio da própria pessoa, categoria Material e mercadoria (27/11/2026, migração 0049): a palavra "negócio" no começo manda a anotação para o negócio, com as categorias e os cartões dele; sem negócio próprio, nada é anotado e a resposta diz como criar. Igual ao Telegram (`docs/35_TELEGRAM.md`, seção 1a) |
 | `DESFAZER` | Apaga a última anotação feita pelo WhatsApp (até 24 horas) |
 | `DESLIGAR` ou `PARAR` | Desliga o número da Clarevo |
 | `AJUDA` ou `oi` | Mostra os exemplos |

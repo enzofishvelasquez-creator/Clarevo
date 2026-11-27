@@ -1,6 +1,17 @@
-import { ACCESS_TEXT, WEB_SUBSCRIPTION_TEXT, accessView, formatDateBR, parseWebPaymentReturn, todayIn } from '@clarevo/core';
-import { useLocalSearchParams } from 'expo-router';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
+import {
+  ACCESS_TEXT,
+  FAMILY_PLAN_NEXT_TEXT,
+  WEB_SUBSCRIPTION_TEXT,
+  accessView,
+  chosenPlanStillUseful,
+  familyPlanNextStep,
+  formatDateBR,
+  parseWebPaymentReturn,
+  todayIn,
+  type Access,
+} from '@clarevo/core';
+import { router, useLocalSearchParams } from 'expo-router';
+import { AlertCircle, CheckCircle2, Info, UserPlus, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
@@ -10,8 +21,10 @@ import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { BenefitsCard, SubscriptionHero } from '@/components/subscription-parts';
 import { Banner, Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
+import { clearChosenPlan, peekChosenPlan } from '@/lib/chosen-plan';
 import { useWideLayout } from '@/lib/layout';
 import { useAccess, useReloadAccess } from '@/state/access';
+import { useFamily } from '@/state/family';
 import { useRepo } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -88,11 +101,38 @@ function WebCancelCard({ canceled, trialEnd = null, onTrialCanceled }: { cancele
 }
 
 /**
+ * O próximo passo de quem paga o plano Família (jornada de compra de 27/11/2026): sem Família, criar; sem ninguém convidado, convidar.
+ * Calmo e sem prazo; some quando a Família tem outra pessoa ou um convite válido (`familyPlanNextStep`).
+ */
+function FamilyNextStep({ access, now }: { access: Access; now: Date }) {
+  const family = useFamily();
+  const step = familyPlanNextStep(access, family.isSuccess ? family.data : undefined, now);
+  if (!step) return null;
+  const create = step === 'criar';
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {create ? FAMILY_PLAN_NEXT_TEXT.createTitle : FAMILY_PLAN_NEXT_TEXT.inviteTitle}
+      </Txt>
+      <Txt color={colors.textSecondary}>{create ? FAMILY_PLAN_NEXT_TEXT.createBody : FAMILY_PLAN_NEXT_TEXT.inviteBody}</Txt>
+      <Button
+        label={create ? FAMILY_PLAN_NEXT_TEXT.createAction : FAMILY_PLAN_NEXT_TEXT.inviteAction}
+        icon={create ? Users : UserPlus}
+        onPress={() => router.push(create ? '/familia/nova' : '/familia/convidar')}
+      />
+    </Card>
+  );
+}
+
+/**
  * Conta > Assinatura (D-083): a situação do acesso (teste grátis, só ver e exportar, plano, benefício, cortesia ou Plano Família da
  * pessoa titular), com as datas no fuso da pessoa, e os planos com os preços para quem ainda não paga. Na web, com a compra aberta
  * (SUBSCRIBE_OPEN), os botões de assinar pelo Asaas (D-084) e, para quem assinou na web, o cancelamento; a volta da página de pagamento
  * chega com `?pagamento=sucesso|cancelado|expirado`. No iPhone e no Android, a compra pela loja (D-090) e, para quem assina por ela, os
  * ajustes da loja e a troca de plano. A trava da escrita é do banco.
+ * Jornada de compra de 27/11/2026: para quem ainda escolhe um plano, os planos vêm logo depois da situação (com os botões dentro de cada
+ * plano) e "O que a assinatura libera" depois deles; o plano e o período escolhidos no site (`lib/chosen-plan.ts`) abrem já marcados na
+ * primeira vez e saem do aparelho; quem paga o plano Família ganha o próximo passo (criar a Família e convidar).
  */
 export default function AssinaturaScreen() {
   const access = useAccess();
@@ -127,6 +167,15 @@ export default function AssinaturaScreen() {
   const welcomed = returned === 'sucesso' && access.data?.status === 'assinatura';
   const subscribed = access.data ? ['assinatura', 'familia', 'beneficio', 'cortesia'].includes(access.data.status) : false;
   const [trialCanceled, setTrialCanceled] = useState<string | null>(null);
+  // O plano escolhido no site: lido uma vez ao abrir a tela. Com a situação lida, sai do aparelho (usado agora ou, para quem já não escolhe
+  // plano, sem uso) e só vale enquanto esta tela está aberta.
+  const [chosen, setChosen] = useState(() => peekChosenPlan());
+  const status = access.data?.status;
+  useEffect(() => {
+    if (!status || !chosen) return;
+    clearChosenPlan();
+    if (!chosenPlanStillUseful(status)) setChosen(null);
+  }, [status, chosen]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
@@ -157,8 +206,11 @@ export default function AssinaturaScreen() {
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}
             {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
-            <BenefitsCard subscribed={subscribed} />
-            {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
+            <FamilyNextStep access={access.data} now={now} />
+            {/* Quem ainda escolhe um plano: os planos primeiro e o que a assinatura libera depois deles (jornada de compra de 27/11/2026). */}
+            {view.showPlans ? null : <BenefitsCard subscribed={subscribed} />}
+            {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} chosen={chosen} /> : null}
+            {view.showPlans ? <BenefitsCard subscribed={subscribed} /> : null}
             {view.showPlans ? (
               <Txt variant="caption" color={colors.textSecondary} style={note}>
                 {T.benefitNote}

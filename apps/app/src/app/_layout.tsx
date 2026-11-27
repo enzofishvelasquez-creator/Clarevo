@@ -19,6 +19,7 @@ import { FormPanel, NavScrim, isPanelPath, isPanelRoute } from '@/components/for
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
+import { rememberChosenPlanFromLocation } from '@/lib/chosen-plan';
 import { initCrashReport } from '@/lib/crash-report';
 import { useWideLayout } from '@/lib/layout';
 import { forgetDevice } from '@/lib/device-forget';
@@ -87,6 +88,9 @@ function entryFromAppLink(url: string | null): string | null {
 
 /** Lido uma vez, ao carregar o app, antes de a navegação trocar o endereço. */
 let entryTarget = readEntryTarget();
+// O plano escolhido no site (jornada de compra de 27/11/2026): do endereço da primeira carga, também para quem já está na conta e não passa
+// por Criar conta nem por Entrar. Fica só no aparelho, para a tela Assinatura.
+rememberChosenPlanFromLocation();
 
 /**
  * Devolve o endereço guardado uma única vez. Fica fora dos componentes de propósito: o React Compiler trata variáveis

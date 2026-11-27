@@ -1,0 +1,36 @@
+{
+  "ferramenta": "wawoff2 2.0.1",
+  "de": "apps/app/assets/fonts",
+  "fontes": {
+    "500Medium": {
+      "ttf": {
+        "bytes": 34436,
+        "sha256": "cd058584661628975918ebb8e0cb571bd4002a67d130378116a60d81bde26ac4"
+      },
+      "woff2": {
+        "bytes": 13296,
+        "sha256": "8aa4ab04fbd14e8a41b1a8c5cacc40fcff77c4fae750c0b8d09f455669d404cd"
+      }
+    },
+    "700Bold": {
+      "ttf": {
+        "bytes": 34312,
+        "sha256": "f4a865e773d7c405ff6c43a14fc378b625df8437efbb9b2f330afb991b3b7107"
+      },
+      "woff2": {
+        "bytes": 13456,
+        "sha256": "478f5d211a8d8100e935cf694ad48c1ada1c84264f0dc71aa48c4508151193eb"
+      }
+    },
+    "800ExtraBold": {
+      "ttf": {
+        "bytes": 34556,
+        "sha256": "610aecd62144848da6a29c7d965952423c20421f6c8dc0ca759b2717f98feceb"
+      },
+      "woff2": {
+        "bytes": 12916,
+        "sha256": "af95ca3c324ccf4855d418cb96214343c0f3726ffefb6fc28ef826b01d53e4be"
+      }
+    }
+  }
+}

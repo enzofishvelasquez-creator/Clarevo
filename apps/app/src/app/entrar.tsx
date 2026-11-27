@@ -1,18 +1,24 @@
 import { DEMO_TEXT, INVITE_BASE_URL } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, type TextInput } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { Banner, Button, LinkButton, TextField, Txt } from '@/components/ui';
 import { AuthError, emailProblem, pendingCredentials } from '@/lib/auth';
+import { rememberChosenPlan } from '@/lib/chosen-plan';
 import { useSession } from '@/state/session';
 import { colors } from '@/theme/tokens';
 
 export default function Entrar() {
-  const params = useLocalSearchParams<{ email?: string; aviso?: string }>();
+  const params = useLocalSearchParams<{ email?: string; aviso?: string; plano?: string; periodo?: string }>();
   const { auth, linkProblem, clearLinkProblem } = useSession();
+  // O plano escolhido no site, se o link passar por Entrar (jornada de compra de 27/11/2026): só neste aparelho, para a tela Assinatura.
+  useEffect(() => {
+    rememberChosenPlan(params);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();

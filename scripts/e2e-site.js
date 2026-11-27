@@ -296,7 +296,9 @@ function roteiros(CALC) {
 function varrerPagina() {
   const caixas = [...document.querySelectorAll('main *, footer *')].filter((e) => {
     const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
-    if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none') return false;
+    // O que está num <details> fechado não aparece (27/11/2026: parte de O app e de Para empresas fica recolhida): fica de fora, e a
+    // varredura confere essas duas páginas também com tudo aberto.
+    if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none' || !e.checkVisibility()) return false;
     if ((parseFloat(cs.borderTopLeftRadius) || 0) < 8) return false;
     const borda = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
     const fundo = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
@@ -312,7 +314,7 @@ function varrerPagina() {
     if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
   }
   // Varredura de 12/11/2026. Uma "caixa" é o mesmo que acima (fundo, borda ou sombra, com cantos arredondados), sem os campos.
-  const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
+  const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0 && e.checkVisibility(); };
   const caixa = (e) => caixas.includes(e) && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.tagName);
   const noFluxo = (e) => vis(e) && getComputedStyle(e).position !== 'absolute';
   const antes = (e) => { let x = e.previousElementSibling; while (x && !noFluxo(x)) x = x.previousElementSibling; return x; };
@@ -1071,7 +1073,7 @@ function varrerPagina() {
       // D-127: cada cartão mostra também o anual, logo abaixo do mensal, com o equivalente por mês dito como equivalente.
       const anuais = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => [a.querySelector('.preco').textContent, a.querySelector('.preco-anual')?.textContent ?? ''].map((t) => t.replace(/\u00a0/g, ' '))));
       ok('planos: cada cartão da página inicial com o mensal e o anual (com o equivalente por mês), do núcleo',
-        JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)']]), JSON.stringify(anuais));
+        JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês, R$ 88,90 a menos que 12 mensalidades)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês, R$ 208,90 a menos que 12 mensalidades)']]), JSON.stringify(anuais));
       // Clicar no cartão (fora do texto do link) abre a página do plano. O clique é no canto de cima, à direita, em cima da fita "Em breve"
       // (D-128), que é só desenho e não pega o clique.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
@@ -1125,9 +1127,11 @@ function varrerPagina() {
         }
         const familiaPg = nome === 'Família';
         // D-127: na capa, o mensal e, logo abaixo, o anual com o equivalente por mês (três valores, todos na capa).
-        const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)';
+        // Desde 27/11/2026 (jornada de compra, S6), com a diferença para 12 mensalidades; no Família, também a conta do preço por casa em "Para
+        // quem é" (S4): 6 valores em reais no Família, 4 no Individual.
+        const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês, R$ 208,90 a menos que 12 mensalidades)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês, R$ 88,90 a menos que 12 mensalidades)';
         ok(`planos: a página do plano ${nome} tem o nome, o preço mensal (com "Em breve" antes do lançamento) e o anual só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, sem a frase de "abre no lançamento", D-128) e o Espaço Negócio incluído, sem negócio compartilhado`,
-          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === (nome === 'Família' ? 6 : 4) && /^R\$ \d+,\d{2} por mês Em breve$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && !pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
         ok(`planos (D-129): antes do lançamento, a capa do plano ${nome} diz à vista "A assinatura abre em breve, na web e nas lojas." e leva a "Conheça o app"; ${familiaPg ? 'o Telegram anota no Pessoal ou na Família em que a pessoa anota' : 'sem etiqueta de onde vale'}`,
@@ -1285,6 +1289,8 @@ function varrerPagina() {
       const fora = [];
       for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
         await p.goto(`${origem}/${c}`);
+        // Desde 27/11/2026, parte dos celulares de O app e de Para empresas fica num <details> recolhido: abertos, para medir de verdade.
+        await p.evaluate(() => document.querySelectorAll('main details').forEach((d) => { d.open = true; }));
         // Desde 25/11/2026 (D-125), o celular de "Como funciona" (início) fica na coluna ao lado dos passos, como o de Segurança.
         const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular, .passos-com-celular > figure.celular')].map((f) => {
           const m = f.querySelector('.celular-moldura').getBoundingClientRect();
@@ -1825,8 +1831,9 @@ function varrerPagina() {
           w.every((x) => semFaseDeTestes(x) && !x.breve && x.fita === 0 && x.menu[0] === 'Assine aqui' && x.menu[1] === CRIAR && x.entrar[0] === 'Entrar' && x.entrar[1] === `${URL_APP}/entrar` && !x.seguranca && x.avisoDaAssinatura === 0 && x.botoesPorBloco.every((n) => n <= 2)) && demoCerta(pos) && erros.length === 0, JSON.stringify({ pos, erros }));
         ok('estado do produto, lançado (D-129): planos.html e a capa de cada plano com "Assine aqui" (criar conta) e "Conheça o app"; Use no navegador com "Já tem conta? Entrar no navegador" embaixo das duas chamadas',
           JSON.stringify(pos.planos.capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', 'app/index.html']]) &&
-            JSON.stringify(pos['planos/individual'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
-            JSON.stringify(pos['planos/familia'].capa) === JSON.stringify([['Assine aqui', CRIAR], ['Conheça o app', '../app/index.html']]) &&
+            // Desde 27/11/2026 (jornada de compra, S3), a capa de cada plano leva o plano ao cadastro.
+            JSON.stringify(pos['planos/individual'].capa) === JSON.stringify([['Assine aqui', `${CRIAR}?plano=individual`], ['Conheça o app', '../app/index.html']]) &&
+            JSON.stringify(pos['planos/familia'].capa) === JSON.stringify([['Assine aqui', `${CRIAR}?plano=familia`], ['Conheça o app', '../app/index.html']]) &&
             JSON.stringify(pos.web.jaTemConta) === JSON.stringify([['Entrar no navegador', `${URL_APP}/entrar`], ['Entrar no navegador', `${URL_APP}/entrar`]]),
           JSON.stringify({ planos: pos.planos.capa, individual: pos['planos/individual'].capa, web: pos.web.jaTemConta }));
         // Lançado, os cliques do menu e de "Assine aqui" levam à tela de criar conta, e o link de O app, à tela inicial do app web.
@@ -1875,6 +1882,32 @@ function varrerPagina() {
         await q.setViewportSize({ width: 390, height: 900 });
         ok('estado do produto, lançado (D-129): o cabeçalho com "Entrar" ao lado de "Assine aqui" continua numa linha a 1120 e 1440 px, com folga entre o logotipo e o menu, e nada passa da largura',
           cabecalhos.every((c) => c.topo <= 80 && c.folga >= 16 && c.mesmaLinha && c.entrarAntes && !c.largo), JSON.stringify(cabecalhos));
+        // 27/11/2026: de 768 a 1119 px, "Entrar" e "Assine aqui" à vista antes de "Menu", numa linha, sem passar da largura (de 320 a 1440 px).
+        const meio = [];
+        await q.goto(`${lancado.url}/`);
+        for (let l = 320; l <= 1440; l += 16) {
+          await q.setViewportSize({ width: l, height: 700 });
+          meio.push(await q.evaluate((largura) => {
+            const vis = (e) => e && e.getClientRects().length > 0;
+            const itens = [...document.querySelectorAll('.topo-i .marca, .topo-i .menu-lista, .topo-i .menu-entrar, .topo-i .menu-cta, .topo-i .menu-movel > summary')].filter(vis).map((e) => e.getBoundingClientRect());
+            const entrar = document.querySelector('.menu-entrar').getBoundingClientRect();
+            const cta = document.querySelector('.menu-cta').getBoundingClientRect();
+            return { l: largura, ambos: vis(document.querySelector('.menu-entrar')) && vis(document.querySelector('.menu-cta')), antes: entrar.right <= cta.left, linhas: new Set(itens.map((r) => Math.round(r.top + r.height / 2))).size, fora: Math.max(...itens.map((r) => r.right)) > innerWidth, largo: document.documentElement.scrollWidth > innerWidth + 1 };
+          }, l));
+        }
+        const meioErrado = meio.filter((c) => c.linhas > 1 || c.fora || c.largo || (c.l >= 768 && !(c.ambos && c.antes)) || (c.l < 768 && c.ambos));
+        await q.setViewportSize({ width: 390, height: 900 });
+        ok('estado do produto, lançado (27/11): de 768 px em diante, "Entrar" e "Assine aqui" à vista no cabeçalho, nessa ordem, numa linha e sem passar da largura de 320 a 1440 px', meioErrado.length === 0, JSON.stringify(meioErrado.slice(0, 5)));
+        // A jornada de compra (S3): lançado, "Assine aqui" da capa de cada plano leva o plano ao cadastro; o do cabeçalho, não. E S2: a linha
+        // do fim das páginas de conteúdo leva ao cadastro, com o teste grátis.
+        const doPlano = {};
+        for (const c of ['planos', 'planos/individual', 'planos/familia', 'calculadoras/reserva']) {
+          await q.goto(`${lancado.url}/${c}`);
+          doPlano[c] = await q.evaluate(() => ({ capa: document.querySelector('.capa .botao-principal')?.getAttribute('href') ?? null, menu: document.querySelector('.menu-cta').getAttribute('href'), ponte: document.querySelector('.ponte') ? [document.querySelector('.ponte a').getAttribute('href'), document.querySelector('.ponte').textContent] : null }));
+        }
+        ok('estado do produto, lançado (27/11): "Assine aqui" da capa do Individual e do Família leva ?plano=individual e ?plano=familia ao cadastro; o resumo dos planos e o cabeçalho, sem parâmetro; a linha do fim de uma calculadora leva ao cadastro, com o teste grátis',
+          doPlano.planos.capa === CRIAR && doPlano['planos/individual'].capa === `${CRIAR}?plano=individual` && doPlano['planos/familia'].capa === `${CRIAR}?plano=familia` &&
+          Object.values(doPlano).every((x) => x.menu === CRIAR) && doPlano['calculadoras/reserva'].ponte[0] === CRIAR && /14 dias grátis, sem cartão\.$/.test(doPlano['calculadoras/reserva'].ponte[1]), JSON.stringify(doPlano));
         const largas = [];
         for (const largura of [320, 1280]) {
           await q.setViewportSize({ width: largura, height: 900 });
@@ -1967,7 +2000,7 @@ function varrerPagina() {
         };
       });
       ok('web: o título, as seções, "Assine aqui" (para os planos) e "Conheça o app", a demonstração como link de texto menor (não botão, com noopener), as duas telas do computador carregadas, cartão ou Pix pelo serviço de pagamento com os mesmos preços, sem desconto, e "Na web" marcado no menu',
-        web.h1 === 'Use a Clarevo no navegador' && JSON.stringify(web.secoes) === JSON.stringify(['no-navegador', 'no-computador', 'pagar', 'comecar']) &&
+        web.h1 === 'Use a Clarevo no navegador' && JSON.stringify(web.secoes) === JSON.stringify(['no-navegador', 'no-computador', 'como-app', 'pagar', 'comecar']) &&
         JSON.stringify(web.capa) === JSON.stringify([['Assine aqui', 'planos.html'], ['Conheça o app', 'app/index.html']]) &&
         web.demo && web.demo.texto === 'Ver uma demonstração com dados fictícios' && !web.demo.botao && /noopener/.test(web.demo.rel) && web.demo.fonte <= 16 &&
         web.telas.length === 2 && web.telas.every((t) => t.ok && t.local && t.alt) && web.pagar && !web.proibido && web.menuAtual === 'Na web', JSON.stringify(web));
@@ -1983,6 +2016,128 @@ function varrerPagina() {
         if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${largura} px`);
       }
       ok('web: nada passa da largura da tela em 320, 390 e 1280 px', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+    }
+
+    // 7c13. Rodada de 27/11/2026 (análise geral de 26/11, lista "Depois", e a jornada de compra de 27/11; docs/22_SITE.md, seção 22): O app e
+    // Para empresas mais curtas, com o resto recolhido num <details> que abre pelo teclado (e os vídeos de dentro só baixam e tocam depois de
+    // abrir); as calculadoras na ordem formulário, resultado e aviso, com o aviso à vista; as fontes em WOFF2; o botão do cabeçalho à vista de
+    // 768 a 1119 px; a linha para o app no fim das páginas de conteúdo; e "Use como app no celular" em Use no navegador.
+    {
+      const p = await pagina();
+      const deVideo = [];
+      p.on('request', (q) => /\/videos\//.test(q.url()) && deVideo.push(q.url()));
+      // O app: os blocos, o <details> fechado, a altura no celular (eram cerca de 21 telas de 844 px; agora até 12) e o teclado.
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.goto(`${origem}/app/`);
+      const app = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main > section.bloco')].map((x) => x.getAttribute('aria-labelledby')),
+        aVista: [...document.querySelectorAll('section[aria-labelledby="como-funciona"] article.recurso')].map((a) => a.id),
+        fechado: !document.querySelector('#todos-os-recursos').open,
+        dentro: [...document.querySelectorAll('#todos-os-recursos article.recurso')].map((a) => a.id),
+        resumo: document.querySelector('#todos-os-recursos > summary').textContent,
+        altura: document.documentElement.scrollHeight,
+        planos: [...document.querySelectorAll('section[aria-labelledby="planos"] .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+      }));
+      ok('O app (27/11): Como funciona com Resumo, Anotar e Contas à vista, o resto recolhido e fechado em "Ver todos os recursos", Seus dados, Onde usar e a chamada dos planos, com até 12 telas de 844 px em 390 px',
+        JSON.stringify(app.secoes) === JSON.stringify(['como-funciona', 'recursos', 'seus-dados', 'onde', 'planos']) && JSON.stringify(app.aVista) === JSON.stringify(['resumo', 'anotar', 'contas']) &&
+        app.fechado && app.dentro.length === 8 && app.resumo === 'Ver todos os recursos' && app.altura <= 12 * 844 &&
+        JSON.stringify(app.planos) === JSON.stringify([['Assine aqui', '../planos.html'], ['Use no navegador', '../web.html']]), JSON.stringify(app));
+      // Rolar a página inteira com o <details> fechado: nenhum vídeo de dentro dele baixa.
+      deVideo.length = 0;
+      await p.evaluate(async () => { for (let y = 0; y < document.documentElement.scrollHeight; y += 400) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 80)); } });
+      const fechadoBaixou = deVideo.filter((u) => /\/videos\/(importar-fatura-print|metas|investir|tema-escuro-claro)\./.test(u));
+      // Pelo teclado: foco no resumo e Enter abre; o vídeo de Metas, rolado para a tela, toca.
+      await p.locator('#todos-os-recursos > summary').focus();
+      const focoNoResumo = await p.evaluate(() => { const a = document.activeElement; return a.matches('summary:focus-visible') || a.matches('summary:focus'); });
+      await p.keyboard.press('Enter');
+      const aberto = await p.evaluate(() => document.querySelector('#todos-os-recursos').open);
+      await p.locator('#metas video').evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForFunction(() => document.querySelector('#metas video').currentTime > 0.3, null, { timeout: 15000 }).catch(() => {});
+      const metas = await p.locator('#metas video').evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
+      ok('O app (27/11): com o <details> fechado nenhum vídeo de dentro baixa; Enter no resumo abre, e o vídeo de Metas toca ao aparecer', fechadoBaixou.length === 0 && focoNoResumo && aberto && !metas.paused && metas.tempo > 0.3, JSON.stringify({ fechadoBaixou, focoNoResumo, aberto, metas }));
+      // Para empresas: à vista o que a empresa recebe, o que vê e nunca vê, como funciona e a apresentação; o resto em três perguntas fechadas.
+      await p.goto(`${origem}/empresas/`);
+      const emp = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main > section.bloco')].map((x) => x.getAttribute('aria-labelledby')),
+        duvidas: [...document.querySelectorAll('section[aria-labelledby="detalhes"] details.duvida')].map((d) => [d.id, d.querySelector('summary').textContent, d.open]),
+        altura: document.documentElement.scrollHeight,
+        nuncaVe: document.querySelector('.nunca-ve').checkVisibility(),
+      }));
+      await p.locator('#painel > summary').focus();
+      await p.keyboard.press('Enter');
+      const painel = await p.evaluate(() => ({ aberto: document.querySelector('#painel').open, telas: [...document.querySelectorAll('#painel img')].filter((i) => i.checkVisibility()).length, outras: [...document.querySelectorAll('details.duvida:not(#painel)')].every((d) => !d.open) }));
+      ok('Para empresas (27/11): à vista o que a empresa recebe, o que vê e nunca vê, como funciona e a apresentação; o painel, o fim do benefício e a NR-1 em perguntas fechadas, que abrem pelo teclado; até 9 telas de 844 px em 390 px',
+        JSON.stringify(emp.secoes) === JSON.stringify(['bem-estar', 'o-que-ve', 'como-funciona', 'detalhes', 'apresentacao']) &&
+        JSON.stringify(emp.duvidas) === JSON.stringify([['painel', 'O painel, só na web', false], ['fim', 'Quando o benefício acaba', false], ['nr-1', 'Bem-estar financeiro e a NR-1', false]]) &&
+        emp.altura <= 9 * 844 && emp.nuncaVe && painel.aberto && painel.telas === 3 && painel.outras, JSON.stringify({ emp, painel }));
+      // As calculadoras: o formulário, depois o resultado (com a resposta numa frase no topo) e o aviso logo depois, à vista, sem recolher.
+      const ordens = [];
+      for (const slug of ['reserva', 'custo-por-ano', 'rendimento-cdi', 'plano-dividas', 'antes-de-financiar']) {
+        await p.goto(`${origem}/calculadoras/${slug}`);
+        await p.waitForSelector('[data-calculadora][data-pronta="sim"]');
+        ordens.push(await p.evaluate((s) => {
+          const f = document.querySelector('.calc-formulario').getBoundingClientRect();
+          const r = document.querySelector('.calc-resultados').getBoundingClientRect();
+          const aviso = document.querySelector('.calc-aviso');
+          const a = aviso.getBoundingClientRect();
+          return { slug: s, ordem: f.bottom <= r.top + 1 && r.bottom <= a.top + 1, visivel: aviso.checkVisibility(), recolhido: aviso.closest('details') !== null, estimativa: /estimativas/.test(aviso.textContent), titulo: document.querySelector('.calc-resultado h3, .calc-resultado h4')?.textContent };
+        }, slug));
+      }
+      // Com a reserva preenchida, a primeira linha do resultado é a resposta numa frase.
+      await p.goto(`${origem}/calculadoras/reserva`);
+      await p.waitForSelector('[data-calculadora][data-pronta="sim"]');
+      await p.fill('#c-essenciais', '3.750,00');
+      await p.click('label.chip:has-text("6 meses")');
+      await p.waitForTimeout(300);
+      const destaque = await p.evaluate(() => { const r = document.querySelector('.calc-resultado'); const d = r.querySelector('.calc-linhas > p'); return { classe: d.className, texto: d.textContent, avisoDepois: r.getBoundingClientRect().bottom <= document.querySelector('.calc-aviso').getBoundingClientRect().top + 1 }; });
+      ok('calculadoras (27/11): o formulário, o resultado e o aviso logo depois, à vista e sem recolher, dizendo que os resultados são estimativas; a primeira linha do resultado é a resposta, em destaque',
+        ordens.every((o) => o.ordem && o.visivel && !o.recolhido && o.estimativa && o.titulo === 'Resultado') && destaque.classe === 'calc-destaque' && /^Com estes números, a reserva de 6 meses é de R\$/.test(destaque.texto.replace(/ /g, ' ')) && destaque.avisoDepois, JSON.stringify({ ordens, destaque }));
+      // As fontes em WOFF2: o navegador pede só os WOFF2 (do próprio site, font/woff2, guardados por um ano), nenhum TTF, e as três carregam.
+      const fontes = [];
+      const q = await pagina();
+      q.on('response', (r) => /\/fontes\//.test(r.url()) && fontes.push([r.url().replace(origem, ''), r.status(), r.headers()['content-type'], /immutable/.test(r.headers()['cache-control'] || '')]));
+      await q.goto(`${origem}/`);
+      await q.evaluate(() => document.fonts.ready);
+      const carregadas = await q.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.weight).sort());
+      ok('fontes (27/11): só os três WOFF2 do próprio site, como font/woff2 e guardados por um ano, nenhum TTF, e os três pesos carregados', fontes.length === 3 && fontes.every(([u, st, tipo, guarda]) => /^\/fontes\/Manrope_\w+\.woff2$/.test(u) && st === 200 && tipo === 'font/woff2' && guarda) && JSON.stringify(carregadas) === JSON.stringify(['500', '700', '800']), JSON.stringify({ fontes, carregadas }));
+      await q.close();
+      // O cabeçalho: de 768 a 1119 px, "Entrar" à vista ao lado de "Menu"; nunca passa da largura nem quebra linha, de 320 a 1440 px; o foco.
+      const cabecalho = [];
+      await p.goto(`${origem}/`);
+      for (let l = 320; l <= 1440; l += 16) {
+        await p.setViewportSize({ width: l, height: 700 });
+        cabecalho.push(await p.evaluate((largura) => {
+          const vis = (e) => e && e.getClientRects().length > 0;
+          const itens = [...document.querySelectorAll('.topo-i .marca, .topo-i .menu-lista, .topo-i .menu-cta, .topo-i .menu-movel > summary')].filter(vis).map((e) => e.getBoundingClientRect());
+          return { l: largura, cta: vis(document.querySelector('.menu-cta')), movel: vis(document.querySelector('.menu-movel > summary')), linhas: new Set(itens.map((r) => Math.round(r.top + r.height / 2))).size, fora: Math.max(...itens.map((r) => r.right)) > innerWidth, largo: document.documentElement.scrollWidth > innerWidth + 1 };
+        }, l));
+      }
+      const errados = cabecalho.filter((c) => c.linhas > 1 || c.fora || c.largo || (c.l >= 768 && !c.cta) || (c.l < 768 && c.cta) || (c.l < 1120) !== c.movel);
+      await p.setViewportSize({ width: 900, height: 700 });
+      await p.goto(`${origem}/`);
+      await p.keyboard.press('Tab');
+      await p.keyboard.press('Tab');
+      for (let i = 0; i < 4 && !(await p.evaluate(() => document.activeElement.classList.contains('menu-cta'))); i++) await p.keyboard.press('Tab');
+      const foco = await p.evaluate(() => { const a = document.activeElement; const cs = getComputedStyle(a); return { cta: a.classList.contains('menu-cta'), texto: a.textContent, visivel: a.matches(':focus-visible'), contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      ok('cabeçalho (27/11): de 768 a 1119 px, "Entrar" à vista ao lado de "Menu" (abaixo de 768 px, só "Menu"; de 1120 px, o menu em linha), numa linha e sem passar da largura de 320 a 1440 px; o Tab chega a "Entrar" com o contorno do foco',
+        errados.length === 0 && foco.cta && foco.texto === 'Entrar' && foco.visivel && foco.contorno, JSON.stringify({ errados: errados.slice(0, 5), foco }));
+      // A linha para o app no fim das páginas de conteúdo: antes do lançamento, para O app; o clique chega lá.
+      const pontes = [];
+      for (const c of ['aprender/', 'aprender/cet', 'calculadoras/reserva', 'ajuda/', 'novidades/']) {
+        await p.goto(`${origem}/${c}`);
+        pontes.push(await p.evaluate(() => { const a = document.querySelector('main > .bloco-ponte .ponte a'); return a ? [a.textContent, new URL(a.href).pathname, a.closest('main').lastElementChild === a.closest('.bloco-ponte')] : null; }));
+      }
+      await p.goto(`${origem}/calculadoras/reserva`);
+      await Promise.all([p.waitForURL(/\/app\/(index\.html)?$/), p.click('.ponte a')]);
+      ok('ponte para o app (27/11): no fim de Aprender, de uma calculadora, da Ajuda e das Novidades, "conheça o app da Clarevo", por último no conteúdo, e o clique abre O app',
+        pontes.every((x) => x && x[0] === 'conheça o app da Clarevo' && /^\/app\/(index\.html)?$/.test(x[1]) && x[2]) && (await p.textContent('h1')) === 'A Clarevo por dentro', JSON.stringify(pontes));
+      // Use no navegador: "Use como app no celular", com os passos do iPhone e do Android.
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.goto(`${origem}/web`);
+      const comoApp = await p.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="como-app"] article')].map((a) => [a.querySelector('h3').textContent, a.querySelectorAll('ol > li').length, a.checkVisibility()]));
+      ok('web (27/11): "Use como app no celular" com os passos do iPhone (Safari) e do Android (Chrome), à vista', JSON.stringify(comoApp) === JSON.stringify([['No iPhone, pelo Safari', 3, true], ['No Android, pelo Chrome', 3, true]]), JSON.stringify(comoApp));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
     }
@@ -2048,6 +2203,14 @@ function varrerPagina() {
           for (const x of r.achados) encostados.push(`${arquivo} em ${largura} px: ${x}`);
           if (r.largo) largos.push(`${arquivo} em ${largura} px`);
           for (const k of Object.keys(varredura)) for (const x of r[k]) varredura[k].push(`${arquivo} em ${largura} px: ${x}`);
+          // O app e Para empresas (27/11/2026): de novo com os <details> abertos, para o que está recolhido seguir as mesmas regras.
+          if (/^(app|empresas)[\\/]index\.html$/.test(arquivo)) {
+            await p.evaluate(() => document.querySelectorAll('main details').forEach((d) => { d.open = true; }));
+            const a = await p.evaluate(varrerPagina);
+            for (const x of a.achados) encostados.push(`${arquivo} (aberto) em ${largura} px: ${x}`);
+            if (a.largo) largos.push(`${arquivo} (aberto) em ${largura} px`);
+            for (const k of Object.keys(varredura)) for (const x of a[k]) varredura[k].push(`${arquivo} (aberto) em ${largura} px: ${x}`);
+          }
         }
       }
       ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nenhum cartão ou bloco encostado em outro ou por cima dele`, encostados.length === 0, `${encostados.length} casos: ${encostados.slice(0, 12).join(' | ')}`);

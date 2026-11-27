@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CARD_MONTH_BAR_MIN_TENTHS,
   CARD_MONTH_TEXT,
   CARDS_TEXT,
   MemoryRepository,
   cardInvoicesMonth,
+  cardMonthUpcomingBars,
+  formatBRL,
   invoiceCommittedCents,
   loadInvoices,
   newOperationKey,
@@ -142,9 +145,42 @@ describe('faturas do mês (D-042)', () => {
       { month: '2027-01', cents: 35_000 },
       { month: '2027-02', cents: 15_000 },
     ]);
-    expect(CARD_MONTH_TEXT.upcoming(m.upcoming)).toBe('Próximas faturas (previsto): novembro R$ 550,00, janeiro R$ 350,00, fevereiro R$ 150,00');
+    expect(CARD_MONTH_TEXT.upcomingTitle).toBe('Próximas faturas (previsto)');
     expect(cardInvoicesMonth([invoice(OCT, 10_000), invoice('2027-06', 1_000)], OCT, []).upcoming).toEqual([]);
     expect(cardInvoicesMonth([invoice(OCT, 10_000), invoice('2027-04', 1_000)], OCT, []).upcoming).toEqual([{ month: '2027-04', cents: 1_000 }]);
+  });
+
+  it('próximas faturas em barras (sinal 24): os mesmos meses e valores de "upcoming", na escala do maior mês, com o mês e o valor escritos', () => {
+    const inv = [
+      invoice(OCT, 10_000),
+      invoice('2026-11', 55_000, null, 'aberta'),
+      invoice('2026-12', 0),
+      invoice('2027-01', 35_000, null, 'aberta'),
+      invoice('2027-02', 15_000, null, 'aberta'),
+    ];
+    const m = cardInvoicesMonth(inv, OCT, []);
+    const bars = cardMonthUpcomingBars(m);
+    // Nenhuma conta nova: os meses e os valores são os de upcoming, na mesma ordem.
+    expect(bars.map((b) => ({ month: b.month, cents: b.cents }))).toEqual(m.upcoming);
+    expect(bars).toEqual([
+      { month: '2026-11', cents: 55_000, label: 'Novembro', valueText: 'R$ 550,00', tenths: 1000, a11y: 'Novembro: R$ 550,00, previsto' },
+      // 350/550 = 636,36... décimos; 150/550 = 272,72...: metade para cima.
+      { month: '2027-01', cents: 35_000, label: 'Janeiro de 2027', valueText: 'R$ 350,00', tenths: 636, a11y: 'Janeiro de 2027: R$ 350,00, previsto' },
+      { month: '2027-02', cents: 15_000, label: 'Fevereiro de 2027', valueText: 'R$ 150,00', tenths: 273, a11y: 'Fevereiro de 2027: R$ 150,00, previsto' },
+    ]);
+    // O valor de cada barra é o formatBRL de sempre.
+    expect(bars.map((b) => b.valueText)).toEqual(m.upcoming.map((u) => formatBRL(u.cents)));
+  });
+
+  it('barras: mês de valor pequeno ainda aparece (mínimo), valores iguais têm a mesma barra e, sem próximas faturas, nenhuma barra', () => {
+    const tiny = cardMonthUpcomingBars(cardInvoicesMonth([invoice('2026-11', 1_000_000, null, 'aberta'), invoice('2026-12', 1, null, 'aberta')], OCT, []));
+    expect(tiny.map((b) => b.tenths)).toEqual([1000, CARD_MONTH_BAR_MIN_TENTHS]);
+    const same = cardMonthUpcomingBars(cardInvoicesMonth([invoice('2026-11', 35_000), invoice('2026-12', 35_000)], OCT, []));
+    expect(same.map((b) => b.tenths)).toEqual([1000, 1000]);
+    expect(cardMonthUpcomingBars(cardInvoicesMonth([invoice(OCT, 10_000)], OCT, []))).toEqual([]);
+    // O ano entra no rótulo só quando é outro que o do mês da tela.
+    expect(cardMonthUpcomingBars(cardInvoicesMonth([invoice('2027-01', 5_000)], '2026-12', [])).map((b) => b.label)).toEqual(['Janeiro de 2027']);
+    expect(cardMonthUpcomingBars(cardInvoicesMonth([invoice('2027-02', 5_000)], '2027-01', [])).map((b) => b.label)).toEqual(['Fevereiro']);
   });
 
   it('o Cartão Exemplo da demonstração: nada vence em outubro e as próximas faturas aparecem', async () => {
@@ -159,6 +195,12 @@ describe('faturas do mês (D-042)', () => {
       { month: '2026-11', cents: 55_000 },
       { month: '2026-12', cents: 35_000 },
       { month: '2027-01', cents: 35_000 },
+    ]);
+    // As barras da tela: novembro é a maior; dezembro e janeiro, 350/550 dela.
+    expect(cardMonthUpcomingBars(m).map((b) => [b.label, b.tenths])).toEqual([
+      ['Novembro', 1000],
+      ['Dezembro', 636],
+      ['Janeiro de 2027', 636],
     ]);
     // Novembro: o mesmo número da renda comprometida da demonstração.
     const nov = cardInvoicesMonth(all, '2026-11', []);

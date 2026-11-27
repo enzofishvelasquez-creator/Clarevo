@@ -1,21 +1,33 @@
-import { DEMO_TEXT, INVITE_BASE_URL, LEGAL_TEXT, signupConsentParts } from '@clarevo/core';
-import { router } from 'expo-router';
+import { DEMO_TEXT, INVITE_BASE_URL, LEGAL_TEXT, SIGNUP_TEXT, signupConsentParts } from '@clarevo/core';
+import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, Info } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, type TextInput } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { SiteTextLink } from '@/components/site-link';
 import { Banner, Button, LinkButton, TextField, Txt } from '@/components/ui';
 import { AuthError, PASSWORD_RULE, emailProblem, passwordProblem, pendingCredentials } from '@/lib/auth';
+import { rememberChosenPlan } from '@/lib/chosen-plan';
 import { SITE_URL } from '@/lib/site';
 import { useSession } from '@/state/session';
 import { colors } from '@/theme/tokens';
 
 type Errors = Partial<Record<'name' | 'email' | 'password', string>>;
 
+/**
+ * Criar conta. Com a assinatura aberta, o "Assine aqui" do site chega aqui direto (jornada de compra de 27/11/2026): no alto, a linha do
+ * teste grátis (`SIGNUP_TEXT.trial`, verdadeira antes e depois do início da cobrança); o plano e o período escolhidos no site
+ * (`?plano=individual|familia&periodo=mensal|anual`) ficam só neste aparelho, para a tela Assinatura abrir com eles.
+ */
 export default function CriarConta() {
   const { auth } = useSession();
+  const params = useLocalSearchParams();
+  // O plano do site: guardado uma vez, ao abrir (parâmetros inválidos não guardam nada).
+  useEffect(() => {
+    rememberChosenPlan(params);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,7 +68,7 @@ export default function CriarConta() {
   };
 
   return (
-    <AuthShell back title="Criar conta" subtitle="Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.">
+    <AuthShell back title={SIGNUP_TEXT.title} note={SIGNUP_TEXT.trial} subtitle={SIGNUP_TEXT.subtitle}>
       {auth.mode === 'demo' ? (
         <Banner tone="info" icon={Info}>
           <Txt variant="label">{DEMO_TEXT.signUpNotice}</Txt>

@@ -13,7 +13,8 @@ import { GOALS_TEXT, GOAL_DEADLINE_SHORTCUTS, GOAL_MILESTONES } from '../src/goa
 import { GUIDE_ENTRIES } from '../src/guide';
 import { INVESTMENT_TEXT } from '../src/investments';
 import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
-import { ACCESS_TEXT, PLAN_NAME, PLAN_PERIOD_TEXT, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPeriodPriceAmount, planPriceAmount } from '../src/plano';
+import { ACCESS_TEXT, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, PLAN_PERIOD_TEXT, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPeriodPriceAmount, planPriceAmount } from '../src/plano';
+import { formatBRL } from '../src/money';
 import { SITE_CALCULATORS } from '../src/calculators';
 import { INDICADORES_TEXT, INDICADOR_IDS, exibirIndicador, type RetratoIndicadores } from '../src/indicadores';
 import { GLOSSARIO, INDICADORES_REVIEWED_ON, PAGINAS_INDICADORES, explicacoesDeMercado } from '../src/indicadores/conteudo';
@@ -969,14 +970,15 @@ describe('site público: as páginas geradas', () => {
       expect(secao).toContain(`<article class="cartao plano plano-link com-fita">\n<span class="fita-em-breve" aria-hidden="true">Em breve</span>\n<h3>${PLAN_NAME[plano]}<span class="so-leitor"> (em breve)</span></h3>`);
       // O site junta "R$" e o número com espaço sem quebra (esc), para o preço não partir entre linhas.
       expect(secao).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace("R$ ", "R$\u00a0")}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
-      // D-127: o preço anual logo abaixo do mensal, com o equivalente por mês dito como equivalente, do núcleo.
+      // D-127: o preço anual logo abaixo do mensal, com o equivalente por mês dito como equivalente, do núcleo; desde 27/11/2026 (jornada de
+      // compra, S6), também a diferença para 12 mensalidades, a mesma frase da tela Assinatura do app.
       expect(secao).toContain(
-        `<p class="preco-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (${PLAN_PERIOD_TEXT.equivalent(plano).replace(/^E/, 'e').replace('R$ ', 'R$\u00a0')})</p>`,
+        `<p class="preco-anual">ou <span class="preco-valor-anual">${planPeriodPriceAmount(plano, 'anual').replace('R$ ', 'R$\u00a0')}</span> por ano (${PLAN_PERIOD_TEXT.equivalent(plano).replace(/^E/, 'e').replace('R$ ', 'R$\u00a0')}, ${PLAN_PERIOD_TEXT.saving(plano).replace('R$ ', 'R$\u00a0')})</p>`,
       );
     }
     expect(secao.match(/class="fita-em-breve"/g)?.length).toBe(2);
-    expect(secao).toContain('R$\u00a0269,90</span> por ano (equivale a R$\u00a022,49 por mês)');
-    expect(secao).toContain('R$\u00a0629,90</span> por ano (equivale a R$\u00a052,49 por mês)');
+    expect(secao).toContain('R$\u00a0269,90</span> por ano (equivale a R$\u00a022,49 por mês, R$\u00a088,90 a menos que 12 mensalidades)');
+    expect(secao).toContain('R$\u00a0629,90</span> por ano (equivale a R$\u00a052,49 por mês, R$\u00a0208,90 a menos que 12 mensalidades)');
     for (const p of ACCESS_TEXT.plans) expect(secao).toContain(p.who);
     // Uma linha só embaixo dos cartões: o teste, o cancelamento e o "só ver e exportar", com o passo a passo da assinatura na Ajuda.
     expect(secao).toContain('<p class="nota nota-planos">14 dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, só ver e exportar. <a href="ajuda/conta.html#guia-assinatura">Como funciona a assinatura</a></p>');
@@ -1066,7 +1068,8 @@ describe('site público: as páginas geradas', () => {
     const primeira = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(empresas)![0];
     expect(primeira).not.toMatch(/não promete|não está incluído|não fazem parte/);
     // Revisão de 18/11/2026: as ressalvas ficam numa nota curta depois de "Como funciona", e não em cartões no bloco da NR-1.
-    const nr1 = /<section[^>]*aria-labelledby="nr-1"[\s\S]*?<\/section>/.exec(empresas)![0];
+    // Desde 27/11/2026, o bloco da NR-1 fica recolhido em "Mais detalhes" (um <details> com o id da seção de antes).
+    const nr1 = /<details class="duvida" id="nr-1">[\s\S]*?<\/details>/.exec(empresas)![0];
     expect(nr1).not.toMatch(/<h3>O que não está incluído<\/h3>|não é atendimento de saúde/);
     const comoFunciona = /<section[^>]*aria-labelledby="como-funciona"[\s\S]*?<\/section>/.exec(empresas)![0];
     const nota = /<p class="nota nota-ressalvas">[\s\S]*?<\/p>/.exec(comoFunciona)?.[0] ?? '';
@@ -1165,8 +1168,9 @@ describe('site público: as páginas geradas', () => {
       expect(p, arquivo).not.toContain('mesmo teste grátis');
       expect(p, arquivo).toContain('Com Pix, você paga um mês por vez ou o ano de uma vez.');
       expect(capa, arquivo).toContain(`<p class="lead">${esc(ACCESS_TEXT.plans.find((x) => x.plan === plano)!.who)}</p>`);
-      // Preço só na capa, e só o deste plano.
-      expect(p.replace(capa, ''), arquivo).not.toMatch(/R\$\s?\d/);
+      const { linhaDaFamiliaPorCasa } = require(join(ROOT, 'scripts', 'site', 'paginas', 'planos.js')) as { linhaDaFamiliaPorCasa: () => string };
+      // Preço só na capa, e só o deste plano; no Família, também a conta do preço por casa em "Para quem é" (jornada de compra, S4).
+      expect(p.replace(capa, '').replace(`<li>${esc(linhaDaFamiliaPorCasa())}</li>`, ''), arquivo).not.toMatch(/R\$\s?\d/);
       expect(p, arquivo).not.toContain(planPriceAmount(outro).replace('R$ ', 'R$\u00a0'));
       expect([...p.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]), arquivo).toEqual(plano === 'familiar' ? ['para-quem', 'inclui', 'assinatura', 'perguntas'] : ['para-quem', 'inclui', 'assinatura']);
       // O que só este plano tem, e nada do que só o outro tem.
@@ -1282,10 +1286,30 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('Dados fictícios de demonstração');
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(7);
     expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(figuras + 7);
-    // "E mais": os Lembretes, sem tela, num cartão só de texto na largura toda; os três cartões com celular numa linha só.
-    const mais = /<h2 id="mais">E mais<\/h2>[\s\S]*?<\/section>/.exec(h)![0];
-    expect(mais).toMatch(/^<h2 id="mais">E mais<\/h2>\n<div class="grade grade-texto">\n<article class="cartao sem-captura">\n<h3>Lembretes<\/h3>/);
-    expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(mais)![0].match(/<article class="cartao">/g)?.length).toBe(3);
+    // Desde 27/11/2026 (análise de 26/11, lista "Depois": a página tinha cerca de 21 telas de celular), a página em cinco blocos: "Como
+    // funciona" com os três recursos do dia a dia à vista, "Os recursos" com os outros numa frase e recolhidos (um <details> fechado, com o
+    // mesmo texto, as telas e os vídeos), "Seus dados", "Onde usar" e a chamada dos planos.
+    expect([...h.matchAll(/<section class="bloco[^"]*" aria-labelledby="([^"]+)"/g)].map((m) => m[1])).toEqual(['como-funciona', 'recursos', 'seus-dados', 'onde', 'planos']);
+    const comoFunciona = /<section class="bloco[^"]*" aria-labelledby="como-funciona">[\s\S]*?<\/section>/.exec(h)![0];
+    expect([...comoFunciona.matchAll(/<article class="recurso" id="([^"]+)"/g)].map((m) => m[1])).toEqual(['resumo', 'anotar', 'contas']);
+    const recursos = /<section class="bloco[^"]*" aria-labelledby="recursos">[\s\S]*?<\/section>/.exec(h)![0];
+    const recolhido = /<details class="ver-mais" id="todos-os-recursos">\n<summary>Ver todos os recursos<\/summary>[\s\S]*?<\/details>/.exec(recursos)?.[0] ?? '';
+    expect(recolhido, 'o <details> fechado de "Os recursos"').not.toBe('');
+    expect(recolhido).not.toMatch(/<details[^>]*\sopen/);
+    expect([...recolhido.matchAll(/<article class="recurso" id="([^"]+)"/g)].map((m) => m[1])).toEqual(['nota', 'cartoes', 'evolucao', 'metas', 'investir', 'familia', 'negocio', 'aprender']);
+    // A frase à vista diz, na ordem, o que está recolhido, para quem não abre.
+    expect(recursos).toContain('<p class="lead-bloco">Também no app: leitura de nota fiscal e de comprovante, cartões e faturas, evolução e análises, metas e reserva, Investir, Família, Espaço Negócio, Aprender e calculadoras, lembretes, a tela Quem vê estes dados, benefício pela empresa e tema claro ou escuro.</p>');
+    // "E mais" (dentro do recolhido): os Lembretes, sem tela, num cartão só de texto na largura toda; os três cartões com celular numa linha só.
+    expect(recolhido).toMatch(/<div class="grade grade-texto">\n<article class="cartao sem-captura">\n<h3>Lembretes<\/h3>/);
+    expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(recolhido)![0].match(/<article class="cartao">/g)?.length).toBe(3);
+    // "Seus dados": o essencial de privacidade, à vista, com o link de Segurança e privacidade.
+    const dados = /<section class="bloco[^"]*" aria-labelledby="seus-dados">[\s\S]*?<\/section>/.exec(h)![0];
+    for (const t of ['O seu Pessoal é só seu', 'Você decide o que entra', 'Do cartão, só o apelido', 'Sem anúncios e sem venda de dados']) expect(dados, t).toContain(`<h3>${t}</h3>`);
+    expect(dados).toContain('A Clarevo não se conecta ao banco e não pede senha bancária.');
+    expect(dados).toContain('<a href="../seguranca.html">Segurança e privacidade</a>');
+    // A chamada dos planos, no fim: "Assine aqui" (antes do lançamento, para os planos) e "Use no navegador".
+    const planos = /<section class="bloco[^"]*" aria-labelledby="planos">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(planos).toContain('<h2 id="planos">Individual ou Família</h2>\n<p>Os dois planos têm tudo o que a Clarevo oferece. O que muda é para quem é a assinatura.</p>\n<div class="acoes">\n<a class="botao botao-principal" href="../planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="../web.html">Use no navegador</a>\n</div>');
     // D-128: nada de fase de testes; a web com o link para Use no navegador e, antes do lançamento, só a tela de entrar de quem já tem conta
     // (D-064), nenhum link para a tela inicial do app.
     expect(h).toContain('<h3>Na web</h3>');
@@ -1299,13 +1323,16 @@ describe('site público: as páginas geradas', () => {
     expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="../planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="../web.html">Use no navegador</a>\n</div>\n<p class="link-demo"><a href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>');
     expect(h.match(/demo\.clarevo\.app\.br/g)?.length).toBe(1);
     expect(h).not.toMatch(/class="botao[^"]*" href="https:\/\/demo\./);
-    expect(h).toContain('tocar num vídeo pausa ou toca de novo');
+    // Sem texto sobre a própria página (D-129 e a análise de 26/11, lista "Depois"): saíram "Um passeio pelos recursos do app" e a frase de
+    // como os vídeos tocam (o próprio vídeo diz ao leitor de tela "Pausar o vídeo" ou "Tocar o vídeo").
+    expect(h).not.toContain('tocar num vídeo pausa ou toca de novo');
+    expect(h).not.toContain('Um passeio pelos recursos');
     expect(h).not.toContain('botão redondo');
     // "Cada texto vem do guia" não é verdade (os pontos são do site). Desde a D-129, nada de texto sobre como a página foi feita: só o que a
     // pessoa vê (as cinco abas, os dados fictícios e os vídeos).
     expect(h).not.toContain('Cada texto vem do guia');
     expect(h).not.toContain('guia de uso do próprio app');
-    expect(h).toContain('As telas e os vídeos usam dados fictícios.');
+    expect(h).toContain('<p class="lead">Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. As telas e os vídeos usam dados fictícios, e uma conta nova começa vazia.</p>');
     // O que o app não faz: a faixa curta da capa, com link para o bloco completo de Segurança e privacidade (D-115).
     expect(h).not.toContain('id="nao-faz"');
     expect(h).toContain('<p class="confianca"><a href="../seguranca.html">');
@@ -1322,6 +1349,29 @@ describe('site público: as páginas geradas', () => {
   // D-128 (pedido do Enzo, 26/11/2026): a página da versão web, para incentivar o uso no navegador. Só o que o app faz hoje: sem instalar,
   // a mesma conta, o desenho largo com o menu ao lado (as telas de verdade do computador) e o pagamento na web pelo serviço de pagamento, com
   // os mesmos preços das lojas (sem desconto na web). A demonstração só como link de texto discreto.
+  // Jornada de compra de 27/11/2026, S4: a página do Família abre pelo que a casa ganha, com a conta do preço por casa feita com os preços de
+  // plano-precos.ts (hoje, 3 x R$ 29,90 = R$ 89,70 contra R$ 69,90), dita como fato, sem "economize"; a logística do convite vem depois.
+  it('o plano Família abre pelo que a casa ganha e diz, como fato, a partir de quantas pessoas custa menos que planos Individuais separados', () => {
+    const planos = require(join(ROOT, 'scripts', 'site', 'paginas', 'planos.js')) as { familiaCustaMenosAPartirDe: () => number | null; linhaDaFamiliaPorCasa: () => string; LEAD_DA_FAMILIA: string };
+    const n = planos.familiaCustaMenosAPartirDe();
+    // A conta, refeita aqui com os centavos do núcleo: o menor número de pessoas em que n planos Individuais custam mais que um Família, no mensal e no anual.
+    const menor = (periodo: 'mensal' | 'anual') => { let k = 1; while (k * PLAN_PERIOD_PRICE_CENTS.individual[periodo] <= PLAN_PERIOD_PRICE_CENTS.familiar[periodo]) k++; return k; };
+    expect(n).toBe(Math.max(menor('mensal'), menor('anual')));
+    expect(n).toBe(3);
+    expect(planos.linhaDaFamiliaPorCasa()).toBe(`Com 3 pessoas ou mais, o Família custa menos que planos Individuais separados: ${formatBRL(PLAN_PERIOD_PRICE_CENTS.familiar.mensal)} por mês, contra ${formatBRL(3 * PLAN_PERIOD_PRICE_CENTS.individual.mensal)} de 3 planos Individuais.`);
+    expect(planos.linhaDaFamiliaPorCasa()).toContain('R$ 89,70');
+    const p = html('planos/familia.html');
+    const paraQuem = /<h2 id="para-quem">Para quem é<\/h2>\n([\s\S]*?)<\/ul>/.exec(p)![1]!;
+    expect(paraQuem).toMatch(new RegExp(`^<p class="lead-bloco">${planos.LEAD_DA_FAMILIA}</p>\n<ul class="como-funciona lista-marcada">\n<li>Cada pessoa continua com o próprio Pessoal, que só ela vê`));
+    const itens = [...paraQuem.matchAll(/<li>([^<]+)<\/li>/g)].map((m) => m[1]!);
+    expect(itens.indexOf(esc(planos.linhaDaFamiliaPorCasa()))).toBeGreaterThan(0);
+    // A logística (convite e titularidade) depois do que a casa ganha e do preço.
+    expect(itens.findIndex((i) => i.startsWith('Convite por link'))).toBeGreaterThan(itens.indexOf(esc(planos.linhaDaFamiliaPorCasa())));
+    expect(p).not.toMatch(/economiz|vale a pena|imperd|melhor op/i);
+    // No Individual, nada disso.
+    expect(html('planos/individual.html')).not.toContain('planos Individuais separados');
+  });
+
   it('Use a Clarevo no navegador (web.html): sem instalar, a mesma conta, as telas do computador, cartão ou Pix pelo serviço de pagamento, os mesmos preços, "Assine aqui" e a demonstração como link de texto', () => {
     const h = html('web.html');
     expect(h).toContain('<h1>Use a Clarevo no navegador</h1>');
@@ -1329,7 +1379,11 @@ describe('site público: as páginas geradas', () => {
     expect(capa).toContain('<div class="acoes">\n<a class="botao botao-principal" href="planos.html">Assine aqui</a>\n<a class="botao botao-suave" href="app/index.html">Conheça o app</a>\n</div>');
     expect(capa).toContain('<p class="link-demo"><a href="https://demo.clarevo.app.br" rel="noopener noreferrer">Ver uma demonstração com dados fictícios</a></p>');
     expect(h.match(/demo\.clarevo\.app\.br/g)?.length).toBe(1);
-    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['no-navegador', 'no-computador', 'pagar', 'comecar']);
+    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['no-navegador', 'no-computador', 'como-app', 'pagar', 'comecar']);
+    // Use como app no celular (jornada de compra de 27/11/2026, S5): os passos do Safari e do Chrome, sem link para a tela inicial do app web.
+    const comoApp = /<section class="bloco[^"]*" aria-labelledby="como-app">[\s\S]*?<\/section>/.exec(h)![0];
+    for (const t of ['No iPhone, pelo Safari', 'Toque em Compartilhar, o quadrado com a seta para cima.', 'Escolha Adicionar à Tela de Início e confirme.', 'No Android, pelo Chrome', 'Toque no menu, os três pontos no canto de cima.', 'Escolha Instalar app ou Adicionar à tela inicial e confirme.', 'Os nomes dos menus podem mudar um pouco']) expect(comoApp, t).toContain(t);
+    expect(comoApp).not.toMatch(/href=/);
     for (const t of ['Nada para instalar', 'A mesma conta do celular', 'A tela larga do computador', 'o menu fica ao lado']) expect(h, t).toContain(t);
     // As telas de verdade do computador, gravadas da demonstração (docs/telas/630 e 631), com a legenda de sempre.
     expect(h).toMatch(/<img src="imagens\/computador-resumo\.[0-9a-f]{10}\.png" alt="A Clarevo no navegador do computador[^"]+" width="960" height="\d+"/);
@@ -1382,7 +1436,12 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje.');
     expect(h).toContain('não promete redução de absenteísmo, de estresse nem de adoecimento');
     // O bloco da NR-1 (Manual v2.2, seção 12): a norma não exige app financeiro, a proposta é ação complementar, a contratação isolada não comprova nada.
-    expect(h).toContain('<h2 id="nr-1">Bem-estar financeiro e a NR-1</h2>');
+    // Desde 27/11/2026 (análise de 26/11, lista "Depois": a página tinha cerca de 12 telas de celular), à vista ficam o que a empresa recebe,
+    // o que vê e o que nunca vê, como funciona (com as ressalvas) e como falar com a Clarevo; o painel, o fim do benefício e a NR-1 ficam
+    // recolhidos em "Mais detalhes", com o mesmo texto, cada um com o id da seção de antes.
+    expect([...h.matchAll(/<section class="bloco[^"]*" aria-labelledby="([^"]+)"/g)].map((m) => m[1])).toEqual(['bem-estar', 'o-que-ve', 'como-funciona', 'detalhes', 'apresentacao']);
+    expect([...h.matchAll(/<details class="duvida" id="([^"]+)">\n<summary>([^<]+)<\/summary>/g)].map((m) => [m[1], m[2]])).toEqual([['painel', 'O painel, só na web'], ['fim', 'Quando o benefício acaba'], ['nr-1', 'Bem-estar financeiro e a NR-1']]);
+    expect(h).not.toMatch(/<details class="duvida"[^>]*\sopen/);
     for (const frase of [
       'A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais.',
       'A NR-1 não exige a contratação de um aplicativo financeiro.',
@@ -1525,7 +1584,9 @@ describe('site público: as páginas geradas', () => {
   it('o estilo não carrega nada de fora, usa só as fontes locais e tem foco visível, modo escuro e a identidade da marca', () => {
     const css = html('estilo.css');
     expect(css).not.toMatch(/https?:|@import|\/\/[a-z]/i);
-    for (const m of css.matchAll(/url\(([^)]+)\)/g)) expect(m[1], 'url() no CSS').toMatch(/^fontes\/Manrope_(500Medium|700Bold|800ExtraBold)\.ttf$/);
+    for (const m of css.matchAll(/url\(([^)]+)\)/g)) expect(m[1], 'url() no CSS').toMatch(/^fontes\/Manrope_(500Medium|700Bold|800ExtraBold)\.(woff2|ttf)$/);
+    // Desde 27/11/2026, o WOFF2 primeiro e o TTF como segunda opção (navegador que lê WOFF2 nunca baixa o TTF), em cada peso.
+    for (const peso of ['500Medium', '700Bold', '800ExtraBold']) expect(css, peso).toContain(`src:url(fontes/Manrope_${peso}.woff2) format("woff2"),url(fontes/Manrope_${peso}.ttf) format("truetype")}`);
     expect(css).toContain(':focus-visible');
     expect(css).toContain('@media (prefers-color-scheme: dark)');
     expect(css).toContain('--azul:#2457F5');
@@ -1535,6 +1596,37 @@ describe('site público: as páginas geradas', () => {
     expect(css).toContain('@media print');
     for (const peso of ['500Medium', '700Bold', '800ExtraBold']) expect(existsSync(join(SITE, 'fontes', `Manrope_${peso}.ttf`)), peso).toBe(true);
     expect(readFileSync(join(SITE, 'fontes', 'OFL.txt'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1');
+  });
+
+  // As fontes em WOFF2 (27/11/2026, análise de 26/11, lista "Depois"): feitas do TTF do app por scripts/gerar-fontes-site.js, com o
+  // origem.json (tamanho e resumo de cada TTF e de cada WOFF2). Sem descomprimir (o wawoff2 não é dependência do repositório), o teste confere
+  // que cada WOFF2 é do TTF de hoje, é um WOFF2 de verdade, com as mesmas tabelas do TTF, e é bem menor; e que o gerador avisa se o TTF mudar.
+  it('as fontes do site em WOFF2: do TTF de hoje (origem.json), com as mesmas tabelas, bem menores, copiadas para site/fontes com o TTF e a licença', () => {
+    const resumo = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+    const origem = JSON.parse(readFileSync(join(ROOT, 'site-src', 'fontes', 'origem.json'), 'utf8')) as { ferramenta: string; fontes: Record<string, { ttf: { bytes: number; sha256: string }; woff2: { bytes: number; sha256: string } }> };
+    expect(origem.ferramenta).toMatch(/^wawoff2 \d+\.\d+\.\d+$/);
+    let ttfs = 0;
+    let woff2s = 0;
+    for (const peso of ['500Medium', '700Bold', '800ExtraBold']) {
+      const ttf = readFileSync(join(ROOT, 'apps', 'app', 'assets', 'fonts', `Manrope_${peso}.ttf`));
+      const woff2 = readFileSync(join(ROOT, 'site-src', 'fontes', `Manrope_${peso}.woff2`));
+      expect(resumo(ttf), `${peso}: o TTF do app mudou; rode node scripts/gerar-fontes-site.js`).toBe(origem.fontes[peso]!.ttf.sha256);
+      expect(resumo(woff2), peso).toBe(origem.fontes[peso]!.woff2.sha256);
+      // O cabeçalho do WOFF2: a assinatura "wOF2", o tipo TrueType (0x00010000), o tamanho do arquivo e as mesmas tabelas do TTF.
+      expect(woff2.subarray(0, 4).toString('latin1'), peso).toBe('wOF2');
+      expect(woff2.readUInt32BE(4), peso).toBe(0x00010000);
+      expect(woff2.readUInt32BE(8), peso).toBe(woff2.length);
+      expect(woff2.readUInt16BE(12), peso).toBe(ttf.readUInt16BE(4));
+      expect(woff2.length, peso).toBeLessThan(ttf.length * 0.5);
+      // Copiado para site/ sem mudar um byte.
+      expect(readFileSync(join(SITE, 'fontes', `Manrope_${peso}.woff2`)).equals(woff2), peso).toBe(true);
+      ttfs += ttf.length;
+      woff2s += woff2.length;
+    }
+    // As três juntas: cerca de 101 KB em TTF e menos de 45 KB em WOFF2.
+    expect(ttfs - woff2s).toBeGreaterThan(55 * 1024);
+    const { conferir } = require(join(ROOT, 'scripts', 'gerar-fontes-site.js')) as { conferir: () => string[] };
+    expect(conferir()).toEqual([]);
   });
 
   it('o logotipo e o favicon são os arquivos de docs/marca, sem redesenho', () => {

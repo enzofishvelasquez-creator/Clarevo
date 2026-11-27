@@ -46,7 +46,7 @@ function carregarTs(ts, entradas) {
 function catalogo() {
   if (guardado) return guardado;
   const ts = carregarTypescript();
-  const [learn, guide, calc, datas, plano, indicadores, mercado, noticias] = carregarTs(ts, [
+  const [learn, guide, calc, datas, plano, indicadores, mercado, noticias, dinheiro] = carregarTs(ts, [
     'learn/index.ts',
     'guide/index.ts',
     'calculators/index.ts',
@@ -55,6 +55,7 @@ function catalogo() {
     'indicadores/index.ts',
     'indicadores/conteudo.ts',
     'noticias/fontes.ts',
+    'money.ts',
   ]);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
@@ -106,8 +107,20 @@ function catalogo() {
       precoAnual: (plan) => plano.planPeriodPriceAmount(plan, 'anual'),
       porAno: plano.periodSuffix('anual'),
       equivalente: plano.PLAN_PERIOD_TEXT.equivalent,
+      /** "R$ 88,90 a menos que 12 mensalidades" (a mesma conta e a mesma frase da tela Assinatura do app, `PLAN_PERIOD_TEXT.saving`). */
+      diferencaDoAnual: plano.PLAN_PERIOD_TEXT.saving,
       notaDoAnual: plano.PLAN_PERIOD_TEXT.noteSite,
       cobrancaAnual: plano.PLAN_PERIOD_TEXT.optionHint.anual,
+      /**
+       * O preço em centavos de cada plano em cada período (`PLAN_PERIOD_PRICE_CENTS` de `plano-precos.ts`, o mesmo lugar dos preços do app e
+       * da função da assinatura na web), os períodos na ordem do app e o nome de cada um ("mensal", "anual"): os dados estruturados dos
+       * planos (D-129, `dadosDoApp` em `paginas/planos.js`) saem daqui, sem preço escrito no site.
+       */
+      centavos: (plan, periodo) => plano.PLAN_PERIOD_PRICE_CENTS[plan][periodo],
+      periodos: plano.BILLING_PERIODS,
+      /** Centavos em reais, como o app escreve ("R$ 89,70"). */
+      reais: dinheiro.formatBRL,
+      nomeDoPeriodo: plano.PERIOD_NAME,
       /** Os dias do teste grátis (TRIAL_DAYS), para a pergunta da página Planos. */
       diasDeTeste: plano.TRIAL_DAYS,
       /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */

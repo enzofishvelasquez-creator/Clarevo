@@ -8,9 +8,11 @@
  * Desde 26/11/2026 (D-128, pedido do Enzo), nenhum dos dois estados fala de fase de testes, piloto, "quem testa" ou do acesso que "abre no
  * lançamento", e a chamada principal de todas as páginas é "Assine aqui":
  *   - pré-lançamento (`lancado: false`, o padrão): "Assine aqui" leva aos planos (a seção Planos da página inicial, ou `planos.html` das
- *     outras páginas), que mostram a fita "Em breve" em cada cartão; o botão do menu é "Entrar", para a tela de entrar do app web. Nenhum
- *     convite a criar conta e nenhum link para a tela inicial do app web, que convida a criar conta (D-064: ninguém se cadastra antes do
- *     plano pago do banco de dados; a venda continua fechada, `SUBSCRIBE_OPEN`);
+ *     outras páginas), que mostram a fita "Em breve" em cada cartão; o botão do menu é "Entrar", para a tela de entrar do app web. O
+ *     cadastro continua aberto em produção antes do lançamento (D-129 A, decisão do Enzo de 26/11/2026: quem chega à tela de entrar pode
+ *     criar a conta, com o risco aceito do plano gratuito do banco de dados), mas o site ainda não convida a criar conta antes do lançamento:
+ *     se deve convidar é uma pergunta em aberto para o Enzo (jornada de compra de 27/11/2026, pergunta 1). Até ele decidir, nenhum convite a
+ *     criar conta e nenhum link para a tela inicial do app web, que convida a criar conta; e a venda continua fechada (`SUBSCRIBE_OPEN`);
  *   - lançado (`lancado: true`): "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas
  *     aparecem só com o endereço de cada uma.
  * A demonstração (dados fictícios) não é mais chamada: fica só como um link de texto discreto em O app e em Use no navegador
@@ -169,11 +171,32 @@ function emBreveNoTitulo(estado) {
 }
 
 /**
- * A chamada principal de todas as páginas (D-128): "Assine aqui". Antes do lançamento, leva aos planos (a seção Planos da página inicial ou
- * `planos.html`), que mostram "Em breve"; depois, à tela de criar conta do app web. `arquivo`: a página, para o caminho relativo.
+ * O nome de cada plano no endereço do cadastro (jornada de compra de 27/11/2026, item S3): o app lê `plano` e `periodo` e abre a tela
+ * Assinatura já com a escolha, sem marcar nada sozinho. Só estes nomes e valores: `plano=individual|familia` e `periodo=mensal|anual`.
  */
-function assineAqui(arquivo, estado) {
-  if (estado.lancado) return { href: URL_CRIAR_CONTA, texto: 'Assine aqui', externo: true };
+const PLANO_NO_CADASTRO = { individual: 'individual', familiar: 'familia' };
+const PERIODOS_NO_CADASTRO = ['mensal', 'anual'];
+
+/**
+ * A tela de criar conta do app web (`URL_CRIAR_CONTA`), com o plano e o período escolhidos quando a página é de um plano (os do núcleo:
+ * `individual` ou `familiar`; `mensal` ou `anual`): `.../criar-conta?plano=familia&periodo=anual`. Sem plano nem período, o endereço de
+ * sempre, sem parâmetro (o cabeçalho e as capas). Recusa plano ou período que não existem, e período sem plano.
+ */
+function urlDoCadastro({ plano = null, periodo = null } = {}) {
+  if (plano !== null && !(plano in PLANO_NO_CADASTRO)) throw new Error(`o cadastro não conhece o plano "${plano}" (use individual ou familiar, do núcleo)`);
+  if (periodo !== null && !PERIODOS_NO_CADASTRO.includes(periodo)) throw new Error(`o cadastro não conhece o período "${periodo}" (use mensal ou anual)`);
+  if (periodo !== null && plano === null) throw new Error('o período vai no endereço do cadastro só com o plano');
+  const parametros = [...(plano ? [`plano=${PLANO_NO_CADASTRO[plano]}`] : []), ...(periodo ? [`periodo=${periodo}`] : [])];
+  return parametros.length ? `${URL_CRIAR_CONTA}?${parametros.join('&')}` : URL_CRIAR_CONTA;
+}
+
+/**
+ * A chamada principal de todas as páginas (D-128): "Assine aqui". Antes do lançamento, leva aos planos (a seção Planos da página inicial ou
+ * `planos.html`), que mostram "Em breve"; depois, à tela de criar conta do app web, com o plano (e o período) quando a página é de um plano
+ * (`plano`, `periodo`, item S3 da jornada de compra de 27/11/2026). `arquivo`: a página, para o caminho relativo.
+ */
+function assineAqui(arquivo, estado, { plano = null, periodo = null } = {}) {
+  if (estado.lancado) return { href: urlDoCadastro({ plano, periodo }), texto: 'Assine aqui', externo: true };
   return { href: arquivo === 'index.html' ? '#planos' : rel(arquivo, 'planos.html'), texto: 'Assine aqui', externo: false };
 }
 
@@ -187,8 +210,8 @@ const SECUNDARIAS = {
  * As chamadas de uma capa ou de uma chamada final, no máximo dois botões (D-128): "Assine aqui" e, se pedida, a secundária (`secundaria`:
  * `app`, "Conheça o app", ou `web`, "Use no navegador"). `arquivo`: a página, para o caminho relativo.
  */
-function chamadas(arquivo, estado, { secundaria = null } = {}) {
-  const principal = assineAqui(arquivo, estado);
+function chamadas(arquivo, estado, { secundaria = null, plano = null, periodo = null } = {}) {
+  const principal = assineAqui(arquivo, estado, { plano, periodo });
   const botoes = [`<a class="botao botao-principal" href="${esc(principal.href)}"${principal.externo ? ' rel="noopener noreferrer"' : ''}>${esc(principal.texto)}</a>`];
   if (secundaria) {
     const s = SECUNDARIAS[secundaria];
@@ -211,8 +234,8 @@ function assinaturaEmBreve(estado) {
  * "Conheça o app"), com a linha do teste; antes do lançamento, a linha de que a assinatura abre em breve e um caminho a seguir, "Conheça o
  * app" (os planos são onde "Assine aqui" chega: não podem ser um beco sem saída).
  */
-function chamadasDosPlanos(arquivo, estado) {
-  if (estado.lancado) return `${chamadas(arquivo, estado, { secundaria: 'app' })}\n<p class="estado-produto">${esc(linhaDaCapa(estado))}</p>`;
+function chamadasDosPlanos(arquivo, estado, { plano = null, periodo = null } = {}) {
+  if (estado.lancado) return `${chamadas(arquivo, estado, { secundaria: 'app', plano, periodo })}\n<p class="estado-produto">${esc(linhaDaCapa(estado))}</p>`;
   return `<p class="estado-produto">${esc(assinaturaEmBreve(estado))}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${rel(arquivo, SECUNDARIAS.app.pagina)}">${esc(SECUNDARIAS.app.texto)}</a>\n</div>`;
 }
 
@@ -220,6 +243,17 @@ function chamadasDosPlanos(arquivo, estado) {
  * "Já tem conta? Entrar no navegador" (D-129), embaixo das chamadas de Use no navegador, nos dois estados: a tela de entrar do app web, de
  * quem já tem conta (antes do lançamento, também no menu; lançado, o menu tem "Entrar" ao lado de "Assine aqui").
  */
+/**
+ * A ponte do conteúdo para o produto (jornada de compra de 27/11/2026, item S2): uma linha calma no fim de Aprender, das calculadoras, da
+ * Ajuda e das Novidades, que antes terminavam sem nenhum caminho para o app. Antes do lançamento, "conheça o app da Clarevo" (O app);
+ * lançado, o cadastro, com o teste grátis. Sem pressa nem promessa. Entra pelo modelo de página (`montarPagina`, opção `ponte`).
+ */
+function ponteParaOProduto(arquivo, estado) {
+  const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
+  if (estado.lancado) return `<p class="ponte">${esc(inicio)} <a href="${esc(urlDoCadastro())}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. ${esc(`Toda conta começa com ${diasDeTeste()} dias grátis, sem cartão.`)}</p>`;
+  return `<p class="ponte">${esc(inicio)} <a href="${rel(arquivo, SECUNDARIAS.app.pagina)}">conheça o app da Clarevo</a>.</p>`;
+}
+
 function jaTemConta() {
   return `<p class="ja-tem-conta">Já tem conta? <a href="${esc(URL_ENTRAR)}" rel="noopener noreferrer">Entrar no navegador</a></p>`;
 }
@@ -236,7 +270,8 @@ function linkDaDemonstracao() {
  * A chamada do cabeçalho: antes do lançamento, "Entrar", que leva à tela de entrar do app web (até 26/11/2026, "Entrar (quem testa)"; D-128);
  * depois, "Assine aqui", para a tela de criar conta, como a chamada principal das páginas, e, ao lado, "Entrar" como link de texto (análise
  * geral de 26/11/2026, D-129: lançado, não havia como entrar pelo site). Nunca a tela inicial do app web antes do lançamento: ela começa com
- * "14 dias grátis, sem cartão" e "Criar conta" (D-064).
+ * "14 dias grátis, sem cartão" e "Criar conta", e o site não convida a criar conta antes do lançamento enquanto o Enzo não decidir (o
+ * cadastro em si está aberto, D-129 A: a tela de entrar tem "Criar conta").
  */
 function chamadaDoMenu(estado) {
   return estado.lancado ? { href: URL_CRIAR_CONTA, texto: 'Assine aqui' } : { href: URL_ENTRAR, texto: 'Entrar' };
@@ -258,7 +293,7 @@ function linkDaVersaoWeb(estado) {
 /**
  * O app que qualquer pessoa pode abrir agora, para a nota das calculadoras ("ou use a versão web da Clarevo"): só depois do lançamento.
  * Antes, nenhum (D-128: a demonstração não é mais oferecida fora de O app e de Use no navegador, e a tela inicial do app web convida a
- * criar conta, D-064).
+ * criar conta, o que o site não faz antes do lançamento enquanto o Enzo não decidir, D-129 A).
  */
 function appParaUsar(estado) {
   return estado.lancado ? { href: URL_APP, texto: 'versão web' } : null;
@@ -299,6 +334,8 @@ module.exports = {
   chamadas,
   assinaturaEmBreve,
   chamadasDosPlanos,
+  urlDoCadastro,
+  ponteParaOProduto,
   jaTemConta,
   linkDaDemonstracao,
   chamadaDoMenu,

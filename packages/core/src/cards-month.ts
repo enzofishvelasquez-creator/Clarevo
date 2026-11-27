@@ -16,7 +16,9 @@ import { committedPermille, formatPermille, referenceFor } from './committed';
  *   Por isso `totalCents` é igual a `CommittedSummary.cardCents` do mesmo mês (testado).
  * - Percentual como em D-026(3): milésimos arredondados com metade para cima sobre a renda de referência vigente no mês; sem
  *   referência, só o valor em reais. Sem cor de alerta, nota nem julgamento.
- * - "Próximas faturas": até 3 dos 6 meses seguintes que têm fatura com valor, sempre "previsto".
+ * - "Próximas faturas": até 3 dos 6 meses seguintes que têm fatura com valor, sempre "previsto". Desde a análise geral de 26/11/2026
+ *   (estudo de mercado, sinal 24: "Barras simples por mês para faturas"), em barras, uma por mês (`cardMonthUpcomingBars`), com o mês e o
+ *   valor sempre escritos: a barra só desenha os mesmos números de `upcoming`, na escala do maior mês da lista, numa cor só.
  * - Quem chama passa as faturas de todos os cartões do contexto, ativos e arquivados: a renda comprometida conta as faturas dos
  *   dois, e o número do mês precisa ser o mesmo nas duas telas.
  */
@@ -55,6 +57,38 @@ export interface CardInvoicesMonth {
 /** Valor da fatura no comprometido: paga pelo valor pago, as demais pelo total (zero quando não há conta a pagar). */
 export function invoiceCommittedCents(i: Pick<Invoice, 'paidCents' | 'totalCents'>): Cents {
   return i.paidCents !== null ? i.paidCents : i.totalCents;
+}
+
+/** Menor barra de "Próximas faturas", em décimos de por cento: um mês de valor pequeno ainda aparece como um traço. */
+export const CARD_MONTH_BAR_MIN_TENTHS = 20;
+
+/** Uma barra de "Próximas faturas": o mês, o valor previsto e a largura, na escala do maior mês da lista. */
+export interface CardMonthUpcomingBar extends CardMonthUpcoming {
+  /** "Novembro"; em outro ano que o do mês da tela, "Janeiro de 2027". */
+  label: string;
+  /** "R$ 550,00" */
+  valueText: string;
+  /** Largura da barra em décimos de por cento (de CARD_MONTH_BAR_MIN_TENTHS a 1000): 1000 é o maior mês da lista. */
+  tenths: number;
+  /** Nome acessível da linha: "Novembro: R$ 550,00, previsto" (com valores ocultos, "Novembro: valor oculto, previsto"). */
+  a11y: string;
+}
+
+/**
+ * As próximas faturas em barras (análise geral de 26/11/2026, sinal 24 do estudo de mercado). Nenhuma conta nova: os meses e os valores
+ * são os de `cardInvoicesMonth(...).upcoming`, na mesma ordem; só a largura é calculada, em décimos do maior mês da lista (metade para
+ * cima, com o mínimo de CARD_MONTH_BAR_MIN_TENTHS). O mês e o valor ficam sempre em texto: a barra é só desenho, numa cor só, que não
+ * muda com o valor. Sem próximas faturas, lista vazia.
+ */
+export function cardMonthUpcomingBars(data: Pick<CardInvoicesMonth, 'month' | 'upcoming'>): CardMonthUpcomingBar[] {
+  const max = data.upcoming.reduce((acc, u) => Math.max(acc, u.cents), 0);
+  return data.upcoming.map((u) => {
+    const name = formatMonthName(u.month);
+    const label = CARD_MONTH_TEXT.barLabel(u.month.slice(0, 4) === data.month.slice(0, 4) ? name : `${name} de ${u.month.slice(0, 4)}`);
+    const valueText = formatBRL(u.cents);
+    const tenths = max > 0 ? Math.min(1000, Math.max(CARD_MONTH_BAR_MIN_TENTHS, Math.round((u.cents * 1000) / max))) : CARD_MONTH_BAR_MIN_TENTHS;
+    return { month: u.month, cents: u.cents, label, valueText, tenths, a11y: CARD_MONTH_TEXT.barA11y(label, valueText) };
+  });
 }
 
 function monthCents(invoices: readonly Invoice[], month: IsoMonth): Cents {
@@ -108,7 +142,12 @@ export const CARD_MONTH_TEXT = {
   inCommitted: 'Já entra na sua renda comprometida, no grupo Faturas de cartão.',
   seeCommitted: 'Ver na renda comprometida',
   seeCommittedA11y: 'Ver na renda comprometida, grupo Faturas de cartão',
-  /** "Próximas faturas (previsto): dezembro R$ 1.200,00, janeiro R$ 900,00" */
-  upcoming: (items: readonly CardMonthUpcoming[]): string =>
-    `Próximas faturas (previsto): ${items.map((u) => `${formatMonthName(u.month)} ${formatBRL(u.cents)}`).join(', ')}`,
+  /** Título das barras das próximas faturas (até 26/11/2026, uma frase: "Próximas faturas (previsto): novembro R$ 550,00, ..."). */
+  upcomingTitle: 'Próximas faturas (previsto)',
+  /** Nome acessível da lista das barras. */
+  upcomingListA11y: 'Próximas faturas, valores previstos por mês',
+  /** "novembro" → "Novembro"; "janeiro de 2027" → "Janeiro de 2027". */
+  barLabel: (month: string): string => `${month.charAt(0).toUpperCase()}${month.slice(1)}`,
+  /** "Novembro: R$ 550,00, previsto" */
+  barA11y: (label: string, valueText: string): string => `${label}: ${valueText}, previsto`,
 } as const;

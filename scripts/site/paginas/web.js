@@ -32,6 +32,17 @@ function vantagens() {
   ];
 }
 
+/**
+ * "Use como app no celular" (jornada de compra de 27/11/2026, item S5): a versão web já pode ir para a tela de início do celular e abrir numa
+ * janela própria, como um app (o app web tem o manifesto com `display: standalone`, `apps/app/public/manifest.webmanifest`), e nenhuma página
+ * dizia isso. Os passos usam os nomes dos menus do Safari e do Chrome em português; como eles mudam um pouco com a versão, a nota diz isso.
+ * Sem link para a tela inicial do app web (antes do lançamento, o site não leva a ela, D-129 A): a página já tem "Já tem conta?".
+ */
+const COMO_APP = [
+  { titulo: 'No iPhone, pelo Safari', passos: ['Abra a versão web da Clarevo no Safari.', 'Toque em Compartilhar, o quadrado com a seta para cima.', 'Escolha Adicionar à Tela de Início e confirme.'] },
+  { titulo: 'No Android, pelo Chrome', passos: ['Abra a versão web da Clarevo no Chrome.', 'Toque no menu, os três pontos no canto de cima.', 'Escolha Instalar app ou Adicionar à tela inicial e confirme.'] },
+];
+
 /** Como pagar na web, em itens curtos. */
 const PAGAR = [
   'No cartão, a assinatura renova sozinha a cada mês ou a cada ano, no período que você escolher. Para cancelar, use a tela Assinatura do app, e o acesso continua até o fim do período já pago.',
@@ -90,6 +101,15 @@ ${telaLarga(img['computador-movimentos'], ARQUIVO)}
       { variante: 'alt', rotulo: 'no-computador' },
     ),
     bloco(
+      `<h2 id="como-app">Use como app no celular</h2>
+<p class="lead-bloco">No celular, a versão web pode ficar na tela de início, com o ícone da Clarevo, e abrir numa janela própria, como um app, com a mesma conta.</p>
+<div class="grade">
+${COMO_APP.map((c) => `<article class="cartao">\n<h3>${esc(c.titulo)}</h3>\n<ol class="passos-curtos">\n${c.passos.map((x) => `<li>${esc(x)}</li>`).join('\n')}\n</ol>\n</article>`).join('\n')}
+</div>
+<p class="nota">Os nomes dos menus podem mudar um pouco com a versão do aparelho e do navegador. Os lembretes de vencimento e a leitura do QR Code pela câmera são do app para celular.</p>`,
+      { rotulo: 'como-app' },
+    ),
+    bloco(
       `<div class="pagar-web">
 <h2 id="pagar">Assinar na web${estado.lancado ? '' : ' <span class="etiqueta">Em breve</span>'}</h2>
 <ul class="como-funciona lista-marcada">
@@ -97,7 +117,7 @@ ${PAGAR.map((i) => `<li>${esc(i.replace('14 dias', `${dias} dias`))}</li>`).join
 </ul>
 <p class="nota"><a href="${u('planos.html')}">Ver os planos</a> · <a href="${u('ajuda/conta.html')}#guia-assinatura">Como funciona a assinatura</a></p>
 </div>`,
-      { rotulo: 'pagar' },
+      { variante: 'alt', rotulo: 'pagar' },
     ),
     bloco(
       `<div class="chamada-final">

@@ -6,8 +6,13 @@
  * "em breve", sem selos; depois, a web e os selos de cada loja com endereço. Desde 26/11/2026 (D-128), as chamadas da capa são "Assine aqui"
  * e "Use no navegador" (`web.html`), e a demonstração fica só como um link de texto discreto, logo abaixo delas. Desde 18/11/2026 (D-115), cada vídeo fica no
  * lugar da captura do recurso que ele mostra e toca sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
+ *
+ * Desde 27/11/2026 (análise geral de 26/11, lista "Depois": a página tinha cerca de 21 telas de celular em 390 px), a página fica em cinco
+ * blocos curtos: "Como funciona" (as cinco abas e os três recursos do dia a dia, à vista), "Os recursos" (a lista dos outros numa frase e,
+ * recolhidos num `<details>`, os mesmos recursos e os cartões de "E mais", com as telas e os vídeos), "Seus dados", "Onde usar" e a
+ * chamada dos planos. Nada saiu: o que não está à vista está recolhido, com o mesmo texto (`docs/22_SITE.md`, seção 22).
  */
-const { chamadas, linkDaDemonstracao, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
+const { chamadas, linhaDaCapa, linkDaDemonstracao, linkDaVersaoWeb, lojasPublicadas, selosDasLojas } = require('../estado');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
@@ -49,6 +54,7 @@ const RECURSOS = [
   {
     id: 'nota',
     titulo: 'Leitura de nota fiscal e de comprovante',
+    lista: 'leitura de nota fiscal e de comprovante',
     guia: ['nota-fiscal'],
     imagem: 'nota',
     itens: [
@@ -72,6 +78,7 @@ const RECURSOS = [
   {
     id: 'cartoes',
     titulo: 'Cartões e faturas',
+    lista: 'cartões e faturas',
     guia: ['cartoes'],
     imagem: 'cartoes',
     video: 'importar-fatura-print',
@@ -85,6 +92,7 @@ const RECURSOS = [
   {
     id: 'evolucao',
     titulo: 'Evolução e análises',
+    lista: 'evolução e análises',
     guia: ['evolucao', 'analises'],
     imagem: 'evolucao',
     itens: [
@@ -94,6 +102,7 @@ const RECURSOS = [
   {
     id: 'metas',
     titulo: 'Metas e reserva',
+    lista: 'metas e reserva',
     guia: ['metas', 'plano-de-guardar'],
     imagem: 'metas',
     video: 'metas',
@@ -158,18 +167,38 @@ const RECURSOS = [
  * e a resposta da Ajuda do site (`ajuda`, em `site-src/ajuda/perguntas.md`).
  */
 const MAIS = [
-  { id: 'lembretes', titulo: 'Lembretes', guia: 'lembretes', imagem: null, texto: 'Um aviso no dia anterior ao vencimento de cada conta, no app para celular. Na tela bloqueada, o aviso não mostra valor nem descrição.' },
-  { id: 'quem-ve', titulo: 'Quem vê estes dados', guia: 'quem-ve', imagem: 'quem-ve', texto: 'Uma tela no próprio app mostra quem tem acesso aos registros: no Pessoal, só você, entre as pessoas do app.' },
-  { id: 'beneficio', titulo: 'Benefício pela empresa', guia: 'beneficio-da-empresa', imagem: 'beneficio', texto: 'Quem recebe o convite da empresa aceita pelo link. O app mostra a empresa, o plano e desde quando vale.' },
-  { id: 'tema', titulo: 'Tema claro ou escuro', ajuda: 'ajuda/conta.html#p-tema', video: 'tema-escuro-claro', texto: 'Por padrão, a Clarevo segue o tema do aparelho. Em Conta, no card Tema, dá para escolher Claro ou Escuro, e a escolha vale só para aquele aparelho.' },
+  { id: 'lembretes', titulo: 'Lembretes', lista: 'lembretes', guia: 'lembretes', imagem: null, texto: 'Um aviso no dia anterior ao vencimento de cada conta, no app para celular. Na tela bloqueada, o aviso não mostra valor nem descrição.' },
+  { id: 'quem-ve', titulo: 'Quem vê estes dados', lista: 'a tela Quem vê estes dados', guia: 'quem-ve', imagem: 'quem-ve', texto: 'Uma tela no próprio app mostra quem tem acesso aos registros: no Pessoal, só você, entre as pessoas do app.' },
+  { id: 'beneficio', titulo: 'Benefício pela empresa', lista: 'benefício pela empresa', guia: 'beneficio-da-empresa', imagem: 'beneficio', texto: 'Quem recebe o convite da empresa aceita pelo link. O app mostra a empresa, o plano e desde quando vale.' },
+  { id: 'tema', titulo: 'Tema claro ou escuro', lista: 'tema claro ou escuro', ajuda: 'ajuda/conta.html#p-tema', video: 'tema-escuro-claro', texto: 'Por padrão, a Clarevo segue o tema do aparelho. Em Conta, no card Tema, dá para escolher Claro ou Escuro, e a escolha vale só para aquele aparelho.' },
+];
+
+/**
+ * Os três recursos à vista em "Como funciona" (análise geral de 26/11/2026, lista "Depois": a página tinha cerca de 21 telas de celular): ver
+ * o mês, anotar e acompanhar as contas. Os outros, com os "E mais", ficam em "Os recursos", recolhidos num `<details>` ("Ver todos os
+ * recursos, com telas e vídeos"), com o mesmo texto, as mesmas telas e os mesmos vídeos de antes.
+ */
+const A_VISTA = ['resumo', 'anotar', 'contas'];
+
+/**
+ * "Seus dados" (a mesma rodada): o essencial de privacidade, à vista, em quatro cartões curtos, com os fatos que a página Segurança e
+ * privacidade, a faixa de confiança e os próprios recursos já dizem (o Pessoal só da pessoa, nada de banco, o cartão e a nota sem dado
+ * completo, o modelo de negócio, exportar e excluir). Nada novo: o detalhe continua em Segurança e privacidade.
+ */
+const SEUS_DADOS = [
+  ['O seu Pessoal é só seu', 'Ninguém mais no app vê o seu Pessoal, nem as pessoas da sua Família. Na Família, cada pessoa vê o que o papel permite, e a tela Quem vê estes dados mostra quem tem acesso.'],
+  ['Você decide o que entra', 'A Clarevo não se conecta ao banco e não pede senha bancária. Só aparece no app o que você anota, importa ou manda por mensagem.'],
+  ['Do cartão, só o apelido', 'O app guarda o apelido do cartão e, se você quiser, os 4 últimos dígitos: nunca o número completo, o código de segurança nem a validade. Da nota fiscal, nenhuma foto e nunca o CPF.'],
+  ['Sem anúncios e sem venda de dados', 'A Clarevo ganha com a assinatura e com o benefício que empresas oferecem. Você exporta os seus gastos e recebimentos quando quiser e pode excluir a conta no próprio app.'],
 ];
 
 function paginaApp({ valores, img, videos, estado }) {
+  const { BENEFICIO_DO_INICIO } = require('./inicio');
   const u = (d) => rel(ARQUIVO, d);
   const c = catalogo();
   const guia = (id) => c.GUIA.find((e) => e.id === id);
 
-  const linhas = RECURSOS.map((r) => {
+  const artigo = (r) => {
     const principal = guia(r.guia[0]);
     if (!principal) throw new Error(`o guia do core não tem a entrada "${r.guia[0]}" (página O app)`);
     const extras = r.guia.slice(1).map((id) => {
@@ -189,7 +218,10 @@ ${r.itens.length ? `<ul>\n${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}
 </div>
 ${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.imagem], ARQUIVO)}
 </article>`;
-  }).join('\n');
+  };
+  for (const id of A_VISTA) if (!RECURSOS.some((r) => r.id === id)) throw new Error(`O app: o recurso "${id}" de A_VISTA não existe`);
+  const aVista = RECURSOS.filter((r) => A_VISTA.includes(r.id)).map(artigo).join('\n');
+  const recolhidos = RECURSOS.filter((r) => !A_VISTA.includes(r.id));
 
   const cartaoMais = (m) => {
     let comoUsar = m.ajuda;
@@ -211,11 +243,16 @@ ${figura}
   const comTela = MAIS.filter((m) => m.video || m.imagem).map(cartaoMais).join('\n');
   const mais = `${semTela ? `<div class="grade grade-texto">\n${semTela}\n</div>\n` : ''}<div class="mini">\n${comTela}\n</div>`;
 
+  // A lista, numa frase, do que está recolhido em "Os recursos": quem não abre continua sabendo o que o app tem.
+  const nomes = [...recolhidos.map((r) => r.lista ?? r.titulo), ...MAIS.map((m) => m.lista ?? m.titulo)];
+  const listaDosRecolhidos = `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
+
   // As chamadas e as lojas seguem o estado do produto (`estado.js`): "Assine aqui" (antes do lançamento, para os planos, que dizem "Em
   // breve"; depois, para criar conta) e "Use no navegador" (D-128); a demonstração, só como link de texto; as lojas "em breve" antes do
-  // lançamento e, depois, os selos de cada loja com endereço.
+  // lançamento e, depois, os selos de cada loja com endereço. Desde a análise de 26/11/2026, o lead diz o que o app faz (antes, "Um passeio
+  // pelos recursos do app", um texto sobre a própria página).
   const capa = `<h1>A Clarevo por dentro</h1>
-<p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
+<p class="lead">${esc(BENEFICIO_DO_INICIO)} As telas e os vídeos usam dados fictícios, e uma conta nova começa vazia.</p>
 ${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
 ${linkDaDemonstracao()}
 ${estado.lancado ? selosDasLojas(estado, { pequenos: true }) : '<p class="lojas">Em breve na App Store e no Google Play.</p>'}
@@ -232,7 +269,38 @@ ${selosDasLojas(estado)}
 <p><span class="etiqueta">Em breve</span> O app para iPhone e Android será publicado na App Store e no Google Play. Alguns recursos, como os lembretes e a leitura do QR Code pela câmera, são do app para celular.</p>
 </article>`;
 
+  const { PLANOS } = c;
   const brutas = [
+    bloco(
+      `<h2 id="como-funciona">Como funciona</h2>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. No dia a dia, você vê o mês, anota o que gastou ou recebeu e acompanha as contas a pagar.</p>
+<div class="recursos">
+${aVista}
+</div>`,
+      { rotulo: 'como-funciona' },
+    ),
+    bloco(
+      `<h2 id="recursos">Os recursos</h2>
+<p class="lead-bloco">Também no app: ${esc(listaDosRecolhidos)}.</p>
+<details class="ver-mais" id="todos-os-recursos">
+<summary>Ver todos os recursos</summary>
+<div class="ver-mais-corpo">
+<div class="recursos">
+${recolhidos.map(artigo).join('\n')}
+</div>
+${mais}
+</div>
+</details>`,
+      { variante: 'alt', rotulo: 'recursos' },
+    ),
+    bloco(
+      `<h2 id="seus-dados">Seus dados</h2>
+<div class="grade">
+${SEUS_DADOS.map(([titulo, texto]) => `<article class="cartao">\n<h3>${esc(titulo)}</h3>\n<p>${esc(texto)}</p>\n</article>`).join('\n')}
+</div>
+<p class="nota"><a href="${u('seguranca.html')}">Segurança e privacidade</a> · <a href="${u('privacidade.html')}">Política de privacidade</a></p>`,
+      { rotulo: 'seus-dados' },
+    ),
     bloco(
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">
@@ -246,20 +314,18 @@ ${noCelular}
 <p>Quem administra o benefício de uma empresa usa um painel que existe só na web. <a href="${u('empresas/index.html')}">Veja como funciona para empresas</a>.</p>
 </article>
 </div>`,
-      { rotulo: 'onde' },
+      { variante: 'alt', rotulo: 'onde' },
     ),
+    // A chamada dos planos, no fim: os dois planos com tudo e "Assine aqui" (antes do lançamento, para os planos, que dizem "Em breve";
+    // depois, para criar conta, com a linha do teste), como no fim da página inicial. Antes do lançamento, sem mais um "em breve": a capa e
+    // o cartão "No celular" já dizem.
     bloco(
-      `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. As telas e os vídeos usam dados fictícios. Os vídeos tocam sem som enquanto aparecem na tela, e tocar num vídeo pausa ou toca de novo.</p>
-<div class="recursos">
-${linhas}
+      `<div class="chamada-final">
+<h2 id="planos">Individual ou Família</h2>
+<p>${esc(`${PLANOS.texto.plansNote.split('. ')[0]}. O que muda é para quem é a assinatura.${estado.lancado ? ` ${linhaDaCapa(estado)}` : ''}`)}</p>
+${chamadas(ARQUIVO, estado, { secundaria: 'web' })}
 </div>`,
-      { variante: 'alt', rotulo: 'recursos' },
-    ),
-    bloco(
-      `<h2 id="mais">E mais</h2>
-${mais}`,
-      { rotulo: 'mais' },
+      { rotulo: 'planos' },
     ),
   ];
   return montarPagina({

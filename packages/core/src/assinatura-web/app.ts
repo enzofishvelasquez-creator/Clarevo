@@ -79,6 +79,11 @@ export const WEB_SUBSCRIPTION_TEXT = {
         : 'No cartão, o plano mensal é cobrado todo mês e renova sozinho, pelo mesmo preço, até você cancelar.'
     } Para cancelar, volte a esta tela e toque em Cancelar assinatura, quando quiser: o acesso completo continua até o fim do período já pago, sem nova cobrança. O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo; os dados do cartão ficam só com o Asaas, e a Clarevo não vê nem guarda.`,
   /**
+   * O que a página de pagamento do cartão pede (jornada de compra de 27/11/2026: o CPF pedido sem aviso fazia muita gente parar), dito antes
+   * dos botões. É o que o Asaas pede no Checkout (docs/39, seção 1, item 2); a Clarevo não coleta nenhum desses dados.
+   */
+  paymentPageAsks: 'Na página de pagamento, você informa nome, CPF, e-mail e os dados do cartão.',
+  /**
    * Quem assina no teste grátis (D-129): a primeira cobrança no cartão é no fim do teste (o dia de `paidStartDay`, do servidor, em Brasília),
    * e cancelar antes dela não cobra nada. `rel`: como esse dia fica perto do fim do teste no dia da pessoa (`trialEndRelation`).
    */

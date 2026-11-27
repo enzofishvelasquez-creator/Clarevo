@@ -23,6 +23,7 @@ import { Linking, Platform, View } from 'react-native';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
+import { useBusiness } from '@/state/business';
 import { useSpace } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
@@ -50,7 +51,8 @@ type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
  * escrita. O app gera um código (create_<canal>_code) e abre a conversa com o código pronto (no WhatsApp, "Ativar <código>"; no
  * Telegram, o botão Iniciar manda o código); quem liga de verdade é a função do servidor do canal, quando a mensagem chega. Quem escreve
  * nunca passa pelo app nem fica guardado (só o resumo, no banco). Desligar: unlink_<canal>. Na demonstração e enquanto a Clarevo não
- * existe no canal (número ou bot nulo), a tela só explica.
+ * existe no canal (número ou bot nulo), a tela só explica. Quem tem o próprio negócio (titular) vê também como anotar nele: a palavra
+ * "negócio" no começo da mensagem (27/11/2026, migração 0049); o vínculo continua no Pessoal ou na Família.
  */
 export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
   const { texts: T, target, link, download } = CHANNELS[channel];
@@ -59,6 +61,9 @@ export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
   const qc = useQueryClient();
   const personal = useSpace().data?.personalContextId;
   const family = useFamily().data;
+  // Só o negócio que a pessoa administra: a palavra "negócio" anota no negócio da própria pessoa, nunca no de outra (Clarevo Plus).
+  const business = useBusiness().data;
+  const ownBusiness = business && business.role === 'titular' ? business : null;
   const ready = auth.mode !== 'demo' && target !== null;
   const queryKey = ['chat-link', channel, user?.id ?? null];
   const state = useQuery({ queryKey, queryFn: () => repo.getChatLink(channel), enabled: ready && Boolean(user) });
@@ -254,6 +259,20 @@ export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
             </Txt>
           ))}
         </Card>
+
+        {ownBusiness ? (
+          <Card style={{ gap: space[2] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {T.businessTitle}
+            </Txt>
+            <Txt color={colors.textSecondary}>{T.businessBody(ownBusiness.name)}</Txt>
+            {T.businessExamples.map((e) => (
+              <Txt key={e} variant="label" color={colors.textSecondary}>
+                {e}
+              </Txt>
+            ))}
+          </Card>
+        ) : null}
 
         <Card style={{ gap: space[2] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>

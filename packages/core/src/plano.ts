@@ -8,7 +8,7 @@
  */
 import { addDays, daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
-import { FAMILY_MAX_PEOPLE } from './family';
+import { FAMILY_MAX_PEOPLE, type FamilyOverview } from './family';
 import { formatBRL } from './money';
 import { PIX_GRACE_DAYS, PIX_WARNING_DAYS_BY_PERIOD } from './assinatura-web/pix';
 import type { WebSubscriptionStatus } from './assinatura-web/app';
@@ -304,6 +304,31 @@ export const SUBSCRIPTION_SCREEN_TEXT = {
     { icon: 'familia', text: `Plano Família: até ${FAMILY_MAX_PEOPLE} pessoas na mesma assinatura` },
   ] as const,
   perMonth: ' por mês',
+} as const;
+
+/**
+ * O próximo passo de quem paga o plano Família (jornada de compra de 27/11/2026, item 4): depois de pagar, nada levava a criar a Família e
+ * convidar as pessoas, e sem isso o plano não entrega o que vendeu. Só com a assinatura Família em vigor da própria pessoa: sem Família,
+ * "criar"; na Família em que é titular, sem mais ninguém e sem convite válido, "convidar"; nos outros casos (ou enquanto a Família não foi
+ * lida), nada. `family`: a leitura da Família (null: não tem; undefined: ainda não chegou ou falhou).
+ */
+export function familyPlanNextStep(access: Access, family: FamilyOverview | null | undefined, now: Date): 'criar' | 'convidar' | null {
+  if (access.status !== 'assinatura' || access.plan !== 'familiar' || family === undefined) return null;
+  if (family === null) return 'criar';
+  if (family.role !== 'titular') return null;
+  const others = family.members.filter((m) => m.status === 'ativo' && !m.isMe).length;
+  const openInvite = family.invites.some((i) => !i.usedAt && !i.cancelledAt && Date.parse(i.expiresAt) > now.getTime());
+  return others === 0 && !openInvite ? 'convidar' : null;
+}
+
+/** Os textos do próximo passo do plano Família, calmos e sem prazo. */
+export const FAMILY_PLAN_NEXT_TEXT = {
+  createTitle: `Crie a Família e convide até ${FAMILY_MAX_PEOPLE - 1} pessoas`,
+  createBody: `O plano Família vale para você e até ${FAMILY_MAX_PEOPLE - 1} pessoas na sua Família da Clarevo. O Pessoal de cada pessoa continua só dela.`,
+  createAction: 'Criar a Família',
+  inviteTitle: `Convide até ${FAMILY_MAX_PEOPLE - 1} pessoas para a Família`,
+  inviteBody: 'Cada pessoa que entrar pelo convite passa a ter o acesso completo pelo seu plano. O Pessoal de cada pessoa continua só dela.',
+  inviteAction: 'Convidar para a Família',
 } as const;
 
 /** Como cancelar a assinatura no cartão da web (D-129): na tela Assinatura, o botão vem logo abaixo; no card de Conta, por "Ver a assinatura". */

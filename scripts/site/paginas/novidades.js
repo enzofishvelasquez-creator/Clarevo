@@ -216,6 +216,8 @@ ${fontes}
     ...(dominio ? { mainEntityOfPage: urlDoSite(valores, arquivo), image: `https://${dominio}/og/clarevo.png` } : {}),
   };
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: post.titulo,
     // O resumo inteiro (até 220 caracteres) fica na capa, no índice e no feed; a descrição para as buscas cabe em 160.
@@ -266,6 +268,8 @@ ${rss}
     { rotulo: 'acompanhar' },
   );
   const pg = montarPagina({
+    // A linha calma para o app no fim da página (jornada de compra de 27/11/2026, item S2).
+    ponte: true,
     arquivo,
     titulo: 'Novidades',
     descricao: 'Textos curtos da Equipe Clarevo sobre o app, a empresa como benefício e educação financeira, cada um com data e fontes.',

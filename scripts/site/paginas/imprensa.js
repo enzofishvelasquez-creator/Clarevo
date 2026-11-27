@@ -226,7 +226,7 @@ ${cores}
     ),
     bloco(
       `<h2 id="fonte">Fonte</h2>
-<p>O texto do app e do site usa a <strong>Manrope</strong>, nos pesos Medium (500), Bold (700) e ExtraBold (800), com a licença SIL Open Font License 1.1. O logotipo foi desenhado com a Manrope ExtraBold. A licença está em <a href="${u('fontes/OFL.txt')}">fontes/OFL.txt</a>, e os arquivos das três fontes, que são os do site, estão em <a href="${u('fontes/Manrope_500Medium.ttf')}">Medium</a>, <a href="${u('fontes/Manrope_700Bold.ttf')}">Bold</a> e <a href="${u('fontes/Manrope_800ExtraBold.ttf')}">ExtraBold</a>.</p>`,
+<p>O texto do app e do site usa a <strong>Manrope</strong>, nos pesos Medium (500), Bold (700) e ExtraBold (800), com a licença SIL Open Font License 1.1. O logotipo foi desenhado com a Manrope ExtraBold. A licença está em <a href="${u('fontes/OFL.txt')}">fontes/OFL.txt</a>, e os arquivos das três fontes, em TTF, estão em <a href="${u('fontes/Manrope_500Medium.ttf')}">Medium</a>, <a href="${u('fontes/Manrope_700Bold.ttf')}">Bold</a> e <a href="${u('fontes/Manrope_800ExtraBold.ttf')}">ExtraBold</a>. O site usa as mesmas fontes em WOFF2, mais leves.</p>`,
       { variante: 'alt', rotulo: 'fonte' },
     ),
     bloco(

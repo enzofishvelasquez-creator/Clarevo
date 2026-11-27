@@ -283,7 +283,16 @@ function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'),
   // (/api/noticias e /api/noticias/materia, desligadas sem NOTICIAS=ligado no painel); o resto vai para os arquivos estáticos.
   arquivos.set('_worker.js', workerDoSite(valores));
   arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
-  for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
+  // As fontes (27/11/2026): o site usa o WOFF2 (site-src/fontes, feito do TTF do app por `node scripts/gerar-fontes-site.js`); o TTF fica
+  // como segunda opção do @font-face (quem lê WOFF2, todo navegador atual, nunca o baixa) e para o kit de imprensa, que oferece os arquivos.
+  // TTF mudado sem refazer o WOFF2: aviso, e o --final recusa.
+  for (const peso of PESOS_FONTE) {
+    arquivos.set(`fontes/Manrope_${peso}.woff2`, ler(SITE_SRC, 'fontes', `Manrope_${peso}.woff2`));
+    arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
+  }
+  const dasFontes = require('../gerar-fontes-site').conferir();
+  avisos.push(...dasFontes.map((p) => `o --final recusaria: ${p}`));
+  problemasFinais.push(...dasFontes);
   arquivos.set('fontes/OFL.txt', ler(FONTES, 'OFL.txt'));
   arquivos.set('marca/clarevo-logotipo-reverso.svg', ler(MARCA, 'clarevo-logotipo-reverso.svg'));
   // Na impressão o cabeçalho fica sem fundo azul: entra o logotipo oficial de fundo claro, em vez de inverter as cores do reverso.

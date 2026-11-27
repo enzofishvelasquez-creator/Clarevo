@@ -1,6 +1,7 @@
 import {
   CARDS_TEXT,
   CARD_MONTH_TEXT,
+  cardMonthUpcomingBars,
   cardSummaryTexts,
   formatBRL,
   invoiceMonthLabel,
@@ -8,6 +9,7 @@ import {
   isStackedLayout,
   type Card as CardData,
   type CardInvoicesMonth,
+  type CardMonthUpcomingBar,
   type CardSummary,
   type Invoice,
   type IsoDate,
@@ -20,9 +22,13 @@ import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { Card, FitMoney, LinkButton, Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { cardHref, invoiceHref } from '@/lib/cards';
+import { useWideLayout } from '@/lib/layout';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const focusRing = { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as const;
+
+/** Esconde de leitores de tela (o mês e o valor de cada barra já estão em texto e no nome da linha). */
+const decorative = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true } as const;
 
 /** "final 1234" ou nada (o número completo nunca existe no app). */
 export const finalText = (card: Pick<CardData, 'lastDigits'>) => (card.lastDigits ? `final ${card.lastDigits}` : null);
@@ -153,8 +159,45 @@ export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: 
 }
 
 /**
+ * Próximas faturas em barras (análise geral de 26/11/2026, sinal 24 do estudo de mercado: "Barras simples por mês para faturas"; antes,
+ * uma frase só). Uma linha por mês, com o mês e o valor previsto escritos e, embaixo, uma barra na escala do maior mês da lista, em
+ * `brandMark` sobre `brandTint` (as cores das barras de Análises e do Orçamento, nos dois temas), sem cor que mude com o valor. Os números
+ * são os de `cardInvoicesMonth` (`cardMonthUpcomingBars` só calcula a largura). Leitor de tela: uma lista, e cada linha com o nome
+ * "Novembro: R$ 550,00, previsto"; a barra fica oculta. O valor segue "Ocultar valores". A barra ocupa a largura do card (no
+ * computador, até 560 px, para o valor não ficar longe do mês); com a letra grande, o valor desce para baixo do mês quando não cabe ao lado.
+ */
+function UpcomingBars({ bars }: { bars: readonly CardMonthUpcomingBar[] }) {
+  const maskLabel = useMoneyLabelMask();
+  const wide = useWideLayout();
+  return (
+    <View style={[styles.bars, wide && styles.barsWide]}>
+      <Txt variant="label" accessibilityRole="header" aria-level={3} style={{ fontFamily: fonts.bold }}>
+        {CARD_MONTH_TEXT.upcomingTitle}
+      </Txt>
+      <View role="list" aria-label={CARD_MONTH_TEXT.upcomingListA11y} style={styles.barList}>
+        {bars.map((b) => (
+          <View key={b.month} role="listitem" accessible focusable={false} accessibilityLabel={maskLabel(b.a11y)} style={styles.barItem}>
+            <View style={styles.barHead}>
+              <Txt variant="label" style={styles.barMonth}>
+                {b.label}
+              </Txt>
+              <MoneyTxt variant="label" style={[tabular, styles.barValue]}>
+                {b.valueText}
+              </MoneyTxt>
+            </View>
+            <View style={styles.barTrack} testID="barra-fatura-prevista" {...decorative}>
+              <View style={[styles.barFill, { width: `${b.tenths / 10}%` }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/**
  * Faturas do mês no topo de Cartões (D-042): a soma das faturas que vencem no mês, quanto isso é da renda de referência, as
- * próximas faturas (previstas) e a ligação com a renda comprometida. Neutro: sem cor de alerta. Os valores em reais seguem
+ * próximas faturas (previstas, em barras) e a ligação com a renda comprometida. Neutro: sem cor de alerta. Os valores em reais seguem
  * "Ocultar valores" (o percentual continua à vista, como na renda comprometida).
  */
 export function CardMonthSummary({
@@ -202,11 +245,7 @@ export function CardMonthSummary({
           ) : null}
         </>
       )}
-      {data.upcoming.length > 0 ? (
-        <MoneyTxt variant="label" style={tabular}>
-          {CARD_MONTH_TEXT.upcoming(data.upcoming)}
-        </MoneyTxt>
-      ) : null}
+      {data.upcoming.length > 0 ? <UpcomingBars bars={cardMonthUpcomingBars(data)} /> : null}
       {committed ? (
         <>
           <Txt variant="caption" color={colors.textSecondary}>
@@ -228,6 +267,16 @@ export function CardMonthSummary({
 const styles = StyleSheet.create({
   month: { gap: space[2] },
   monthLink: { alignSelf: 'flex-start', paddingHorizontal: 0, minHeight: 44 },
+  bars: { gap: space[2], paddingVertical: space[1] },
+  barsWide: { maxWidth: 560 },
+  barList: { gap: space[3] },
+  barItem: { gap: 6 },
+  // O mês à esquerda e o valor à direita; sem espaço para os dois (letra grande), o valor desce, ainda à direita.
+  barHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: space[3], rowGap: 2 },
+  barMonth: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  barValue: { fontFamily: fonts.bold, marginLeft: 'auto', flexShrink: 0 },
+  barTrack: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
+  barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandMark },
   tile: { gap: space[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   icon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },

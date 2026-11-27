@@ -95,15 +95,24 @@ ${colunas}
  * para o navegador pedir todos de uma vez (sem esperar cada `import`). `cabecalho`: HTML a mais no `<head>`. `atualizada`: a data
  * ("AAAA-MM-DD") do conteúdo da página, quando ele tem uma (post e tema de Aprender), que vira o `<lastmod>` do sitemap.
  * `avisoDeMercado`: as páginas de mercado (D-106) levam no rodapé "Conteúdo educativo. Não é recomendação nem análise de valores
- * mobiliários."
+ * mobiliários." `ponte`: as páginas de conteúdo terminam com a linha calma para o app (`blocoDaPonte`).
  */
+/**
+ * A linha do fim das páginas de conteúdo (Aprender, calculadoras, Ajuda e Novidades; jornada de compra de 27/11/2026, item S2), pelo estado
+ * do produto (`ponteParaOProduto` em `estado.js`): um bloco curto, depois do conteúdo e antes do rodapé.
+ */
+function blocoDaPonte(arquivo) {
+  const { estadoEmVigor, ponteParaOProduto } = require('./estado');
+  return `<div class="bloco bloco-ponte">\n<div class="miolo">\n${ponteParaOProduto(arquivo, estadoEmVigor())}\n</div>\n</div>`;
+}
+
 /**
  * O script do tema do site (D-115), em todas as páginas, no <head> e antes do estilo, sem `defer`: ele marca o <html> com o tema escolhido
  * antes de a página aparecer (sem piscar no tema errado). É pequeno, do próprio site e não pede nada a ninguém.
  */
 const SCRIPT_DO_TEMA = 'js/tema.js';
 
-function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null, avisoDeMercado: comAviso = false }) {
+function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null, avisoDeMercado: comAviso = false, ponte = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
     ? `<div class="faixa" role="note"><div class="miolo"><p><strong>Versão preliminar, em revisão.</strong> Este texto ainda não vale como versão final: os trechos destacados serão preenchidos antes da publicação.</p></div></div>\n`
@@ -163,7 +172,7 @@ ${capa}
 </div>
 </section>
 ${corpo}
-</main>
+${ponte ? `${blocoDaPonte(arquivo)}\n` : ''}</main>
 ${rodapeHtml(arquivo, valores, { aviso: comAviso })}
 </body>
 </html>

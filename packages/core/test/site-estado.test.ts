@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { NOTICIAS_TEXT } from '../src/noticias/fontes';
-import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, TRIAL_DAYS, planPriceAmount } from '../src/plano';
+import { ACCESS_TEXT, BILLING_PERIODS, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, SUBSCRIBE_OPEN, TRIAL_DAYS, planPeriodPriceAmount, planPriceAmount } from '../src/plano';
 
 /**
  * O estado do produto (D-125, `scripts/site/estado.js`, `docs/22_SITE.md`, seção 19): UM interruptor, `ESTADO_DO_PRODUTO.lancado` em
@@ -283,11 +283,12 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
   });
 
   it('os planos nunca são um beco sem saída (D-129): lançado, "Assine aqui" e "Conheça o app" na capa; antes, à vista, a assinatura em breve e "Conheça o app"', () => {
-    const PLANOS = { 'planos.html': '', 'planos/individual.html': '../', 'planos/familia.html': '../' } as const;
-    for (const [nome, sobe] of Object.entries(PLANOS)) {
+    // Desde 27/11/2026 (jornada de compra, item S3), a capa de cada plano leva o plano no endereço do cadastro; o resumo, não.
+    const PLANOS = { 'planos.html': ['', ''], 'planos/individual.html': ['../', '?plano=individual'], 'planos/familia.html': ['../', '?plano=familia'] } as const;
+    for (const [nome, [sobe, doPlano]] of Object.entries(PLANOS)) {
       const capaDe = (g: Gerado) => /<section class="capa[^"]*">([\s\S]*?)<\/section>/.exec(texto(g, nome))?.[1] ?? '';
       expect(capaDe(lancado), nome).toContain(
-        `<div class="acoes">\n<a class="botao botao-principal" href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">Assine aqui</a>\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>\n<p class="estado-produto">${TRIAL_DAYS} dias grátis, sem cartão. Cancele quando quiser.</p>`,
+        `<div class="acoes">\n<a class="botao botao-principal" href="${URL_CRIAR_CONTA}${doPlano}" rel="noopener noreferrer">Assine aqui</a>\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>\n<p class="estado-produto">${TRIAL_DAYS} dias grátis, sem cartão. Cancele quando quiser.</p>`,
       );
       expect(capaDe(pre), nome).toContain(
         `<p class="estado-produto">${AVISO_DOS_PLANOS}</p>\n<div class="acoes">\n<a class="botao botao-suave" href="${sobe}app/index.html">Conheça o app</a>\n</div>`,
@@ -298,6 +299,47 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     // A seção Planos do início, aonde "Assine aqui" da capa leva antes do lançamento: a mesma linha, logo abaixo do título.
     expect(texto(pre, 'index.html')).toMatch(new RegExp(`<h2 id="planos">Planos</h2>\n<p class="lead-bloco">[^<]+</p>\n<p class="aviso-assinatura">${escRe(AVISO_DOS_PLANOS)}</p>`));
     expect(texto(lancado, 'index.html')).not.toContain('aviso-assinatura');
+  });
+
+  it('as páginas de conteúdo terminam com uma linha calma para o app (jornada de compra de 27/11/2026, S2): antes do lançamento, O app; lançado, o cadastro com o teste grátis', () => {
+    const conteudo = (g: Gerado) => lidos(g).filter((n) => /^(aprender|calculadoras|ajuda)\/[^/]+\.html$/.test(n) || /^novidades\/(index|\d{4}-\d{2}-\d{2}-[^/]+)\.html$/.test(n));
+    const nomes = conteudo(pre);
+    // Todas: os temas de Aprender, a agenda, as calculadoras, a Ajuda e as Novidades, com os índices.
+    expect(nomes).toEqual(expect.arrayContaining(['aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'calculadoras/reserva.html', 'ajuda/index.html', 'novidades/index.html']));
+    expect(nomes.length).toBeGreaterThan(50);
+    const ponte = /<div class="bloco bloco-ponte">\n<div class="miolo">\n(<p class="ponte">[\s\S]*?<\/p>)\n<\/div>\n<\/div>\n<\/main>/;
+    const inicio = 'Para organizar as contas, os cartões e os gastos do mês com os seus números, no navegador ou no celular,';
+    for (const nome of nomes) {
+      const sobe = '../'.repeat(nome.split('/').length - 1);
+      expect(ponte.exec(texto(pre, nome))?.[1], `${nome} (antes)`).toBe(`<p class="ponte">${inicio} <a href="${sobe}app/index.html">conheça o app da Clarevo</a>.</p>`);
+      expect(ponte.exec(texto(lancado, nome))?.[1], `${nome} (lançado)`).toBe(`<p class="ponte">${inicio} <a href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">crie a sua conta na Clarevo</a>. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão.</p>`);
+    }
+    // Só nas páginas de conteúdo: nem as páginas de venda (que já têm as chamadas) nem a 404 e as legais.
+    for (const g of [pre, lancado]) for (const n of lidos(g).filter((x) => x.endsWith('.html') && !conteudo(g).includes(x))) expect(texto(g, n), n).not.toContain('class="ponte"');
+    // Calma: nada de pressa nem de promessa.
+    expect(`${texto(pre, 'aprender/index.html')} ${texto(lancado, 'aprender/index.html')}`).not.toMatch(/agora mesmo|não perca|últimas|garanta|economize/i);
+  });
+
+  it('lançado, "Assine aqui" de um plano leva o plano ao cadastro (?plano=individual|familia, e &periodo=mensal|anual quando a página mostra um período só); o cabeçalho e as capas genéricas, sem parâmetro (S3)', () => {
+    const { urlDoCadastro } = require(join(ROOT, 'scripts', 'site', 'estado.js')) as { urlDoCadastro: (o?: { plano?: string | null; periodo?: string | null }) => string };
+    expect(urlDoCadastro()).toBe(URL_CRIAR_CONTA);
+    expect(urlDoCadastro({ plano: 'individual' })).toBe(`${URL_CRIAR_CONTA}?plano=individual`);
+    expect(urlDoCadastro({ plano: 'familiar' })).toBe(`${URL_CRIAR_CONTA}?plano=familia`);
+    expect(urlDoCadastro({ plano: 'familiar', periodo: 'anual' })).toBe(`${URL_CRIAR_CONTA}?plano=familia&periodo=anual`);
+    expect(urlDoCadastro({ plano: 'individual', periodo: 'mensal' })).toBe(`${URL_CRIAR_CONTA}?plano=individual&periodo=mensal`);
+    expect(() => urlDoCadastro({ plano: 'familia' })).toThrow(/não conhece o plano/);
+    expect(() => urlDoCadastro({ plano: 'individual', periodo: 'semanal' })).toThrow(/não conhece o período/);
+    expect(() => urlDoCadastro({ periodo: 'anual' })).toThrow(/só com o plano/);
+    // No site lançado: os únicos endereços do cadastro com parâmetro são os das capas das duas páginas de plano, cada um com o seu.
+    const comParametro = new Map<string, string[]>();
+    for (const nome of lidos(lancado).filter((n) => n.endsWith('.html'))) {
+      const achados = [...texto(lancado, nome).matchAll(new RegExp(`href="${escRe(URL_CRIAR_CONTA)}\\?([^"]*)"`, 'g'))].map((m) => m[1]!.replace(/&amp;/g, '&'));
+      if (achados.length) comParametro.set(nome, achados);
+    }
+    expect(Object.fromEntries(comParametro)).toEqual({ 'planos/individual.html': ['plano=individual'], 'planos/familia.html': ['plano=familia'] });
+    // O cabeçalho dessas páginas continua sem parâmetro, e antes do lançamento nenhuma página leva ao cadastro.
+    for (const nome of ['planos/individual.html', 'planos/familia.html']) expect(texto(lancado, nome)).toContain(`<a class="menu-cta" href="${URL_CRIAR_CONTA}" rel="noopener noreferrer">Assine aqui</a>`);
+    for (const nome of lidos(pre)) expect(texto(pre, nome), nome).not.toContain('criar-conta');
   });
 
   it('Use no navegador: "Já tem conta? Entrar no navegador" embaixo das chamadas da capa e da chamada final, nos dois estados (D-129)', () => {
@@ -392,6 +434,38 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     }
   });
 
+  it('as ofertas do site lançado levam o período da cobrança (UnitPriceSpecification de 1 mês ou 1 ano) e o preço de plano-precos.ts; antes do lançamento, nenhuma oferta (análise de 26/11, lista "Depois")', () => {
+    type Oferta = { '@type': string; name: string; price: string; priceCurrency: string; description: string; priceSpecification: { '@type': string; price: string; priceCurrency: string; referenceQuantity: { '@type': string; value: number; unitCode: string } } };
+    const unidade = { mensal: 'MON', anual: 'ANN' } as const;
+    // Antes do lançamento, nenhuma oferta em página nenhuma (a fita "Em breve": ninguém consegue assinar ainda).
+    for (const nome of lidos(pre).filter((n) => n.endsWith('.html'))) for (const d of dadosEstruturados(texto(pre, nome))) expect(JSON.stringify(d), nome).not.toMatch(/"offers"|"Offer"|PriceSpecification/);
+    // Lançado, as ofertas ficam só nas páginas com o SoftwareApplication (o início e o resumo dos planos).
+    const comOfertas = lidos(lancado).filter((n) => n.endsWith('.html') && /"Offer"/.test(texto(lancado, n)));
+    expect(comOfertas.sort()).toEqual(['index.html', 'planos.html']);
+    for (const nome of comOfertas) {
+      const app = dadosEstruturados(texto(lancado, nome)).find((d) => d['@type'] === 'SoftwareApplication')!;
+      const ofertas = app.offers as Oferta[];
+      // Uma oferta por plano e por período, na ordem do núcleo (BILLING_PERIODS), com o nome "Plano <nome> <período>".
+      const esperado = (['individual', 'familiar'] as const).flatMap((plano) => BILLING_PERIODS.map((periodo) => ({ plano, periodo })));
+      expect(ofertas.length, nome).toBe(esperado.length);
+      ofertas.forEach((o, i) => {
+        const { plano, periodo } = esperado[i]!;
+        // O preço é o de plano-precos.ts, em centavos, e o mesmo que as páginas mostram (planPeriodPriceAmount).
+        const preco = (PLAN_PERIOD_PRICE_CENTS[plano][periodo] / 100).toFixed(2);
+        expect(planPeriodPriceAmount(plano, periodo).replace(/[^\d,]/g, '').replace(',', '.'), `${nome}: ${o.name}`).toBe(preco);
+        expect(o, nome).toMatchObject({
+          '@type': 'Offer',
+          name: `Plano ${PLAN_NAME[plano]} ${periodo}`,
+          price: preco,
+          priceCurrency: 'BRL',
+          priceSpecification: { '@type': 'UnitPriceSpecification', price: preco, priceCurrency: 'BRL', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: unidade[periodo] } },
+        });
+        // Sem "R$" no texto: o preço só nos campos.
+        expect(o.description, nome).not.toMatch(/R\$/);
+      });
+    }
+  });
+
   it('os dados estruturados: JSON válido em todas as páginas; SoftwareApplication sem oferta antes do lançamento e com os dois planos, no mensal e no anual, depois', () => {
     for (const g of [pre, lancado]) {
       for (const nome of lidos(g).filter((n) => n.endsWith('.html'))) {
@@ -408,11 +482,11 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       expect(appPre, nome).not.toHaveProperty('offers');
       expect(appLancado, nome).toMatchObject({ name: 'Clarevo', applicationCategory: 'FinanceApplication', operatingSystem: 'Web, iOS' });
       const ofertas = appLancado.offers as { '@type': string; name: string; price: string; priceCurrency: string }[];
-      // D-127: os dois planos no mensal e no anual, com o preço do núcleo.
+      // D-127: os dois planos no mensal e no anual, com o preço do núcleo; desde 27/11/2026, "Plano Individual mensal" e assim por diante.
       expect(ofertas.map((o) => [o['@type'], o.name, o.price, o.priceCurrency]), nome).toEqual([
-        ['Offer', `Plano ${PLAN_NAME.individual}`, planPriceAmount('individual').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
+        ['Offer', `Plano ${PLAN_NAME.individual} mensal`, planPriceAmount('individual').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
         ['Offer', `Plano ${PLAN_NAME.individual} anual`, '269.90', 'BRL'],
-        ['Offer', `Plano ${PLAN_NAME.familiar}`, planPriceAmount('familiar').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
+        ['Offer', `Plano ${PLAN_NAME.familiar} mensal`, planPriceAmount('familiar').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
         ['Offer', `Plano ${PLAN_NAME.familiar} anual`, '629.90', 'BRL'],
       ]);
     }

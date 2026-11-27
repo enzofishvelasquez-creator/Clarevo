@@ -12,6 +12,7 @@ const { rel } = require('../util');
 const { URL_NR1 } = require('../config');
 const { montarPagina, marcadoresEmHtml, bloco, celular, telaLarga } = require('../modelo');
 const { blocoDeContato } = require('./formularios');
+const { duvida } = require('./seguranca');
 
 // O aviso de saúde (D-115, com o texto revisado no pacote do advogado) fica na nota de ressalvas, depois de "Como funciona".
 const { AVISO_DE_SAUDE } = require('./seguranca');
@@ -34,32 +35,6 @@ function paginaEmpresas({ valores, img }) {
 <p class="lead-bloco">A empresa oferece a Clarevo a quem trabalha com ela e acompanha só as vagas, os convites e as licenças. Cada pessoa usa o app para organizar o mês e acompanhar decisões financeiras pessoais e familiares, e mantém a privacidade das próprias finanças.</p>
 <p class="texto-bloco"><strong>O que a proposta inclui hoje:</strong> uma licença da Clarevo para cada pessoa convidada, o painel de convites e licenças e o relatório de adesão, só com contagens. Escopo, implantação, privacidade e condições comerciais são combinados na apresentação.</p>`,
       { rotulo: 'bem-estar' },
-    ),
-    bloco(
-      `<h2 id="nr-1">Bem-estar financeiro e a NR-1</h2>
-<p class="lead-bloco">A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais. Veja como a proposta se relaciona com a norma.</p>
-<ul>
-<li>A NR-1 não exige a contratação de um aplicativo financeiro.</li>
-<li>A proposta da Clarevo pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.</li>
-<li>Contratar a Clarevo, sozinha, não comprova atendimento à norma.</li>
-<li>A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.</li>
-<li>O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
-</ul>
-<p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 24/10/2026.</p>`,
-      { variante: 'alt', rotulo: 'nr-1' },
-    ),
-    bloco(
-      `<h2 id="como-funciona">Como funciona</h2>
-<p class="lead-bloco">Em cinco passos, do contrato ao acompanhamento.</p>
-<ol class="passos">
-<li><h3>Contrato</h3><p>A equipe da Clarevo cadastra a empresa, o contrato (plano, vagas, início e fim) e a primeira pessoa administradora. Não há cadastro aberto.</p></li>
-<li><h3>Vagas</h3><p>Cada pessoa que recebe o benefício ocupa uma vaga, também no plano familiar. Convites pendentes e licenças ativas ocupam vagas, e nunca passam do número contratado.</p></li>
-<li><h3>Convite por link</h3><p>Quem administra cola os e-mails, de 1 a 500 por vez, e o painel gera um link de uso único para cada e-mail. A empresa envia o link pelo canal interno dela: a Clarevo não envia e-mail de convite.</p></li>
-<li><h3>A pessoa aceita</h3><p>Para aceitar, a pessoa precisa ter conta na Clarevo com o mesmo e-mail do convite, já confirmado. Quem ativa a licença é a pessoa, ao aceitar. A empresa não escolhe quem aceita.</p></li>
-<li><h3>Acompanhamento</h3><p>No painel, a empresa vê as vagas, os convites e as licenças. Pode reenviar ou cancelar um convite pendente (o link anterior deixa de valer) e encerrar uma licença.</p></li>
-</ol>
-<p class="nota nota-ressalvas"><strong>O que fica de fora.</strong> Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados. A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais. ${esc(AVISO_DE_SAUDE)}</p>`,
-      { rotulo: 'como-funciona' },
     ),
     bloco(
       `<h2 id="o-que-ve">O que a empresa vê e o que nunca vê</h2>
@@ -90,8 +65,25 @@ function paginaEmpresas({ valores, img }) {
       { variante: 'alt', rotulo: 'o-que-ve' },
     ),
     bloco(
-      `<h2 id="painel">O painel, só na web</h2>
-<p class="lead-bloco">Quem administra o benefício usa o painel no navegador. O app de celular não muda para as pessoas.</p>
+      `<h2 id="como-funciona">Como funciona</h2>
+<p class="lead-bloco">Em cinco passos, do contrato ao acompanhamento.</p>
+<ol class="passos">
+<li><h3>Contrato</h3><p>A equipe da Clarevo cadastra a empresa, o contrato (plano, vagas, início e fim) e a primeira pessoa administradora. Não há cadastro aberto.</p></li>
+<li><h3>Vagas</h3><p>Cada pessoa que recebe o benefício ocupa uma vaga, também no plano familiar. Convites pendentes e licenças ativas ocupam vagas, e nunca passam do número contratado.</p></li>
+<li><h3>Convite por link</h3><p>Quem administra cola os e-mails, de 1 a 500 por vez, e o painel gera um link de uso único para cada e-mail. A empresa envia o link pelo canal interno dela: a Clarevo não envia e-mail de convite.</p></li>
+<li><h3>A pessoa aceita</h3><p>Para aceitar, a pessoa precisa ter conta na Clarevo com o mesmo e-mail do convite, já confirmado. Quem ativa a licença é a pessoa, ao aceitar. A empresa não escolhe quem aceita.</p></li>
+<li><h3>Acompanhamento</h3><p>No painel, a empresa vê as vagas, os convites e as licenças. Pode reenviar ou cancelar um convite pendente (o link anterior deixa de valer) e encerrar uma licença.</p></li>
+</ol>
+<p class="nota nota-ressalvas"><strong>O que fica de fora.</strong> Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados. A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais. ${esc(AVISO_DE_SAUDE)}</p>`,
+      { rotulo: 'como-funciona' },
+    ),
+    // Análise geral de 26/11/2026 (lista "Depois"): a página tinha cerca de 12 telas de celular em 390 px. O painel, a NR-1 e o fim do
+    // benefício ficam recolhidos em "Mais detalhes" (`<details>`, sem JavaScript, no desenho das perguntas de Segurança), com o mesmo texto
+    // de antes; cada pergunta leva o `id` da seção que ela substituiu (`painel`, `nr-1`, `fim`).
+    bloco(
+      `<h2 id="detalhes">Mais detalhes</h2>
+<div class="duvidas">
+${duvida('painel', 'O painel, só na web', `<p>Quem administra o benefício usa o painel no navegador. O app de celular não muda para as pessoas.</p>
 ${telaLarga(img['empresa-painel'], ARQUIVO)}
 <div class="grade">
 <article class="cartao">
@@ -118,20 +110,26 @@ ${celular(img['empresa-licencas'], ARQUIVO)}
 <p>No app, a pessoa vê a empresa, o plano, desde quando vale e a situação. A empresa administra só o acesso ao plano, nunca os registros.</p>
 ${celular(img.beneficio, ARQUIVO)}
 </article>
-</div>`,
-      { rotulo: 'painel' },
-    ),
-    bloco(
-      `<h2 id="fim">Quando o benefício acaba</h2>
-<p class="lead-bloco">Nada é apagado por causa do fim do benefício.</p>
+</div>`)}
+${duvida('fim', 'Quando o benefício acaba', `<p>Nada é apagado por causa do fim do benefício.</p>
 <ul>
 <li>Se a licença for encerrada ou o contrato chegar ao fim, a pessoa mantém a conta, o histórico e a Família.</li>
 <li>O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato. O app mostra para a pessoa até quando vai.</li>
 <li>Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar.</li>
 <li>Para voltar a ter o benefício, será preciso convidar de novo.</li>
 <li>Se a pessoa excluir a própria conta, a licença termina na hora e a empresa a vê como encerrada, com a data.</li>
-</ul>`,
-      { variante: 'azul', rotulo: 'fim' },
+</ul>`)}
+${duvida('nr-1', 'Bem-estar financeiro e a NR-1', `<p>A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais. Veja como a proposta se relaciona com a norma.</p>
+<ul>
+<li>A NR-1 não exige a contratação de um aplicativo financeiro.</li>
+<li>A proposta da Clarevo pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.</li>
+<li>Contratar a Clarevo, sozinha, não comprova atendimento à norma.</li>
+<li>A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.</li>
+<li>O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
+</ul>
+<p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 24/10/2026.</p>`)}
+</div>`,
+      { variante: 'alt', rotulo: 'detalhes' },
     ),
     bloco(
       `<h2 id="apresentacao">Solicitar apresentação</h2>

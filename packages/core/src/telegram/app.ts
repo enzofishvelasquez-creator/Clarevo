@@ -84,6 +84,10 @@ export const TELEGRAM_TEXT = {
     'DESFAZER: apaga a última anotação feita por lá',
     'DESLIGAR: desliga o Telegram',
   ],
+  businessTitle: 'No seu negócio',
+  businessBody: (business: string) =>
+    `Comece a mensagem com a palavra negócio para anotar no espaço ${business}, com as categorias do negócio.`,
+  businessExamples: ['negócio material 120', 'negócio recebi 300 conserto', 'negócio gasolina 80 cartão: compra num cartão do negócio'],
   unlink: 'Desligar o Telegram',
   unlinkTitle: 'Desligar o Telegram?',
   unlinkBody: 'As mensagens desta conta do Telegram deixam de anotar. O que já foi anotado continua no app.',

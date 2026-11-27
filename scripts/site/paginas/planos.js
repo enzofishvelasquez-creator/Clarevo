@@ -47,7 +47,15 @@ const { chamadasDosPlanos, emBreveNoTitulo, estadoEmVigor, fitaEmBreve, sistemas
 
 const ARQUIVO = 'planos.html';
 /** "R$ 29,90" → "29.90", para os dados estruturados. */
-const precoDecimal = (texto) => texto.replace(/[^\d,]/g, '').replace(',', '.');
+/**
+ * O código da UN/CEFACT de cada período, para o `referenceQuantity` das ofertas (dados estruturados, D-129): MON (mês) e ANN (ano). Período
+ * novo no núcleo sem código aqui faz a geração falhar.
+ */
+const UNIDADE_DO_PERIODO = { mensal: 'MON', anual: 'ANN' };
+function unidadeDoPeriodo(periodo) {
+  if (!UNIDADE_DO_PERIODO[periodo]) throw new Error(`dados estruturados: o período "${periodo}" não tem código de unidade (paginas/planos.js, UNIDADE_DO_PERIODO)`);
+  return UNIDADE_DO_PERIODO[periodo];
+}
 
 /**
  * O preço anual de um plano (D-127), logo abaixo do mensal: "ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)". `classe`: a do parágrafo
@@ -56,13 +64,37 @@ const precoDecimal = (texto) => texto.replace(/[^\d,]/g, '').replace(',', '.');
 function linhaDoAnual(plano, classe = 'preco-anual') {
   const { PLANOS } = catalogo();
   const equivale = PLANOS.equivalente(plano).replace(/^E/, 'e');
-  return `<p class="${classe}">ou <span class="preco-valor-anual">${esc(PLANOS.precoAnual(plano))}</span>${esc(PLANOS.porAno)} (${esc(equivale)})</p>`;
+  // Desde 27/11/2026 (jornada de compra, item S6), com a diferença para 12 mensalidades, como a tela Assinatura do app: "(equivale a R$ 22,49
+  // por mês, R$ 88,90 a menos que 12 mensalidades)". A ordem (o mensal em destaque) espera a decisão do Enzo.
+  return `<p class="${classe}">ou <span class="preco-valor-anual">${esc(PLANOS.precoAnual(plano))}</span>${esc(PLANOS.porAno)} (${esc(equivale)}, ${esc(PLANOS.diferencaDoAnual(plano))})</p>`;
+}
+
+/**
+ * A partir de quantas pessoas o plano Família custa menos que planos Individuais separados (jornada de compra de 27/11/2026, item S4), no
+ * mensal e no anual, com os preços em centavos de `plano-precos.ts`: com os preços de hoje, 3 (R$ 69,90 contra 3 x R$ 29,90 = R$ 89,70).
+ * Se nem com o máximo de pessoas da Família a conta fechar, `null`, e a página não diz nada.
+ */
+function familiaCustaMenosAPartirDe() {
+  const { PLANOS } = catalogo();
+  const pessoas = (periodo) => Math.floor(PLANOS.centavos('familiar', periodo) / PLANOS.centavos('individual', periodo)) + 1;
+  const n = Math.max(...PLANOS.periodos.map(pessoas));
+  return n >= 2 && n <= pessoasNaFamilia() ? n : null;
+}
+
+/** A linha do preço do Família por casa, em texto (só a conta, sem "economize"): "Com 3 pessoas ou mais, ...". Vazia sem a conta. */
+function linhaDaFamiliaPorCasa() {
+  const n = familiaCustaMenosAPartirDe();
+  if (n === null) return '';
+  const { PLANOS } = catalogo();
+  return `Com ${n} pessoas ou mais, o Família custa menos que planos Individuais separados: ${PLANOS.reais(PLANOS.centavos('familiar', 'mensal'))} por mês, contra ${PLANOS.reais(n * PLANOS.centavos('individual', 'mensal'))} de ${n} planos Individuais.`;
 }
 
 /**
  * Os dados estruturados de app (SoftwareApplication, D-125), na página inicial e em Planos: o nome, a categoria, onde funciona hoje (pelo
  * estado do produto) e, depois do lançamento, os dois planos com o preço mensal e o anual (D-127), do núcleo. Sem nota nem avaliação (a
- * Clarevo ainda não tem).
+ * Clarevo ainda não tem). Desde 27/11/2026 (análise de 26/11, lista "Depois"), cada oferta se chama "Plano Individual mensal" (e assim por
+ * diante) e leva o período da cobrança num `priceSpecification` (`UnitPriceSpecification` com `referenceQuantity` de 1 mês ou 1 ano), com
+ * o preço em centavos de `plano-precos.ts` (`PLANOS.centavos`), sem nenhum preço escrito no site.
  * Antes do lançamento, sem `offers`: os planos estão "Em breve" na página e ninguém consegue assinar ainda, e uma oferta sem
  * disponibilidade seria lida como à venda hoje. `availability: PreOrder` também não serve: não há pré-venda.
  */
@@ -80,23 +112,28 @@ function dadosDoApp(valores, estado, descricao) {
     ...(dominio ? { url: `https://${dominio}/` } : {}),
     ...(estado.lancado
       ? {
-          offers: PLANOS.texto.plans.flatMap((p) => [
-            {
-              '@type': 'Offer',
-              name: `Plano ${PLANOS.nome[p.plan]}`,
-              price: precoDecimal(PLANOS.preco(p.plan)),
-              priceCurrency: 'BRL',
-              // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
-              description: `${p.who} ${PLANOS.texto.plansNote}`,
-            },
-            {
-              '@type': 'Offer',
-              name: `Plano ${PLANOS.nome[p.plan]} anual`,
-              price: precoDecimal(PLANOS.precoAnual(p.plan)),
-              priceCurrency: 'BRL',
-              description: `${p.who} ${PLANOS.cobrancaAnual}. ${PLANOS.texto.plansNote}`,
-            },
-          ]),
+          offers: PLANOS.texto.plans.flatMap((p) =>
+            PLANOS.periodos.map((periodo) => {
+              const preco = (PLANOS.centavos(p.plan, periodo) / 100).toFixed(2);
+              return {
+                '@type': 'Offer',
+                // "Plano Individual mensal", "Plano Família anual" (D-129, análise de 26/11, lista "Depois").
+                name: `Plano ${PLANOS.nome[p.plan]} ${PLANOS.nomeDoPeriodo[periodo]}`,
+                price: preco,
+                priceCurrency: 'BRL',
+                // O período da cobrança (schema.org): o preço vale por 1 mês ou por 1 ano (`referenceQuantity`, com os códigos MON e ANN da
+                // UN/CEFACT). `billingDuration` não serve aqui: diria por quanto tempo a cobrança dura, e a assinatura renova até a pessoa cancelar.
+                priceSpecification: {
+                  '@type': 'UnitPriceSpecification',
+                  price: preco,
+                  priceCurrency: 'BRL',
+                  referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: unidadeDoPeriodo(periodo) },
+                },
+                // Sem "R$" no texto: o preço vai no campo `price`, e "R$" com número só aparece nos cartões dos planos (o teste do site confere).
+                description: periodo === 'anual' ? `${p.who} ${PLANOS.cobrancaAnual}. ${PLANOS.texto.plansNote}` : `${p.who} ${PLANOS.texto.plansNote}`,
+              };
+            }),
+          ),
         }
       : {}),
   };
@@ -168,7 +205,8 @@ function gruposDeRecursos(plano) {
       itens: [
         { nome: 'Metas e reserva', destino: ajudaDoGuia('metas'), icone: 'meta', texto: 'Metas com prazo e a reserva para imprevistos, com o plano de guardar em etapas.', nota: 'O guardado é só o que você registra.' },
         { nome: 'Investir', destino: ajudaDoGuia('investimentos'), icone: 'investir', texto: 'O que você já investe, pelo valor do extrato: quanto aplicou, quanto vale e quanto rendeu, ao lado do CDI, do IPCA e da poupança.', nota: 'Não é recomendação de investimento.', onde: soNaFamilia('Só no seu Pessoal: ninguém da Família vê.') },
-        { nome: 'Aprender, simulador e calculadoras', destino: 'app/index.html#aprender', icone: 'aprender', texto: 'Explicações curtas com fonte e data de revisão. O simulador e as calculadoras usam só os números que você digita.' },
+        // Desde 27/11/2026, o passo a passo da Ajuda: em O app, o recurso Aprender ficou recolhido em "Os recursos" (`docs/22_SITE.md`, seção 22.1).
+        { nome: 'Aprender, simulador e calculadoras', destino: ajudaDoGuia('aprender'), icone: 'aprender', texto: 'Explicações curtas com fonte e data de revisão. O simulador e as calculadoras usam só os números que você digita.' },
       ],
     },
     {
@@ -192,11 +230,14 @@ function gruposDeRecursos(plano) {
  */
 function oQueSoEsteTem(plano) {
   if (plano === 'individual') return ['Para uma pessoa: a assinatura é sua.', 'O seu Pessoal, que só você vê.', 'Todos os recursos do app, listados abaixo.'];
+  // Desde 27/11/2026 (jornada de compra, item S4), primeiro o que a casa ganha (as contas da casa em comum, o Pessoal de cada pessoa só dela)
+  // e a conta do preço por casa; a logística do convite e da titularidade desce.
   return [
+    'Cada pessoa continua com o próprio Pessoal, que só ela vê, e a Família em comum mostra a cada uma o que o papel permite.',
     `Até ${pessoasNaFamilia()} pessoas na mesma Família, contando a pessoa titular.`,
     'Uma assinatura só, paga pela pessoa titular. Quem recebe o convite para a Família não paga.',
+    ...(linhaDaFamiliaPorCasa() ? [linhaDaFamiliaPorCasa()] : []),
     'Convite por link, de uso único e válido por 7 dias, com o papel de quem anota e vê ou de quem só vê.',
-    'Cada pessoa continua com o próprio Pessoal, que só ela vê, e a Família em comum mostra a cada uma o que o papel permite.',
     'Quem é titular muda o papel de cada pessoa, passa a titularidade ou encerra a Família, e quem quiser sai.',
   ];
 }
@@ -239,6 +280,12 @@ const PERGUNTAS_DA_FAMILIA = [
   { id: 'sair', pergunta: 'O que acontece com o que eu anotei se eu sair da Família?', resposta: 'O que você anotou na Família continua lá, como histórico da casa, com o seu primeiro nome e "saiu da Família" ao lado. O seu Pessoal continua só seu.' },
 ];
 
+/**
+ * O que a casa ganha, em uma frase, no começo de "Para quem é" do plano Família (jornada de compra de 27/11/2026, item S4: a página abria pela
+ * logística do convite). Os mesmos fatos da página inicial e do guia da Família: as contas da casa em comum e o Pessoal de cada pessoa só dela.
+ */
+const LEAD_DA_FAMILIA = 'A casa toda em ordem, numa assinatura só: as contas da casa ficam em comum, na Família, e o Pessoal de cada pessoa continua só dela.';
+
 /** A página de um plano (`individual` ou `familiar`). */
 function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
   const arquivo = PAGINA_DO_PLANO[plano];
@@ -259,7 +306,7 @@ function paginaDoPlano(plano, { valores, estado = estadoEmVigor() }) {
 <p class="preco-capa"><span class="preco-valor">${esc(PLANOS.preco(plano))}</span>${esc(PLANOS.porMes)}${estado.lancado ? '' : ' <span class="etiqueta etiqueta-capa">Em breve</span>'}</p>
 ${linhaDoAnual(plano, 'preco-capa-anual')}
 <p class="lead">${esc(t.plans.find((p) => p.plan === plano).who)}</p>
-${chamadasDosPlanos(arquivo, estado)}`;
+${chamadasDosPlanos(arquivo, estado, { plano })}`;
 
   const assinatura = `<h2 id="assinatura">Como funciona a assinatura</h2>
 <ul class="como-funciona">
@@ -275,7 +322,7 @@ ${chamadasDosPlanos(arquivo, estado)}`;
     bloco(
       // Desde 23/11/2026, com a marca de lima de cada item (o que o plano dá), como os cartões de "O que o plano inclui" logo abaixo.
       `<h2 id="para-quem">Para quem é</h2>
-<ul class="como-funciona lista-marcada">
+${familia ? `<p class="lead-bloco">${esc(LEAD_DA_FAMILIA)}</p>\n` : ''}<ul class="como-funciona lista-marcada">
 ${oQueSoEsteTem(plano).map((i) => `<li>${esc(i)}</li>`).join('\n')}
 </ul>
 <p class="pequeno"><a href="${u(ajudaDoGuia(familia ? 'familia' : 'assinatura'))}">${familia ? 'Como funciona a Família, na Ajuda' : 'Como funciona a assinatura, na Ajuda'}</a></p>`,
@@ -397,4 +444,4 @@ function paginasPlanos(ctx) {
   return [paginaPlanos(ctx), paginaDoPlano('individual', ctx), paginaDoPlano('familiar', ctx)];
 }
 
-module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, linhaDoAnual, linhaDosPlanos, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };
+module.exports = { paginasPlanos, paginaPlanos, paginaDoPlano, gruposDeRecursos, dadosDoApp, pessoasNaFamilia, linhaDoAnual, linhaDosPlanos, familiaCustaMenosAPartirDe, linhaDaFamiliaPorCasa, LEAD_DA_FAMILIA, ARQUIVO_PLANOS: ARQUIVO, PAGINA_DO_PLANO };

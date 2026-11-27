@@ -23,12 +23,17 @@ const HOST_APP = 'app.clarevo.app.br';
  */
 const URL_DEMO = 'https://demo.clarevo.app.br';
 const HOST_DEMO = 'demo.clarevo.app.br';
-/** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Assine aqui" depois do lançamento (D-128). */
+/**
+ * A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Assine aqui" depois do lançamento (D-128). Vinda de
+ * uma página de plano, leva o plano (e o período, quando a página mostra um só) no endereço: `?plano=individual|familia&periodo=mensal|anual`
+ * (`urlDoCadastro` em `estado.js`, jornada de compra de 27/11/2026, item S3).
+ */
 const URL_CRIAR_CONTA = `${URL_APP}/criar-conta`;
 /**
  * A tela de entrar do app web (`apps/app/src/app/entrar.tsx`): o destino de "Entrar" no menu antes do lançamento (até 26/11/2026, "Entrar
- * (quem testa)"; D-128). A tela inicial do app web começa com "14 dias grátis, sem cartão" e "Criar conta", e o cadastro de pessoas reais só
- * abre no lançamento (D-064): antes dele, o site nunca leva à tela inicial do app, só à de entrar, para quem já tem conta.
+ * (quem testa)"; D-128). A tela inicial do app web começa com "14 dias grátis, sem cartão" e "Criar conta". O cadastro continua aberto em
+ * produção antes do lançamento (D-129 A, decisão do Enzo de 26/11/2026; a tela de entrar também tem "Criar conta"), mas o site ainda não
+ * convida a criar conta antes do lançamento, enquanto o Enzo não decidir: antes dele, o site nunca leva à tela inicial do app, só à de entrar.
  */
 const URL_ENTRAR = `${URL_APP}/entrar`;
 
@@ -37,7 +42,7 @@ const URL_ENTRAR = `${URL_APP}/entrar`;
  * `docs/22_SITE.md`, seção 19). Desde 26/11/2026 (D-128), nenhum dos dois estados fala de fase de testes, e a chamada principal é "Assine
  * aqui" em todas as páginas.
  *   - `lancado: false` (o padrão, pré-lançamento): "Assine aqui" leva aos planos, que mostram a fita "Em breve" em cada cartão, sem oferta nos
- *     dados estruturados; nada convida a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais abre por decisão do Enzo); o
+ *     dados estruturados; nada convida a criar conta (o cadastro está aberto, D-129 A, mas convidar antes do lançamento espera a decisão do Enzo); o
  *     botão do menu é "Entrar" e leva à tela de entrar do app web (`URL_ENTRAR`).
  *   - `lancado: true`: "Assine aqui" (também no menu) leva à tela de criar conta do app web, a fita some e os selos das lojas aparecem, cada
  *     um só com o endereço dele preenchido em `lojas`. O gerador RECUSA `lancado: true` enquanto a assinatura pelo app estiver fechada

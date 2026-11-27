@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, BadgeCheck } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Pressable, StyleSheet, View } from 'react-native';
 
@@ -8,11 +8,12 @@ import { DemoPill, Screen, TopInset, Txt, styles as ui } from '@/components/ui';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useWideLayout } from '@/lib/layout';
 import { useSession } from '@/state/session';
-import { cardShadowOpacity, colors, radius, space } from '@/theme/tokens';
+import { cardShadowOpacity, colors, fonts, radius, space } from '@/theme/tokens';
 
 /**
  * Estrutura das telas de entrada: faixa azul com o logo e conteúdo em superfície clara.
- * `back` mostra o botão de voltar (para telas abertas a partir de outra).
+ * `back` mostra o botão de voltar (para telas abertas a partir de outra). `note`: uma linha em destaque logo abaixo do título, com o selo de
+ * conferido (em Criar conta, o teste grátis, como nas boas-vindas).
  * Versão para computador: um cartão branco centralizado no fundo da página, com o logotipo em cima, sem a faixa azul de ponta a ponta
  * (revisão de 23/11/2026: a faixa com os cantos do celular e a coluna branca no meio do cinza pareciam uma tela de celular colada).
  */
@@ -22,9 +23,11 @@ export function AuthShell({
   children,
   art,
   back,
+  note,
 }: {
   title?: string;
   subtitle?: string;
+  note?: string;
   children: ReactNode;
   art?: ReactNode;
   back?: boolean;
@@ -39,6 +42,14 @@ export function AuthShell({
         <Txt variant="title" style={styles.title} accessibilityRole="header" aria-level={1}>
           {title}
         </Txt>
+      ) : null}
+      {note ? (
+        <View style={styles.note}>
+          <BadgeCheck size={20} color={colors.brandText} style={{ marginTop: 2 }} aria-hidden />
+          <Txt variant="label" style={{ flex: 1, fontFamily: fonts.bold }}>
+            {note}
+          </Txt>
+        </View>
       ) : null}
       {subtitle ? <Txt color={colors.textSecondary}>{subtitle}</Txt> : null}
     </>
@@ -112,6 +123,8 @@ const styles = StyleSheet.create({
   // não ficava alinhada com o título).
   content: { padding: space[6], gap: space[4], backgroundColor: colors.surface, flexGrow: 1, maxWidth: 560 },
   title: { fontSize: 26, lineHeight: 34 },
+  // A linha em destaque, no azul claro das boas-vindas (o mesmo fundo do teste grátis de lá).
+  note: { flexDirection: 'row', gap: space[2], alignItems: 'flex-start', backgroundColor: colors.brandTint, borderRadius: radius.md, paddingVertical: space[3], paddingHorizontal: space[4] },
   // Computador: o logotipo e o cartão no meio da janela (no alto, quando o conteúdo é mais alto que ela, e aí a página rola).
   wideOuter: { maxWidth: 560, flexGrow: 1, justifyContent: 'center', gap: space[6], paddingTop: space[8], paddingBottom: space[8], paddingHorizontal: 0 },
   wideBrand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[3] },
