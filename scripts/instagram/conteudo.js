@@ -16,22 +16,23 @@ const { R, reais, EXEMPLOS } = require('./calculos');
 // Perfil
 // ---------------------------------------------------------------------------------------------------------------------------------
 const PERFIL = {
-  /** Playbook v2.2: "Clarevo | Bem-estar financeiro" (conferir o identificador e o limite disponível na conta). */
+  /** Playbook v2.2: "Clarevo | Bem-estar financeiro" (conferir o limite disponível na conta). */
   nome: 'Clarevo | Bem-estar financeiro',
-  /** Bio com o acesso em preparação (D-067): a terceira linha troca "Conheça a Clarevo" por "Acompanhe as informações de acesso" (Playbook, P03). */
-  bio: ['Cuidar da vida financeira faz parte de cuidar de você.', 'App para organizar seu mês.', 'Acompanhe as informações de acesso ↓'],
-  /** A bio do Playbook v2.2 para quando o acesso abrir. */
-  bioAcessoAberto: ['Cuidar da vida financeira faz parte de cuidar de você.', 'App para organizar seu mês.', 'Conheça a Clarevo ↓'],
+  /**
+   * A bio do Playbook v2.2, com "Conheça a Clarevo" (D-130, 27/11/2026). A versão "Acompanhe as informações de acesso" era do tempo em que o
+   * site falava em fase de testes, o que a D-128 tirou. Antes da abertura, o convite é só para conhecer.
+   */
+  bio: ['Cuidar da vida financeira faz parte de cuidar de você.', 'App para organizar seu mês.', 'Conheça a Clarevo ↓'],
   link: 'clarevo.app.br/comece.html',
   linkCompleto: 'https://clarevo.app.br/comece.html',
-  /** O @ só aparece depois de confirmado (Playbook, "Identificação e autoria"). */
-  identificador: '@identificador a confirmar',
+  /** Decidido por Enzo em 27/11/2026 (D-130). Conferir na criação da conta se o identificador está livre. */
+  identificador: '@clarevo',
   categoria: 'Bem-estar financeiro',
 };
 
 /** Os seis destaques (Playbook: cinco, e "Para empresas" quando a apresentação e o canal comercial estiverem conferidos). */
 const DESTAQUES = [
-  { id: 'comece-aqui', nome: 'Comece aqui', icone: 'bandeira', conteudo: 'Orientações de entrada: o que é a Clarevo, como está o acesso e por onde começar (P03 e Stories de apoio).' },
+  { id: 'comece-aqui', nome: 'Comece aqui', icone: 'bandeira', conteudo: 'Orientações de entrada: o que é a Clarevo e como conhecer o app (P03 e Stories de apoio).' },
   { id: 'na-pratica', nome: 'Na prática', icone: 'tela', conteudo: 'Tarefas demonstradas na versão atual (P02, P05, P08 e P11).' },
   { id: 'duvidas', nome: 'Dúvidas', icone: 'pergunta', conteudo: 'Respostas às dúvidas externas recorrentes e às caixas de perguntas dos Stories.' },
   { id: 'quem-faz', nome: 'Quem faz', icone: 'pessoas', conteudo: 'Quem está por trás da Clarevo, só com pessoas reais, funções confirmadas e autorização (P06 e P09).' },
@@ -82,7 +83,7 @@ const ex = EXEMPLOS;
 const rs = (centavos) => reais(centavos);
 const rsc = (centavos) => reais(centavos, { centavos: true });
 
-const COM_ACESSO_EM_PREPARACAO = 'Acesso em preparação (D-067): a chamada para cadastro, lista de espera, data e "grátis" ficam de fora.';
+const ANTES_DA_ABERTURA = 'Antes da abertura (D-130): o convite é só para conhecer. Chamada para cadastro, lista de espera e data ficam de fora; "grátis" só na frase do site.';
 
 /** Gravações reais que cada Reel usa (arquivos de `scripts/gravar-redes.js`, na pasta `--redes`). */
 // O recorte (`recorte`, em pixels do quadro da gravação) termina sempre entre dois blocos da tela, nunca no meio de uma linha de texto:
@@ -156,7 +157,7 @@ const PECAS = [
     formato: 'reel',
     fixado: 2,
     objetivo: 'Mostrar uma tarefa real: a comparação entre o orçado e o usado, em Orçamento por categoria.',
-    acao: 'Ver no perfil as informações de acesso (fixado P03).',
+    acao: 'Conhecer a Clarevo pelo link da bio (fixado P03).',
     familia: 'Demonstração real',
     gravacao: 'p02',
     capa: { titulo: 'Clarevo na prática', sub: 'Orçado e usado no mesmo exemplo', chip: 'Exemplo fictício' },
@@ -166,10 +167,10 @@ const PECAS = [
       { em: 9.4, tela: 'Usado: R$ 1.400,00 (77,8%). Faltam R$ 400,00', fala: 'Foram usados R$ 1.400,00, ou 77,8%. Faltam R$ 400,00.' },
       { em: 13.0, tela: 'Lazer: R$ 400,00 de R$ 300,00, R$ 100,00 acima', fala: 'Em Lazer, o usado passou: R$ 400,00 de R$ 300,00, R$ 100,00 acima.' },
       { em: 17.4, tela: 'A diferença do orçamento não é saldo nem autorização para gastar', fala: 'Leia a diferença do orçamento junto com as despesas que ainda virão. Ela não é saldo nem autorização para gastar.' },
-      { em: 24.1, tela: 'Orçamento por categoria, na Clarevo. Veja no perfil as informações de acesso', fala: 'A Clarevo mostra essa comparação em Orçamento por categoria. Veja no perfil as informações de acesso.' },
+      { em: 24.1, tela: 'Orçamento por categoria. Conheça a Clarevo pelo link da bio', fala: 'A Clarevo mostra essa comparação em Orçamento por categoria. Conheça a Clarevo pelo link da bio.' },
     ],
     legenda:
-      'Planejar e acompanhar são etapas diferentes. No exemplo do vídeo, o orçamento de Mercado é de R$ 1.800,00 por mês e foram usados R$ 1.400,00: faltam R$ 400,00. Em Lazer, o usado passou: R$ 400,00 de R$ 300,00, ou seja, R$ 100,00 acima. Antes de decidir sobre qualquer valor, confira compromissos que ainda não aconteceram.\n\nOs números são fictícios, usados para demonstrar a tarefa. Veja no perfil as informações de acesso.',
+      'Planejar e acompanhar são etapas diferentes. No exemplo do vídeo, o orçamento de Mercado é de R$ 1.800,00 por mês e foram usados R$ 1.400,00: faltam R$ 400,00. Em Lazer, o usado passou: R$ 400,00 de R$ 300,00, ou seja, R$ 100,00 acima. Antes de decidir sobre qualquer valor, confira compromissos que ainda não aconteceram.\n\nOs números são fictícios, usados para demonstrar a tarefa. Conheça a Clarevo pelo link da bio.',
     alt: 'Gravação da tela de Orçamento por categoria da demonstração da Clarevo, com dados fictícios: Mercado com R$ 1.400,00 usados de R$ 1.800,00 (faltam R$ 400,00) e Lazer com R$ 400,00 usados de R$ 300,00 (R$ 100,00 acima). Legendas na tela repetem a narração.',
     altCapa: 'Capa do Reel "Clarevo na prática, orçado e usado no mesmo exemplo", com um trecho da tela de Orçamento por categoria (Mercado e Lazer, dados fictícios).',
     ajustes: [
@@ -177,13 +178,13 @@ const PECAS = [
       'A tela diz "orçado", "usado", "faltam" e "acima", e não "planejado", "registrado" e "diferença"; a capa troca "Planejado e gasto" por "Orçado e usado".',
       'A narração acrescenta "nem saldo": o app nunca chama o que falta de saldo.',
       'O texto na tela do trecho de 17 a 24 s leva o sujeito ("A diferença do orçamento não é saldo nem autorização para gastar"), para a frase não ficar solta sobre os valores de Mercado e Lazer.',
-      'O fim manda ver no perfil as informações de acesso, e não "o fixado Como acessar": o acesso está em preparação (D-067) e a P03 é o fixado que traz a informação.',
+      'O fim convida a conhecer a Clarevo pelo link da bio, e não a usar nem a criar conta: antes da abertura, o convite é só para conhecer (D-130).',
     ],
     depende: [
       'Conferir a prévia no Instagram: o cabeçalho do app (com a etiqueta "Demonstração") fica nos primeiros 230 px; se o topo for coberto, repetir "Exemplo fictício" dentro da área livre.',
       'Edição final no Edits (legendas revisadas, pergunta na tela, trilha só com direitos de uso) e capa no Canva.',
       'Refazer a gravação na versão que for ao ar (responsável pelo produto, a designar).',
-      'P03 publicada e fixada, porque as informações de acesso a que o fim do vídeo manda ver no perfil estão nela.',
+      'Link da bio conferido no navegador do Instagram, porque o fim do vídeo manda para ele.',
     ],
     conferencia: [
       { afirmacao: 'Mercado: R$ 1.400,00 usados de R$ 1.800,00, 77,8%, faltam R$ 400,00. Lazer: R$ 400,00 de R$ 300,00, R$ 100,00 acima.', situacao: 'Confirmado', nota: 'Tela da demonstração de outubro de 2026 (gravação P02).' },
@@ -194,48 +195,50 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'P03',
-    pasta: 'D07-P03-como-acessar',
+    pasta: 'D07-P03-como-conhecer-a-clarevo',
     dia: 7,
-    nome: 'Como acessar (acesso em preparação)',
+    nome: 'Como conhecer a Clarevo',
     formato: 'carrossel',
     fixado: 3,
-    objetivo: 'Informar a disponibilidade real: a Clarevo está em fase de testes e o acesso abre no piloto.',
-    acao: 'Acompanhar o perfil e ver a demonstração pelo link da bio.',
+    objetivo: 'Dizer o que é a Clarevo e levar ao link da bio, onde o site mostra o app tela por tela. Antes da abertura, o convite é só para conhecer (D-130).',
+    acao: 'Conhecer a Clarevo pelo link da bio.',
     familia: 'Editorial educativa e demonstração real',
     paginas: [
-      { modelo: 'capaAzul', titulo: 'Como acompanhar a disponibilidade da Clarevo' },
-      { modelo: 'texto', titulo: 'A Clarevo está em *fase de testes*.', tamTitulo: 72 },
-      { modelo: 'texto', titulo: 'A versão para pessoas e empresas abre no piloto.', corpo: 'Quando houver novidade de acesso, ela aparece aqui e na página Novidades do site.' },
+      { modelo: 'capaAzul', titulo: 'Como conhecer a Clarevo' },
+      { modelo: 'texto', titulo: 'A Clarevo é um app para organizar *as contas, os cartões e os gastos* do mês.' },
+      { modelo: 'texto', titulo: 'Pelo link da bio, você vê o que o app faz, *tela por tela*.', corpo: 'As telas e os vídeos usam dados fictícios.' },
       {
         modelo: 'tela',
-        titulo: 'Enquanto isso, dá para ver a demonstração, com dados fictícios, pelo link da bio.',
+        titulo: 'O Resumo mostra o que entrou e o que saiu no mês.',
         captura: { arquivo: 'capturas/resumo-diferenca-do-mes.png', recorte: { x: 0, y: 0, w: 1080, h: 900 } },
         chip: 'Dados fictícios · demonstração',
       },
-      { modelo: 'final', titulo: 'Acompanhe este perfil para as próximas informações de acesso.' },
+      { modelo: 'final', titulo: 'Conheça a Clarevo pelo link da bio.', corpo: 'Assinatura em breve, com 14 dias grátis, sem cartão.' },
     ],
     legenda:
-      'A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto. Enquanto isso, você pode ver a demonstração, com dados fictícios, pelo link da bio. Acompanhe este perfil para as próximas informações de acesso.',
+      'A Clarevo é um app para organizar as contas, os cartões e os gastos do mês. Pelo link da bio, você vê o que o app faz, tela por tela, com dados fictícios. Assinatura em breve, com 14 dias grátis, sem cartão. Conheça a Clarevo pelo link da bio.',
     alt: [
-      'Capa do carrossel fixado, fundo azul: "Como acompanhar a disponibilidade da Clarevo".',
-      'Fundo claro com o texto "A Clarevo está em fase de testes."',
-      'Fundo claro com o texto "A versão para pessoas e empresas abre no piloto. Quando houver novidade de acesso, ela aparece aqui e na página Novidades do site."',
-      'Tela Resumo da demonstração da Clarevo, com dados fictícios: Diferença do mês R$ 2.100,00, recebido menos pago até 07/10, "não é saldo", Recebido R$ 6.000,00 e Pago R$ 3.900,00. Texto: "Enquanto isso, dá para ver a demonstração, com dados fictícios, pelo link da bio."',
-      'Fundo azul com o texto "Acompanhe este perfil para as próximas informações de acesso."',
+      'Capa do carrossel fixado, fundo azul: "Como conhecer a Clarevo".',
+      'Fundo claro com o texto "A Clarevo é um app para organizar as contas, os cartões e os gastos do mês."',
+      'Fundo claro com o texto "Pelo link da bio, você vê o que o app faz, tela por tela. As telas e os vídeos usam dados fictícios."',
+      'Tela Resumo da demonstração da Clarevo, com dados fictícios: Diferença do mês R$ 2.100,00, recebido menos pago até 07/10, "não é saldo", Recebido R$ 6.000,00 e Pago R$ 3.900,00. Texto: "O Resumo mostra o que entrou e o que saiu no mês."',
+      'Fundo azul com o texto "Conheça a Clarevo pelo link da bio. Assinatura em breve, com 14 dias grátis, sem cartão."',
     ],
     ajustes: [
-      'É a "versão com acesso em preparação" do Playbook, com o texto de `docs/24_REDES_SOCIAIS.md`, seção 1.3. A bio troca a chamada pela "Acompanhe as informações de acesso".',
-      'Quando o acesso abrir, mudam juntos: o texto de `ACESSO` em `scripts/site/paginas/comece.js`, a página Comece aqui, esta peça, a bio e o destaque Comece aqui.',
+      'Reescrita em 27/11/2026 (D-130): a versão anterior era a "com acesso em preparação" do Playbook e dizia "fase de testes" e "abre no piloto", que o site deixou de dizer (D-128).',
+      'As frases vêm da página Comece aqui do site ("A Clarevo é um app para organizar as contas, os cartões e os gastos do mês"; "Veja o que o app faz, tela por tela"; "Assinatura em breve, com 14 dias grátis, sem cartão."). Sem preço: os planos têm peça própria.',
+      'Na abertura, uma fixada nova ("O acesso abriu", a criar) entra no lugar desta, e o destaque Comece aqui é refeito.',
     ],
     depende: [
-      'Confirmar que o link da bio funciona no navegador do Instagram e no celular (a página Comece aqui ainda é a versão preliminar do site, sem indexação).',
-      'Produto e proprietária preenchem a ficha de acesso do Playbook (destino, dispositivos testados, preço, primeira tarefa e canal de ajuda, versão e responsável): hoje a resposta é "em preparação" e sem preço.',
-      'Se qualquer informação de acesso mudar, refazer a peça, a bio e o destaque no mesmo dia.',
+      'Confirmar que o link da bio funciona no navegador do Instagram e no celular, e que a página Comece aqui continua com as mesmas frases.',
+      'Se o texto do site sobre a assinatura mudar, refazer a página 5 e a legenda no mesmo dia.',
     ],
     conferencia: [
-      { afirmacao: 'A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto.', situacao: 'Confirmado', nota: 'D-064: cadastro de pessoas reais só no piloto; nada está nas lojas; preço indefinido (P-005). Mesmo texto da página Comece aqui.' },
-      { afirmacao: 'Dá para ver a demonstração, com dados fictícios, pelo link da bio.', situacao: 'Confirmado', nota: 'comece.html leva à demonstração (https://demo.clarevo.app.br), com a etiqueta "Demonstração" em cada tela. Depende de o site estar no ar.' },
-      { afirmacao: 'Sem cadastro, lista de espera, data de abertura, preço, "grátis" ou plataforma.', situacao: COM_ACESSO_EM_PREPARACAO, nota: 'Playbook: "não simular cadastro, lista de espera ou data de liberação que ainda não exista".' },
+      { afirmacao: 'A Clarevo é um app para organizar as contas, os cartões e os gastos do mês.', situacao: 'Confirmado', nota: 'Primeira frase da página Comece aqui do site (main de 27/11/2026, D-128).' },
+      { afirmacao: 'Pelo link da bio, você vê o que o app faz, tela por tela, com dados fictícios.', situacao: 'Confirmado', nota: 'comece.html tem "Conheça o app", que leva à página O app, com as telas e os vídeos da demonstração ("As telas e os vídeos usam dados fictícios."). Conferido no repositório; conferir no site publicado antes de publicar.' },
+      { afirmacao: 'O Resumo mostra o que entrou e o que saiu no mês.', situacao: 'Confirmado', nota: 'Captura do Resumo da demonstração: Diferença do mês, Recebido e Pago.' },
+      { afirmacao: 'Assinatura em breve, com 14 dias grátis, sem cartão.', situacao: 'Confirmado', nota: 'Frase da capa do site e de Comece aqui (D-128); preço e 14 dias liberados por Enzo. Sempre com essas palavras.' },
+      { afirmacao: 'Sem cadastro, lista de espera, data de abertura, preço, "grátis" ou plataforma.', situacao: ANTES_DA_ABERTURA, nota: 'Playbook: "não simular cadastro, lista de espera ou data de liberação que ainda não exista".' },
     ],
   },
   // =============================================================================================================================
@@ -311,7 +314,7 @@ const PECAS = [
     nome: 'Planejar uma categoria',
     formato: 'reel',
     objetivo: 'Mostrar o início de um orçamento na versão atual.',
-    acao: 'Ver no perfil as informações de acesso (acesso em preparação).',
+    acao: 'Conhecer a Clarevo pelo link da bio.',
     familia: 'Demonstração real',
     gravacao: 'p05',
     capa: { tag: 'Orçamento por categoria', titulo: 'Quanto você pretende gastar nesta categoria?', chip: 'Exemplo fictício' },
@@ -321,16 +324,16 @@ const PECAS = [
       { em: 8.7, tela: 'Escolhemos a categoria e o valor por mês', fala: 'Escolhemos a categoria e preenchemos o valor por mês. Ele vale a partir do mês escolhido.' },
       { em: 14.5, tela: 'Salvar: vale a partir de outubro', fala: 'Ao salvar, o app avisa que o orçamento vale a partir de outubro.' },
       { em: 18.8, tela: 'Transporte: R$ 0,00 de R$ 600,00. Total orçado: R$ 5.200,00', fala: 'A categoria entra com R$ 0,00 usados de R$ 600,00, e o total orçado passa de R$ 4.600,00 para R$ 5.200,00.' },
-      { em: 25.6, tela: 'Depois, confira os registros da categoria. Veja no perfil as informações de acesso', fala: 'Depois, é preciso conferir os registros da categoria. Veja no perfil as informações de acesso.' },
+      { em: 25.6, tela: 'Depois, confira os registros da categoria. Conheça a Clarevo pelo link da bio', fala: 'Depois, é preciso conferir os registros da categoria. Conheça a Clarevo pelo link da bio.' },
     ],
     legenda:
-      'Planejar uma categoria cria uma referência para acompanhar o mês. Os R$ 600,00 por mês de Transporte neste vídeo são um exemplo fictício, sem recomendação de valor para seu orçamento. Veja no perfil as informações de acesso.',
+      'Planejar uma categoria cria uma referência para acompanhar o mês. Os R$ 600,00 por mês de Transporte neste vídeo são um exemplo fictício, sem recomendação de valor para seu orçamento. Conheça a Clarevo pelo link da bio.',
     alt: 'Gravação da tela da demonstração da Clarevo, com dados fictícios: a pessoa escolhe a categoria Transporte, preenche R$ 600,00 por mês, salva e vê o aviso de que o orçamento vale a partir de outubro e o novo card, com R$ 0,00 usados de R$ 600,00. Legendas na tela repetem a narração.',
     altCapa: 'Capa do Reel com a pergunta "Quanto você pretende gastar nesta categoria?" e um trecho da tela de definição do orçamento de Transporte, com R$ 600 no campo Valor por mês (dados fictícios).',
     ajustes: [
-      'Categoria: Transporte, uma das seis do app (o Playbook cita "alimentação", que não existe como categoria).',
+      'Categoria: Transporte, uma das categorias do app (o Playbook cita "alimentação", que não existe como categoria).',
       'Não há campo de nome: a pessoa escolhe a categoria e preenche "Valor por mês". O texto diz "escolhemos a categoria e preenchemos o valor por mês".',
-      'A chamada final manda ver no perfil as informações de acesso (acesso em preparação), e não começar a usar nem se cadastrar.',
+      'A chamada final convida a conhecer a Clarevo pelo link da bio, e não a começar a usar nem a criar conta (D-130).',
     ],
     depende: [
       'A sequência só pode ser publicada se terminar corretamente no teste da versão que for ao ar (a gravação atual termina com o aviso e o card novo).',
@@ -499,7 +502,7 @@ const PECAS = [
     nome: 'Uma meta com próximo passo',
     formato: 'reel',
     objetivo: 'Mostrar como iniciar uma meta com informação concreta.',
-    acao: 'Ver no perfil as informações de acesso (acesso em preparação).',
+    acao: 'Conhecer a Clarevo pelo link da bio.',
     familia: 'Demonstração real',
     gravacao: 'p08',
     capa: { tag: 'Metas', titulo: 'Qual é o próximo passo da sua meta?', chip: 'Exemplo fictício' },
@@ -509,10 +512,10 @@ const PECAS = [
       { em: 9.2, tela: 'Nome, valor, prazo, já guardado e quanto por mês', fala: 'Escolhemos um modelo de nome, o valor, o prazo, quanto já está guardado e quanto pretende guardar por mês.' },
       { em: 17.6, tela: 'R$ 600,00 guardados de R$ 3.000,00, 20%. Faltam R$ 2.400,00', fala: 'Depois de salvar, o app mostra R$ 600,00 guardados de R$ 3.000,00, 20%, e faltam R$ 2.400,00.' },
       { em: 23.6, tela: 'Com R$ 300,00 por mês: maio de 2027, sem rendimentos', fala: 'Com R$ 300,00 por mês, a meta chega em maio de 2027, sem rendimentos. A Clarevo não guarda nem movimenta dinheiro.' },
-      { em: 31.0, tela: 'Veja no perfil as informações de acesso', fala: 'Veja no perfil as informações de acesso.' },
+      { em: 31.0, tela: 'Conheça a Clarevo pelo link da bio', fala: 'Conheça a Clarevo pelo link da bio.' },
     ],
     legenda:
-      'Transforme o objetivo em um registro que possa acompanhar. A meta do vídeo usa dados fictícios. Conferir o progresso faz parte da revisão, e qualquer contribuição precisa caber no orçamento. Veja no perfil as informações de acesso.',
+      'Transforme o objetivo em um registro que possa acompanhar. A meta do vídeo usa dados fictícios. Conferir o progresso faz parte da revisão, e qualquer contribuição precisa caber no orçamento. Conheça a Clarevo pelo link da bio.',
     alt: 'Gravação da tela da demonstração da Clarevo, com dados fictícios: a pessoa cria a meta Estudos, de R$ 3.000,00, com R$ 600,00 já guardados e R$ 300,00 por mês, e vê o progresso de 20%, faltam R$ 2.400,00, e a previsão de chegar em maio de 2027, sem rendimentos. Legendas na tela repetem a narração.',
     altCapa: 'Capa do Reel com a pergunta "Qual é o próximo passo da sua meta?" e um trecho da tela da meta Estudos: R$ 600,00 de R$ 3.000,00, 20%, faltam R$ 2.400,00 (dados fictícios).',
     ajustes: ['A narração diz o que o app faz de fato: a meta mostra só o que a pessoa registra, e "a Clarevo não guarda nem movimenta dinheiro" (D-027). Nada de contribuição automática, rendimento ou transferência.'],
@@ -636,7 +639,7 @@ const PECAS = [
       { em: 9.9, tela: 'Descrição, valor e categoria', fala: 'Confira os campos que esta versão pede: descrição, valor e categoria.' },
       { em: 15.7, tela: 'Salvar e conferir o registro', fala: 'Salve e veja se o registro aparece corretamente.' },
       { em: 19.4, tela: 'Pago: R$ 3.900,00 para R$ 3.935,00', fala: 'No Resumo, o Pago vai de R$ 3.900,00 para R$ 3.935,00, e a Diferença do mês, de R$ 2.100,00 para R$ 2.065,00.' },
-      { em: 26.4, tela: 'O gasto também aparece em Pagamentos do mês', fala: 'O gasto também aparece em Pagamentos do mês. Veja no perfil as informações de acesso.' },
+      { em: 26.4, tela: 'O gasto também aparece em Pagamentos do mês', fala: 'O gasto também aparece em Pagamentos do mês. Conheça a Clarevo pelo link da bio.' },
       { em: 31.8, tela: 'Na sua conta, o primeiro registro começa do zero.', fala: 'Na sua conta, o primeiro registro começa do zero.' },
     ],
     legenda:
@@ -646,7 +649,7 @@ const PECAS = [
     ajustes: [
       'A última frase da legenda não cita canal de ajuda: o Playbook manda "pelo canal informado no perfil", e o canal ainda está a definir. Quando existir, acrescentar.',
       'A gravação usa a conta de demonstração, que já tem registros. Numa conta nova, o primeiro gasto deixaria a Diferença do mês negativa (R$ 0,00 recebidos), e a peça teria de explicar isso. Por isso o roteiro (7 trechos), a legenda e o texto na tela do último trecho dizem "Na sua conta, o primeiro registro começa do zero."',
-      'A narração do fim troca "A orientação de acesso está no perfil" por "Veja no perfil as informações de acesso" (como P02, P05 e P08) e perde "É o primeiro passo para acompanhar", para caber a frase nova no tempo da gravação (a última frase fica nos 3,8 s finais, sobre o Resumo parado).',
+      'A narração do fim troca "A orientação de acesso está no perfil" por "Conheça a Clarevo pelo link da bio" (como P02, P05 e P08) e perde "É o primeiro passo para acompanhar", para caber a frase nova no tempo da gravação (a última frase fica nos 3,8 s finais, sobre o Resumo parado).',
     ],
     depende: [
       'Definir o canal de ajuda (e-mail de suporte) e o horário real de atendimento para o destaque Ajuda; sem canal, a chamada final fica só no perfil.',
@@ -742,16 +745,16 @@ const PECAS = [
       'Uma dúvida efetivamente recebida e a resposta conferida pelo produto; pessoa integrante da equipe que conhece o fluxo, com autorização.',
       'Canal de ajuda e horário real de atendimento; não prometer resposta imediata. Nunca pedir senha nem dados bancários.',
       'Legenda: o `legenda.txt` está completo ("A dúvida de hoje é sobre o acesso"). Se a dúvida recebida for sobre outro tema, trocar "o acesso" pelo tema real. A frase "use o canal confirmado" só vale com o canal de ajuda definido.',
-      'Roteiro: preencher [pergunta real] e [resposta conferida] com a dúvida recebida e a resposta que o produto conferiu (hoje, a da P03: acesso em preparação).',
+      'Roteiro: preencher [pergunta real] e [resposta conferida] com a dúvida recebida e a resposta que o produto conferiu (hoje, a da P03: conhecer pelo link da bio; assinatura em breve).',
     ],
     conferencia: [
-      { afirmacao: 'A orientação para esta versão é [resposta conferida].', situacao: 'A preencher', nota: 'A resposta de acesso é a da P03 (acesso em preparação); o canal de ajuda é a definir.' },
+      { afirmacao: 'A orientação para esta versão é [resposta conferida].', situacao: 'A preencher', nota: 'A resposta de acesso é a da P03 (conhecer pelo link da bio; assinatura em breve); o canal de ajuda é a definir.' },
       { afirmacao: 'Não envie senha ou dados bancários.', situacao: 'Confirmado', nota: 'O suporte nunca pede senha, cartão nem dados bancários.' },
     ],
     stories: [
       'Pergunta (enquete ou caixa de perguntas nativa do Instagram, nunca um desenho que simule a interação): "Você consegue comparar o que planejou com o que aconteceu?" Sem pedir valores pessoais.',
       'Explicação: um trecho real da peça do dia ou uma pessoa respondendo em uma frase.',
-      'Ação: o link oficial conferido ou o fixado correspondente. Não anunciar acesso enquanto estiver em preparação.',
+      'Ação: o link oficial conferido ou o fixado correspondente. Antes da abertura, só convidar a conhecer (D-130).',
     ],
     respostas: [
       { situacao: 'Pergunta de acesso', resposta: 'A orientação atual está no destaque Comece aqui. Vou indicar o passo correto para o seu caso. (Confirmar antes o dispositivo e o destino.)' },
@@ -1043,24 +1046,24 @@ const PECAS = [
 // ---------------------------------------------------------------------------------------------------------------------------------
 /** tipos: preparo, carrossel, reel, integrante, trend, revisao, escuta, livre, decisao. */
 const CALENDARIO = [
-  { dia: 1, tipo: 'preparo', peca: 'Conta', formato: 'Configuração', objetivo: 'Perfil seguro e da Clarevo', acao: 'Confirmar identificador, contato de recuperação da equipe, autenticação em duas etapas e quem administra, publica e responde.', depende: 'Equipe: conta, acessos e responsáveis; guardar acessos em local restrito.' },
+  { dia: 1, tipo: 'preparo', peca: 'Conta', formato: 'Configuração', objetivo: 'Perfil seguro e da Clarevo', acao: 'Criar a conta com o identificador @clarevo, contato de recuperação da equipe, autenticação em duas etapas e quem administra, publica e responde.', depende: 'Equipe: conta, acessos e responsáveis; guardar acessos em local restrito.' },
   { dia: 2, tipo: 'preparo', peca: 'Perfil', formato: 'Configuração', objetivo: 'Primeira visita clara', acao: 'Subir avatar, nome, bio e link; criar os destaques; testar o link no navegador do Instagram.', depende: 'Equipe: publicar; conferir o limite do nome na conta e o link da bio.' },
-  { dia: 3, tipo: 'preparo', peca: 'Produto', formato: 'Conferência', objetivo: 'Acesso e primeira tarefa conferidos', acao: 'Conferir a oferta (acesso em preparação), a demonstração e a primeira tarefa; preencher a ficha de acesso.', depende: 'Produto: responsável a designar, versão e data do teste. Proprietária: oferta.' },
+  { dia: 3, tipo: 'preparo', peca: 'Produto', formato: 'Conferência', objetivo: 'Acesso e primeira tarefa conferidos', acao: 'Conferir a oferta (assinatura em breve, convite só para conhecer), a demonstração e a primeira tarefa; preencher a ficha de acesso.', depende: 'Produto: responsável a designar, versão e data do teste. Proprietária: oferta.' },
   { dia: 4, tipo: 'preparo', peca: 'P01 a P03', formato: 'Produção', objetivo: 'Três fixados prontos', acao: 'Montar P01, P02 e P03 no Canva e no Edits, com texto e telas conferidos; preparar Stories de apoio; conferir a leitura no celular.', depende: 'Marketing: Canva e Edits. Fotos reais da P01. Revisão da conferência.' },
   { dia: 5, tipo: 'carrossel', peca: 'P01', formato: 'Carrossel fixado, 6 páginas', objetivo: 'Compreensão do produto', acao: 'Ver o fixado Clarevo na prática (P02).', depende: 'Fotos reais; publicar e fixar; Stories de apoio levando à peça.' },
-  { dia: 6, tipo: 'reel', peca: 'P02', formato: 'Reel fixado', objetivo: 'Mostrar uma tarefa real', acao: 'Ver no perfil as informações de acesso (fixado P03).', depende: 'Edição final no Edits; gravação refeita se a versão mudou; publicar e fixar.' },
-  { dia: 7, tipo: 'carrossel', peca: 'P03', formato: 'Carrossel fixado, 5 páginas', objetivo: 'Orientar a oferta atual', acao: 'Link da bio ou aviso de disponibilidade.', depende: 'Ficha de acesso preenchida; link conferido; publicar e fixar.' },
+  { dia: 6, tipo: 'reel', peca: 'P02', formato: 'Reel fixado', objetivo: 'Mostrar uma tarefa real', acao: 'Conhecer a Clarevo pelo link da bio (fixado P03).', depende: 'Edição final no Edits; gravação refeita se a versão mudou; publicar e fixar.' },
+  { dia: 7, tipo: 'carrossel', peca: 'P03', formato: 'Carrossel fixado, 5 páginas', objetivo: 'Orientar a oferta atual', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Ficha de acesso preenchida; link conferido; publicar e fixar.' },
   { dia: 8, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories com a sequência de apoio (pergunta, explicação, ação) levando ao fixado.', depende: 'Marketing: Stories com recursos nativos (enquete e caixa de perguntas).' },
   { dia: 9, tipo: 'carrossel', peca: 'P04', formato: 'Carrossel, 5 páginas', objetivo: 'Entender a diferença', acao: 'Salvar a sequência de conferência.', depende: 'Montar no Canva; publicar; registrar salvamentos.' },
   { dia: 10, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P04; ler e responder perguntas em dia útil.', depende: 'Quem responde: rotina de leitura e horário real de atendimento.' },
-  { dia: 11, tipo: 'reel', peca: 'P05', formato: 'Reel', objetivo: 'Demonstrar orçamento', acao: 'Ver no perfil as informações de acesso (acesso em preparação).', depende: 'Fluxo validado na versão atual; edição final; publicar.' },
+  { dia: 11, tipo: 'reel', peca: 'P05', formato: 'Reel', objetivo: 'Demonstrar orçamento', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Fluxo validado na versão atual; edição final; publicar.' },
   { dia: 12, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P05; pesquisar a referência de trend para o D13 (revisão semanal).', depende: 'Marketing: shortlist com link e data da referência, direitos e alternativa perene.' },
   { dia: 13, tipo: 'integrante', peca: 'P06 ou T01', formato: 'Posição flexível de trend', objetivo: 'Identificação e conversa', acao: 'Uma pergunta específica. T01 (carrossel de post reproduzido) se houver trend adequada; senão, P06 (pergunta da integrante, em vídeo real).', depende: 'Decisão até 48 horas antes; gravação com integrante real e autorização (P06); ficha de referência (T01).' },
   { dia: 14, tipo: 'revisao', peca: 'Revisão D14', formato: 'Reunião curta', objetivo: 'Compreensão, visitas, acessos, cadastros e primeira tarefa', acao: 'Conferir os números do painel do Instagram e as contagens do app; anotar a pergunta externa mais frequente e o principal obstáculo.', depende: 'Equipe: relatório semanal; "não medido" onde não houver dado.' },
   { dia: 15, tipo: 'escuta', peca: 'Stories', formato: 'Stories e escuta', objetivo: 'Recolher dúvidas', acao: 'Caixa de perguntas nativa: qual parte você gostaria de entender melhor? Sem dados pessoais.', depende: 'Quem responde; a resposta padrão da equipe.' },
   { dia: 16, tipo: 'carrossel', peca: 'P07', formato: 'Carrossel, 5 páginas', objetivo: 'Comparar compromisso e preço', acao: 'Guardar o roteiro de perguntas.', depende: 'Montar no Canva; publicar; registrar salvamentos e compartilhamentos.' },
   { dia: 17, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P07.', depende: 'Marketing.' },
-  { dia: 18, tipo: 'reel', peca: 'P08', formato: 'Reel', objetivo: 'Demonstrar o fluxo de meta', acao: 'Ver no perfil as informações de acesso (acesso em preparação).', depende: 'Fluxo validado; edição final; publicar.' },
+  { dia: 18, tipo: 'reel', peca: 'P08', formato: 'Reel', objetivo: 'Demonstrar o fluxo de meta', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Fluxo validado; edição final; publicar.' },
   { dia: 19, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P08; pesquisar a referência de trend para o D20.', depende: 'Marketing: shortlist da referência, direitos e alternativa perene.' },
   { dia: 20, tipo: 'integrante', peca: 'P09 ou T02', formato: 'Posição flexível de trend', objetivo: 'Reconhecimento e reflexão', acao: 'Salvar ou comentar a experiência. T02 (formato em circulação escolhido na revisão semanal) ou, como alternativa perene, P09 (observação do contexto de uma compra).', depende: 'Decisão até 48 horas antes; gravação com integrante real, função confirmada e autorização (P09).' },
   { dia: 21, tipo: 'revisao', peca: 'Revisão D21', formato: 'Reunião curta', objetivo: 'Que explicação repetir e que atrito corrigir no acesso ou no app', acao: 'Decidir o que repetir e corrigir.', depende: 'Equipe; produto para o atrito encontrado.' },
@@ -1075,4 +1078,4 @@ const CALENDARIO = [
   { dia: 30, tipo: 'decisao', peca: 'Revisão D30', formato: 'Decisão', objetivo: 'Há evidência para ampliar a distribuição?', acao: 'Decidir temas a repetir, ajustes de acesso e cadência do próximo ciclo. Antes de ampliar: destino funcionando, cadastro e primeira tarefa observados, mensagem compreendida por pessoas de fora e origem identificada.', depende: 'Proprietária e equipe.' },
 ];
 
-module.exports = { PERFIL, DESTAQUES, CENAS, PESSOA, TERMOS_DO_APP, PECAS, CALENDARIO, GRAVACOES, COM_ACESSO_EM_PREPARACAO, R, rs, rsc };
+module.exports = { PERFIL, DESTAQUES, CENAS, PESSOA, TERMOS_DO_APP, PECAS, CALENDARIO, GRAVACOES, ANTES_DA_ABERTURA, R, rs, rsc };

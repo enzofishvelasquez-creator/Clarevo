@@ -245,30 +245,25 @@ function calendarioMd() {
 function nomeEBioTxt() {
   const c = (t) => contarCaracteres(t);
   const bio = PERFIL.bio.join('\n');
-  const bio2 = PERFIL.bioAcessoAberto.join('\n');
-  return `NOME DE EXIBIÇÃO (Playbook v2.2; conferir o identificador e o limite disponível na conta)
+  return `NOME DE EXIBIÇÃO (Playbook v2.2; conferir o limite disponível na conta)
 ${PERFIL.nome}
 ${c(PERFIL.nome)} caracteres (limite adotado: ${LIMITES.nome})
 
-BIO COM O ACESSO EM PREPARAÇÃO (vale hoje, D-067)
+BIO (D-130, 27/11/2026)
 ${bio}
 ${c(bio)} caracteres, com a quebra de linha contando 1 (limite do Instagram: ${LIMITES.bio}). Linhas: ${PERFIL.bio.map((x) => c(x)).join(', ')}.
 
-BIO PARA QUANDO O ACESSO ABRIR (Playbook v2.2, trocar a terceira linha junto com a P03 e o destaque Comece aqui)
-${bio2}
-${c(bio2)} caracteres.
-
 LINK DA BIO
 ${PERFIL.linkCompleto}
-Versão preliminar do site (sem indexação): testar no navegador do Instagram e no celular antes de abrir o perfil. Sem parâmetro de rastreamento (D-067).
+Testar no navegador do Instagram e no celular antes de abrir o perfil. Sem parâmetro de rastreamento (D-067).
 
 IDENTIFICADOR
-Só exibir o @ depois de confirmado o identificador real.
+${PERFIL.identificador} (D-130). Conferir, ao criar a conta, se está livre.
 
-DESTAQUES (nesta ordem; Para empresas só com a apresentação e o canal comercial conferidos)
+DESTAQUES (nesta ordem; no começo só Comece aqui e Na prática; Para empresas só com a apresentação e o canal comercial conferidos)
 ${DESTAQUES.map((d) => `- ${d.nome}: ${d.conteudo}`).join('\n')}
 
-FIXADOS: P01 O que é a Clarevo, P02 Clarevo na prática e P03 Como acessar.
+FIXADOS: P01 O que é a Clarevo, P02 Clarevo na prática e P03 Como conhecer a Clarevo.
 AVATAR: o ícone oficial C (avatar-1080.png), nunca a assinatura.
 `;
 }
@@ -530,9 +525,9 @@ montagem.png           folha de contato com todas as páginas e capas, para revi
 BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - B01 e o destaque Para empresas: canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
 - P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento (hoje o e-mail de suporte é marcador).
-- P03 e a bio: acesso em preparação (sem data, sem lista de espera, sem preço). Mudam juntos quando o acesso abrir.
-- Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram; o site ainda é preliminar.
-- Identificador e nome de exibição: conferir o limite na conta; o @ só aparece depois de confirmado.
+- P03, a bio e o fim dos Reels: antes da abertura, o convite é só para conhecer (D-130), sem data, lista de espera nem chamada para criar conta. Na abertura, uma fixada nova entra no lugar da P03.
+- Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram.
+- Identificador (@clarevo, D-130) e nome de exibição: conferir na conta se o @ está livre e o limite do nome.
 - Todas as peças de produto: responsável pelo produto (a designar) refaz o teste na versão que for ao ar.
 
 O QUE FALTA PREENCHER (só no roteiro, nunca nas legendas)

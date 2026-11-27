@@ -659,7 +659,7 @@ const VIDEOS = [
       await rolarAte(texto('O orçamento conta o usado no mês.'), 1700, 190);
       await s.fim();
       // De volta ao topo, com o total do mês.
-      s = await c.fala('A Clarevo mostra essa comparação em Orçamento por categoria. Veja no perfil as informações de acesso.');
+      s = await c.fala('A Clarevo mostra essa comparação em Orçamento por categoria. Conheça a Clarevo pelo link da bio.');
       await rolarPara(0, 1700);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -717,7 +717,7 @@ const VIDEOS = [
       await pausa(900);
       await c.quadro('capa', 0);
       await s.fim();
-      s = await c.fala('Depois, é preciso conferir os registros da categoria. Veja no perfil as informações de acesso.');
+      s = await c.fala('Depois, é preciso conferir os registros da categoria. Conheça a Clarevo pelo link da bio.');
       await rolarPara(0, 1500);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -785,7 +785,7 @@ const VIDEOS = [
       await c.quadro('conferencia', 0);
       await s.fim();
       // Fecho.
-      s = await c.fala('Veja no perfil as informações de acesso.', { min: 3.5 });
+      s = await c.fala('Conheça a Clarevo pelo link da bio.', { min: 3.5 });
       await rolarPara(0, 1400);
       await s.fim();
     },
@@ -844,7 +844,7 @@ const VIDEOS = [
       await pausa(1200);
       await c.quadro('capa', 0);
       await s.fim();
-      s = await c.fala('O gasto também aparece em Pagamentos do mês. É o primeiro passo para acompanhar. A orientação de acesso está no perfil.');
+      s = await c.fala('O gasto também aparece em Pagamentos do mês. É o primeiro passo para acompanhar. Conheça a Clarevo pelo link da bio.');
       await rolarPara(520, 1700);
       await pausa(3000);
       await rolarPara(0, 1400);
@@ -919,7 +919,7 @@ const VIDEOS = [
       await pausa(1200);
       await c.quadro('conferencia', 0);
       await s.fim();
-      s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Veja no perfil as informações de acesso.');
+      s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Conheça a Clarevo pelo link da bio.');
       await pausa(2600);
       await s.fim();
     },

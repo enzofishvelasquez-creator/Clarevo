@@ -3,7 +3,7 @@
  * Conferências puras do conteúdo do Instagram (D-069): redação, números, estrutura e limites do perfil. Sem navegador e sem arquivo. O
  * gerador recusa gerar se algo falhar, e o teste `packages/core/test/instagram.test.ts` roda a mesma função.
  */
-const { LIMITES, contarCaracteres, conferirExemplos, conferirContrastes, conferirRedacao, EXEMPLOS, reais } = require('./calculos');
+const { LIMITES, contarCaracteres, conferirExemplos, conferirContrastes, conferirRedacao, EXEMPLOS, reais, FRASE_DA_ASSINATURA } = require('./calculos');
 const { PERFIL, DESTAQUES, PECAS, CALENDARIO } = require('./conteudo');
 
 const CHAVES_DE_TEXTO_PUBLICO = ['paginas', 'legenda', 'alt', 'altCapa', 'capa', 'roteiro', 'stories', 'respostas'];
@@ -19,7 +19,6 @@ function textosPublicos(pecas = PECAS) {
   };
   for (const p of pecas) for (const k of CHAVES_DE_TEXTO_PUBLICO) if (p[k] !== undefined) andar(p[k], `${p.id}.${k}`);
   PERFIL.bio.forEach((l, i) => saida.push({ origem: `perfil.bio[${i}]`, texto: l }));
-  PERFIL.bioAcessoAberto.forEach((l, i) => saida.push({ origem: `perfil.bioAcessoAberto[${i}]`, texto: l }));
   saida.push({ origem: 'perfil.nome', texto: PERFIL.nome });
   for (const d of DESTAQUES) saida.push({ origem: `destaque.${d.id}`, texto: d.nome });
   return saida;
@@ -91,7 +90,11 @@ function conferirRegrasDasPecas(pecas = PECAS) {
   if (p03) {
     // A tela do app que a arte mostra tem datas e valores da demonstração; a regra vale para o texto da peça (páginas e legenda).
     const txt = textosPublicos([{ id: 'P03', paginas: p03.paginas, legenda: p03.legenda }]).map((x) => x.texto).join('\n');
-    for (const re of [/\d{1,2}\/\d{1,2}/, /\bem breve\b/i, /cadastre-se/i, /lista de espera/i, /\bgr[áa]tis\b/i, /R\$/]) if (re.test(txt)) erros.push(`P03: a versão com acesso em preparação não pode ter ${re}`);
+// Antes da abertura (D-130): sem data, lista de espera, cadastro nem preço; "em breve" e "grátis" só na frase do site.
+    const semFrase = txt.split(FRASE_DA_ASSINATURA).join(' ');
+    for (const re of [/\d{1,2}\/\d{1,2}/, /\bem breve\b/i, /cadastre-se/i, /lista de espera/i, /\bgr[áa]tis\b/i, /R\$/]) if (re.test(semFrase)) erros.push(`P03: antes da abertura, a peça não pode ter ${re}`);
+    if (!txt.includes(FRASE_DA_ASSINATURA)) erros.push('P03: falta a frase do site "' + FRASE_DA_ASSINATURA + '"');
+    if (!/Conheça a Clarevo pelo link da bio\./.test(txt)) erros.push('P03: a ação é "Conheça a Clarevo pelo link da bio."');
   }
   const b01 = pecas.find((p) => p.id === 'B01');
   if (b01) {
@@ -109,13 +112,14 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     if (!p11.roteiro.some((x) => x.fala.includes(frase))) erros.push('P11: a narração (roteiro e srt) precisa dizer "' + frase + '"');
     if (!p11.roteiro.some((x) => x.tela.includes(frase))) erros.push('P11: o texto na tela precisa dizer "' + frase + '"');
   }
-  // Acesso em preparação (D-067): os quatro Reels mandam ver no perfil as informações de acesso, sem sugerir acesso aberto.
+  // Antes da abertura (D-130): os quatro Reels terminam convidando a conhecer a Clarevo pelo link da bio, sem sugerir usar agora.
   for (const id of ['P02', 'P05', 'P08', 'P11']) {
     const r = por(id);
     if (!r) continue;
-    const comAcesso = r.roteiro.filter((x) => /acesso/i.test(x.tela) || /acesso/i.test(x.fala));
-    if (comAcesso.length === 0 || !comAcesso.every((x) => /Veja no perfil as informações de acesso/.test(x.fala) && (!/acesso/i.test(x.tela) || /Veja no perfil as informações de acesso/.test(x.tela)))) erros.push(id + ': o fim do Reel diz "Veja no perfil as informações de acesso" na narração e no texto na tela');
-    if (id !== 'P11' && !/Veja no perfil as informações de acesso\./.test(r.legenda)) erros.push(id + ': a legenda diz "Veja no perfil as informações de acesso."');
+    const fim = 'Conheça a Clarevo pelo link da bio';
+    const comLink = r.roteiro.filter((x) => /link da bio/i.test(x.tela) || /link da bio/i.test(x.fala));
+    if (comLink.length === 0 || !comLink.every((x) => x.fala.includes(fim + '.') && (!/link da bio/i.test(x.tela) || x.tela.includes(fim)))) erros.push(id + ': o fim do Reel diz "' + fim + '" na narração e no texto na tela');
+    if (id !== 'P11' && !r.legenda.includes(fim + '.')) erros.push(id + ': a legenda diz "' + fim + '."');
   }
   const p02 = por('P02');
   if (p02) {
@@ -153,7 +157,7 @@ function conferirPerfil() {
   const erros = [];
   const nome = contarCaracteres(PERFIL.nome);
   if (nome > LIMITES.nome) erros.push(`nome de exibição com ${nome} caracteres (limite ${LIMITES.nome})`);
-  for (const [chave, linhas] of [['bio', PERFIL.bio], ['bioAcessoAberto', PERFIL.bioAcessoAberto]]) {
+  for (const [chave, linhas] of [['bio', PERFIL.bio]]) {
     const total = contarCaracteres(linhas.join('\n'));
     if (total > LIMITES.bio) erros.push(`${chave} com ${total} caracteres (limite ${LIMITES.bio})`);
     // Margem de segurança: se a quebra de linha valesse 2 caracteres, ainda caberia.

@@ -193,7 +193,7 @@ const PROMESSAS = [
   /adequada com uma assinatura/i,
   /redu[çc][ãa]o garantida/i,
   /garantid[oa]\b/i,
-  // Acesso em preparação (D-067): nada que sugira acesso aberto ("como acessar", "conhecer o acesso", cadastro, download).
+  // Antes da abertura (D-130): o convite é só para conhecer. Nada que sugira usar agora ("como acessar", cadastro, download).
   /fixado Como acessar/i,
   /(?:saber|ver|veja) como acessar/i,
   /conhecer o acesso/i,
@@ -201,6 +201,11 @@ const PROMESSAS = [
   /baix(?:e|ar) (?:o|a) (?:app|aplicativo)/i,
   /cadastr(?:e-se|ar-se)/i,
 ];
+
+/** A única frase em que "grátis" e "em breve" podem aparecer: a da capa do site (D-128), liberada por Enzo (D-130). */
+const FRASE_DA_ASSINATURA = 'Assinatura em breve, com 14 dias grátis, sem cartão.';
+/** O texto do tempo em que o site falava em fase de testes (D-128 tirou do site; D-130, das peças). */
+const TEXTO_ANTIGO_DO_ACESSO = [/fase de testes/i, /\bpiloto\b/i, /informações de acesso/i, /abre no lançamento/i, /quem testa/i];
 
 /**
  * Devolve os problemas de redação de um texto (lista vazia quando está de acordo). `origem` identifica o texto na mensagem. Um termo de
@@ -212,7 +217,8 @@ function conferirRedacao(texto, origem) {
   if (FAZER_SENTIDO.test(texto)) erros.push(`${origem}: a expressão que o CLAUDE.md proíbe`);
   if (MARCA_MASCULINA.test(texto)) erros.push(`${origem}: a marca no masculino ("o Clarevo")`);
   if (NOMES_PROIBIDOS.test(texto)) erros.push(`${origem}: nome de pessoa real`);
-  for (const frase of texto.split(/(?<=[.!?])\s+|\n/)) {
+  for (const re of TEXTO_ANTIGO_DO_ACESSO) if (re.test(texto)) erros.push(`${origem}: texto antigo do acesso, que o site não diz mais (${re})`);
+  for (const frase of texto.split(FRASE_DA_ASSINATURA).join(' ').split(/(?<=[.!?])\s+|\n/)) {
     if (/\b(n[ãa]o|sem|nunca|nem)\b/i.test(frase)) continue;
     for (const re of PROMESSAS) if (re.test(frase)) erros.push(`${origem}: termo que o Playbook proíbe (${re})`);
   }
@@ -235,4 +241,6 @@ module.exports = {
   PARES_EM_USO,
   conferirContrastes,
   conferirRedacao,
+  FRASE_DA_ASSINATURA,
+  TEXTO_ANTIGO_DO_ACESSO,
 };
