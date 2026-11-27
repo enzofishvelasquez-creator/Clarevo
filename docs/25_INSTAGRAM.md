@@ -14,19 +14,19 @@ Saída em `--saida <pasta>` (nesta rodada, uma pasta fora do repositório). Quan
 | Capas de destaque 1080 x 1920 (Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda, Para empresas) | 6 | `perfil/destaques/` |
 | Prévia do perfil no celular (cabeçalho, nome, bio, link, destaques e a grade com as 9 primeiras peças) | 1 | `perfil/previa-do-perfil.png` |
 | Nome de exibição, bio (com a contagem de caracteres), link, destaques e fixados | 1 texto | `perfil/nome-e-bio.txt` |
-| Carrosséis do calendário, todas as páginas 1080 x 1350: P01 (6), P03 (5), P04 (5), P07 (5), P10 (6), B01 (5) e T01 (5) | 7 peças, 37 páginas | uma pasta por peça, na ordem do calendário |
-| Peças de reserva, fora do calendário: os carrosséis R01 (5), R02 (6, "Organizar as finanças com a câmera do celular"), B do Manual (5), F01 (7) e F02 (6), e o Reels R03 (nota, comprovante e boleto lidos sem digitar) | 6 peças, 29 páginas e um Reels | `reserva-*` |
+| Carrosséis do calendário de dezembro, todas as páginas 1080 x 1350: P01 (6), P03 (5), P04 (5), R01 (5), P07 (5), P10 (6), N01 (5) e F01 (7) | 8 peças, 44 páginas | uma pasta por peça, na ordem do calendário |
+| Fora do calendário de dezembro: os carrosséis B01 (5), T01 (5), R02 (6, "Organizar as finanças com a câmera do celular"), B do Manual (5) e F02 (6), e os Reels P11 e R03 (nota, comprovante e boleto lidos sem digitar) | 5 carrosséis, 27 páginas, e dois Reels | `reserva-*` |
 | Capas de Reel 1080 x 1920 (P02, P05, P08, P11) | 4 | `capa.png` |
 | Rascunhos em MP4 com a gravação real e o texto na tela do roteiro, em trechos (1080 x 1920, H.264, 25 quadros por segundo, sem áudio, de 33 a 36 s, de 1,4 a 1,9 MB) | 4 | `rascunho.mp4`, mais `rascunho-conferencia.png` (3 quadros), `gravacao-limpa.mp4` e `legendas.srt` (a narração) |
 | Capas de vídeo com integrante real, com o quadro "[Gravação com integrante real]" (P06, P09 e P12) | 3 | `capa.png` e `roteiro.md` |
-| T02 (trend a definir): só a ficha, sem arte | 1 | `D20-T02-trend-a-definir/` |
+| T02 (trend a definir): só a ficha, sem arte | 1 | `reserva-T02-trend-a-definir/` |
 | Em cada peça: `legenda.txt`, `alt.txt` (uma linha por página nos carrosséis), `ficha.md` (ação principal, o que depende da equipe, conferência das afirmações sobre o app, ajustes ao Playbook e a lista de conferência antes de publicar) | todas | na pasta da peça |
 | Calendário D1 a D30 (dia, peça, formato, objetivo, ação e o que depende da equipe) e a imagem-resumo | 2 | `calendario.md`, `calendario.png` |
 | Folha de contato com todas as páginas e capas, e o `LEIA-ME.txt` com a ordem de publicação | 2 | `montagem.png`, `LEIA-ME.txt` |
 
 Total da primeira geração: 160 arquivos (82 PNG, 8 MP4 e os textos), 26 MB.
 
-**Foto real.** Onde o Playbook pede foto e a peça a mantém (as capas de F01 e F02) o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva. A P01 saiu dessa lista em 27/11/2026: por decisão do Enzo, a capa e a página 5 são só com texto. O texto alternativo dessas páginas (capas de F01 e F02) descreve só o quadro e a cena sugerida: a `ficha.md` de cada peça diz que a equipe o reescreve, antes de publicar, para descrever o que a foto escolhida realmente mostra.
+**Foto real.** Onde o Playbook pede foto, o gerador desenhava um quadro marcado. Por decisão do Enzo de 27/11/2026, as capas da P01, da F01 e da F02 e a página 5 da P01 ficaram só com texto, e nenhuma peça leva mais esse quadro. Quando houver foto, o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva. O texto alternativo de uma página com foto descreve só o quadro e a cena sugerida: a `ficha.md` de cada peça diz que a equipe o reescreve, antes de publicar, para descrever o que a foto escolhida realmente mostra.
 
 **Telas do app.** Só de captura ou gravação real da demonstração (dados fictícios, etiqueta "Demonstração"), recortadas e ampliadas sem redesenhar: as capturas 4:5 e as gravações de `scripts/gravar-redes.js` (`docs/24`, seção 2). As páginas que mostram tela levam o aviso "Exemplo fictício" ou "Dados fictícios".
 
@@ -47,6 +47,8 @@ node scripts/gerar-instagram.js --saida <pasta> --redes <pasta> --sem-video
 
 ### O que o gerador recusa
 
+**A peça dos planos (N01)** tem regras próprias: os quatro preços e a frase do site aparecem nas páginas e na legenda; cada página de plano traz o preço por mês e por ano do plano certo, junto da frase; nada de "desconto", "economia", "equivale", percentual, convite para assinar ("assine", "garanta", "experimente"), mês, ano ou data, nem no texto alternativo. É a única peça com números que não leva "Exemplo fictício", porque os preços são reais, e os preços dos planos são recusados em qualquer outra peça.
+
 Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: travessão, a expressão que o `CLAUDE.md` proíbe, a marca no masculino, nome de pessoa real, termo de promessa ("grátis", "gratuito" e "em breve" fora da frase do site "Assinatura em breve, com 14 dias grátis, sem cartão.", mesmo em frase com "sem" ou "não"; "crie sua conta", "assine"; lista de espera, "saldo disponível" afirmado, "acaba com a ansiedade", "certificado pela NR-1"...), chamada que sugira usar agora ("como acessar", "conhecer o acesso", "fixado Como acessar", cadastro, download: antes da abertura, o convite é só para conhecer, D-130), o texto antigo do acesso ("fase de testes", "piloto", "informações de acesso", "abre no lançamento", "quem testa", que o site deixou de dizer na D-128), legenda com campo entre colchetes ("legenda pronta" não tem marcador a preencher), valor em reais que não seja de um exemplo conferido, número de páginas diferente do Playbook, nome ou bio acima dos limites e contraste abaixo do mínimo. Confere também pontos que a revisão pediu: a P11 dizer que na conta nova o primeiro registro começa do zero, a frase "não é saldo nem autorização para gastar" da P02 ter sujeito, a B01 dizer que a empresa nunca vê as finanças de ninguém, nem somadas (D-056), e a T01 página 3, a B página 5 e a R01 página 4 com o texto fixado. Em **cada página desenhada**, no navegador, confere ainda: margens laterais de 80 px; nada sobre o rodapé; nas artes 9:16, o conteúdo entre 250 px do topo e 350 px do rodapé; rótulo de 24 px ou mais, título de 56 a 72 px e corpo de 32 a 40 px; contraste real de cada texto (nunca branco sobre lima; lima sobre azul só em texto grande e em negrito); texto que não rola nem é cortado. O teste `packages/core/test/instagram.test.ts` roda a parte pura (limites do perfil, somas dos exemplos, contrastes do Manual, redação, estrutura e que cada nome de tela do app citado existe no app).
 
 ## 3. Identidade do perfil
@@ -63,11 +65,13 @@ Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: trave
 - **Identificador:** `@clarevo` (D-130). Conferir, ao criar a conta, se está livre; a prévia já mostra o @.
 - **Avatar:** o ícone oficial C, o mesmo de `docs/marca/icone-app.svg`, nos 1080 px. A 110 px (perfil) e a 44 px (feed) o C e o crescente lima continuam legíveis (conferência em `perfil/avatar-conferencia.png`). A assinatura "clarevo." nunca vai no avatar.
 - **Destaques (nesta ordem):** Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas. As seis capas têm o mesmo desenho: só um ícone simples em traço marinho, grande e centrado, sobre um disco lima no fundo azul, **sem o nome** (o Instagram já mostra o rótulo do destaque, e o texto dentro do círculo ficaria ilegível a 110 px). O disco e o ícone ficam no centro da arte, que é onde o Instagram recorta o círculo; a prévia do perfil usa o mesmo recorte central. O conteúdo de cada destaque está em `perfil/nome-e-bio.txt`. **Para empresas** só entra com a apresentação e o canal comercial conferidos, como o Playbook manda; na prévia aparece esmaecido e tracejado.
-- **Fixados:** P01, P02 e P03, nessa ordem. Na grade, os três fixados vêm primeiro e, depois, as peças mais novas primeiro (a prévia usa P09 no D20 e P06 no D13, as alternativas perenes).
+- **Fixados:** P01, P02 e P03, nessa ordem. Na grade, os três fixados vêm primeiro e, depois, as peças mais novas primeiro (a prévia usa P10, P08, P07, R01, P05 e P04; o Reels do mercado ainda não tem pasta no gerador).
 
 ## 4. Peças do primeiro mês
 
-Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, ação, o que depende da equipe, a conferência com o app e os ajustes) está na `ficha.md` da pasta.
+**Desde 27/11/2026 (D-130) a ordem é a do plano de dezembro** (`docs/redes/plano-do-instagram.md`), e não mais a do Playbook: saíram de dezembro as posições de trend e de vídeo com integrante (P06, P09, T01 e T02), a P11 (só depois da abertura) e a B01 (bloqueada); entraram a R01 (D13), o Reels do mercado (D20), a peça nova N01 "Os planos da Clarevo" (D27) e a F01 (D30); o D25 fica sem publicação. Com a conta criada em 30/11/2026, D5 é 04/12 e D30 é 29/12. O que saiu está nas pastas `reserva-*`.
+
+Na ordem do plano de dezembro. O detalhe de cada peça (objetivo, ação, o que depende da equipe, a conferência com o app e os ajustes) está na `ficha.md` da pasta.
 
 | Dia | Peça | Formato | Ação principal | Arte gerada |
 |---|---|---|---|---|
@@ -76,15 +80,17 @@ Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, aç
 | D7 | P03 Como conhecer a Clarevo | Carrossel fixado, 5 páginas | Conhecer a Clarevo pelo link da bio | 5 páginas, reescritas em 27/11/2026 (D-130) com as frases da página Comece aqui; página 4 com o Resumo; página 5 com "Assinatura em breve, com 14 dias grátis, sem cartão." |
 | D9 | P04 Saldo e compromissos do mês | Carrossel, 5 páginas | Salvar a sequência de conferência | 5 páginas em fundo claro, valores em reais, barras a partir de zero |
 | D11 | P05 Planejar uma categoria | Reel | Conhecer a Clarevo pelo link da bio | Capa, rascunho em MP4 (34 s): Transporte, R$ 600,00 |
-| D13 | P06 ou T01 | Vídeo com integrante ou trend (posição flexível) | Uma pergunta específica | P06: capa e roteiro. T01: carrossel de 5 páginas no visual de post reproduzido |
+| D13 | R01 O salário entrou | Carrossel, 5 páginas | Usar as perguntas na próxima revisão | 5 páginas: calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível." |
 | D16 | P07 Parcela e total da compra | Carrossel, 5 páginas | Guardar o roteiro de perguntas | 5 páginas: o mesmo produto em 6 x R$ 120 e à vista, e a linha dos meses |
 | D18 | P08 Uma meta com próximo passo | Reel | Conhecer a Clarevo pelo link da bio | Capa, rascunho em MP4 (36 s): meta Estudos |
-| D20 | P09 ou T02 | Vídeo com integrante ou trend (posição flexível) | Escolher uma pergunta para a próxima compra | P09: capa e roteiro. T02: só a ficha (a referência é escolhida na revisão semanal) |
+| D20 | Reels do mercado | Reel | Conhecer a Clarevo pelo link da bio | Gravação de `scripts/gravar-redes.js --so reels` (compra de mercado e orçamento); ainda sem pasta no gerador |
 | D23 | P10 Revisão do mês | Carrossel, 6 páginas | Fazer a revisão com os próprios registros | 6 páginas; página 3 com a tela do orçamento |
-| D25 | P11 Primeiro registro de despesa | Reel | Concluir a primeira tarefa | Capa, rascunho em MP4 (36 s, 7 trechos): Farmácia, R$ 35,00; o último avisa que, na conta da pessoa, o primeiro registro começa do zero |
-| D27 | B01 Bem-estar financeiro nas empresas | Carrossel, 5 páginas | Solicitar apresentação pelo canal conferido | 5 páginas, com a ressalva da NR-1 e a frase de D-056 (a empresa nunca vê as finanças de ninguém, nem somadas); **bloqueada** (seção 6) |
+| D25 | Sem publicação | Pausa | Responder perguntas em dia útil | Véspera de Natal |
+| D27 | N01 Os planos da Clarevo | Carrossel, 5 páginas | Conhecer a Clarevo pelo link da bio | 5 páginas: Individual (R$ 29,90 por mês ou R$ 269,90 por ano) e Família (R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas), com a frase "Assinatura em breve, com 14 dias grátis, sem cartão."; sem convite para assinar e sem falar em economia |
+| D30 | F01 5 perguntas para organizar o mês | Carrossel, 7 páginas | Escolher uma pergunta e começar por ela | 7 páginas; capa só com texto |
+| Reserva | P11, B01, P06, P09, T01 e T02 | Reel, carrossel, vídeos com integrante e trends | Ver cada `ficha.md` | P11 só depois da abertura (Farmácia, R$ 35,00; a conta nova começa do zero); B01 **bloqueada** (seção 6); P06 e P09 esperam pessoas reais; T01 e T02, a referência e os direitos de uso |
 | Stories e destaque Ajuda | P12 Dúvida de acesso | Vídeo com integrante | Acessar ou pedir orientação pelo canal confirmado | Capa, roteiro (com [pergunta real] e [resposta conferida] para a equipe), legenda completa, sequência de Stories e respostas-base |
-| Reserva | R01, R02, R03, B (Manual), F01, F02 | Carrosséis e um Reels (R03) | Ver cada `ficha.md` | R01 (calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível."), B (à vista ou em 10 parcelas; a página 5 cita a calculadora "Parcelado ou à vista?"), F01 (5 perguntas) e F02 (conversa sobre as contas da casa) |
+| Reserva | R02, R03, B (Manual) e F02 | Carrosséis e um Reels (R03) | Ver cada `ficha.md` | R02 e R03 fora até o teste da leitura com documentos reais; B (à vista ou em 10 parcelas; a página 5 cita a calculadora "Parcelado ou à vista?") e F02 (conversa sobre as contas da casa, capa só com texto) ficam para janeiro |
 
 ### Os rascunhos em vídeo
 
@@ -92,7 +98,7 @@ Cada Reel traz a gravação real da demonstração (a de `scripts/gravar-redes.j
 
 ## 5. Calendário D1 a D30
 
-`calendario.md` traz a tabela completa e `calendario.png`, a imagem-resumo. Resumo: D1 a D4 preparo (conta e acessos, avatar, bio, link e destaques, conferência do produto e da oferta, montar P01 a P03); D5, D6 e D7 os três fixados; depois P04 (D9), P05 (D11), D13 flexível, P07 (D16), P08 (D18), D20 flexível, P10 (D23), P11 (D25) e B01 (D27); revisões nos D14, D21, D28, D29 e D30; escuta (caixa de perguntas nativa) nos D15, D22 e D29; Stories de apoio nos dias de publicação. Três peças por semana como referência, sem promessa de alcance. Horários a testar: 12h e 19h de Brasília, anotando horário e formato. D13 e D20: T01 ou T02 se houver trend adequada (referência escolhida na revisão semanal, até 48 horas antes, com a ficha de referência externa do Manual e direitos de uso), senão P06 ou P09.
+`calendario.md` traz a tabela completa e `calendario.png`, a imagem-resumo. **Desde 27/11/2026 vale a ordem do plano de dezembro** (seção 4): D5, D6 e D7 os três fixados; P04 (D9), P05 (D11), R01 (D13), P07 (D16), P08 (D18), o Reels do mercado (D20), P10 (D23), sem publicação no D25, N01 (D27) e F01 (D30); revisões nos D14, D21, D28 e D29; escuta nos D15, D22 e D29. O resumo abaixo é o do Playbook, guardado como histórico. Resumo: D1 a D4 preparo (conta e acessos, avatar, bio, link e destaques, conferência do produto e da oferta, montar P01 a P03); D5, D6 e D7 os três fixados; depois P04 (D9), P05 (D11), D13 flexível, P07 (D16), P08 (D18), D20 flexível, P10 (D23), P11 (D25) e B01 (D27); revisões nos D14, D21, D28, D29 e D30; escuta (caixa de perguntas nativa) nos D15, D22 e D29; Stories de apoio nos dias de publicação. Três peças por semana como referência, sem promessa de alcance. Horários a testar: 12h e 19h de Brasília, anotando horário e formato. D13 e D20: T01 ou T02 se houver trend adequada (referência escolhida na revisão semanal, até 48 horas antes, com a ficha de referência externa do Manual e direitos de uso), senão P06 ou P09.
 
 ## 6. Conferência antes de publicar
 
@@ -115,7 +121,7 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 ## 7. O que fica para a equipe no Canva
 
 - **Montar cada arte como design nativo do Canva**, com texto, avatar, imagens e números em camadas separadas e a fonte DM Sans (títulos em negrito, corpo sem negrito nem itálico). Os PNG daqui são o desenho de referência; o Playbook não converte nada automaticamente em Canva. Usar a assinatura "clarevo." pelo ativo original de `docs/marca` e o ícone C só no avatar.
-- **Fotos reais** (F01 e F02 quando forem usadas; a P01 ficou só com texto): escolher, ter a autorização e trocar o quadro. Reescrever o texto alternativo dessas páginas depois da escolha, para descrever o que a foto mostra (o `alt.txt` descreve só o quadro). Não associar a foto a depoimento nem a resultado de saúde.
+- **Fotos reais** (nenhuma peça depende delas desde 27/11/2026; se a equipe quiser usar uma): escolher, ter a autorização e trocar o quadro. Reescrever o texto alternativo dessas páginas depois da escolha, para descrever o que a foto mostra (o `alt.txt` descreve só o quadro). Não associar a foto a depoimento nem a resultado de saúde.
 - **Vídeos com integrante** (P06, P09 e P12): gravar, revisar a fala com a pessoa, legendar no Edits e montar a capa no Canva no lugar do quadro "[Gravação com integrante real]".
 - **Reels** (P02, P05, P08 e P11): edição final no Edits a partir de `gravacao-limpa.mp4`, com pergunta na tela, legendas revisadas, "Exemplo fictício" enquanto os valores aparecerem e trilha só com direitos de uso. O `rascunho.mp4` serve de referência de posição e de texto.
 - **Trends** (T01 e T02): decidir na revisão semanal, preencher a ficha de referência externa e manter a alternativa perene pronta.
@@ -145,10 +151,10 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 
 ## 9. Decisões
 
-As decisões de 26 e 27/11/2026 (identificador, responsáveis, convite só para conhecer, abertura a partir de janeiro de 2027, preço liberado e leitura de documentos fora até o teste) estão na D-130 de `docs/00_VISAO_E_DECISOES.md`, e o plano, em `docs/redes/plano-do-instagram.md`. O calendário D1 a D30 da seção 5 ainda é o do Playbook: a ordem de dezembro é a do plano, e o gerador será reordenado na próxima rodada. As de 25/10/2026, a registrar:
+As decisões de 26 e 27/11/2026 (identificador, responsáveis, convite só para conhecer, abertura a partir de janeiro de 2027, preço liberado e leitura de documentos fora até o teste) estão na D-130 de `docs/00_VISAO_E_DECISOES.md`, e o plano, em `docs/redes/plano-do-instagram.md`. O calendário D1 a D30 do gerador segue o plano de dezembro desde 27/11/2026 (seções 4 e 5). As de 25/10/2026, a registrar:
 
 1. D-069: o ciclo do Instagram gera, por script, o desenho de referência do perfil e das peças do primeiro mês (`scripts/gerar-instagram.js`), sem mudar app, site nem banco; as artes finais são do Canva e do Edits.
 2. A DM Sans (OFL) entra no repositório só para estas artes.
 3. O nome de exibição tem 30 caracteres (no limite adotado) e a bio, 102 caracteres (D-130).
 4. A B01 e o destaque Para empresas ficam bloqueados até o canal comercial e a revisão técnica (saúde e NR-1).
-5. Pautas de reserva fora do calendário: R01, B, F01 e F02.
+5. Pautas de reserva fora do calendário: R01, B, F01 e F02 (desde 27/11/2026, a R01 e a F01 estão no calendário de dezembro).

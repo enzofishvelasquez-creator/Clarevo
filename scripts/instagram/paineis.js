@@ -63,13 +63,14 @@ function imagemDoCalendario(calendario) {
     const t = TIPOS[c.tipo];
     return `<div style="background:${t.fundo};color:${t.texto};border:4px ${c.tipo === 'livre' ? 'dashed' : 'solid'} ${t.borda};border-radius:24px;padding:22px 24px;height:250px;display:flex;flex-direction:column;gap:6px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:30px;font-weight:700">D${c.dia}</span></div><div style="font-size:${c.peca.length > 12 ? 36 : 50}px;font-weight:700;line-height:1.05">${esc(c.peca)}</div><div style="font-size:26px;line-height:1.2">${esc(c.formato)}</div></div>`;
   };
-  const legenda = Object.entries(TIPOS).map(([, t]) => `<span style="display:flex;align-items:center;gap:12px;font-size:26px"><i style="width:34px;height:34px;border-radius:9px;background:${t.fundo};border:4px solid ${t.borda};display:inline-block"></i>${esc(t.rotulo)}</span>`).join('');
+  const emUso = new Set(calendario.map((c) => c.tipo));
+  const legenda = Object.entries(TIPOS).filter(([tipo]) => emUso.has(tipo)).map(([, t]) => `<span style="display:flex;align-items:center;gap:12px;font-size:26px"><i style="width:34px;height:34px;border-radius:9px;background:${t.fundo};border:4px solid ${t.borda};display:inline-block"></i>${esc(t.rotulo)}</span>`).join('');
   return `${ABERTURA(2480)}<body class="branco" style="padding:56px 48px 56px;color:#17223B">
 <h1 style="font-size:64px;margin-bottom:10px">Calendário do primeiro mês: D1 a D30</h1>
-<p style="font-size:30px;color:var(--cinza);margin-bottom:28px">Playbook v2.2. D é o dia contado a partir da criação do perfil. Três peças por semana como referência; D13 e D20 são posições flexíveis (T01 ou T02 se houver trend adequada, senão P06 ou P09).</p>
+<p style="font-size:30px;color:var(--cinza);margin-bottom:28px">Plano de dezembro (D-130). D é o dia contado a partir da criação do perfil. Três peças por semana como referência; D25 fica sem publicação.</p>
 <div style="display:flex;flex-wrap:wrap;gap:16px 36px;margin-bottom:30px">${legenda}</div>
 <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px">${calendario.map(cel).join('')}</div>
-<p style="font-size:28px;line-height:1.4;margin-top:30px">Horários para testar: 12h e 19h de Brasília, anotando horário e formato. Revisões nos D14, D21, D28 e D29 e D30; escuta nos D15, D22 e D29. Sem promessa de alcance. A publicação, as fotos, as gravações com pessoas, a conferência do produto e o canal comercial dependem da equipe (detalhe em calendario.md).</p>
+<p style="font-size:28px;line-height:1.4;margin-top:30px">Horários para testar: 12h e 19h de Brasília, anotando horário e formato. Revisões nos D14, D21, D28 e D29; escuta nos D15, D22 e D29. Sem promessa de alcance. A publicação, a edição final dos vídeos e a conferência do produto dependem da equipe (detalhe em calendario.md).</p>
 </body></html>`;
 }
 

@@ -348,12 +348,12 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'P06',
-    pasta: 'D13-P06-video-com-integrante-por-onde-comecar',
-    dia: 13,
+    pasta: 'reserva-P06-video-com-integrante-por-onde-comecar',
+    reserva: true,
     nome: 'Por onde começar a organizar o mês?',
     formato: 'video-integrante',
     alternativaDe: 'T01',
-    objetivo: 'Apresentar uma pessoa real ligada ao projeto e uma pergunta útil para organizar o mês (alternativa perene da posição flexível do D13).',
+    objetivo: 'Apresentar uma pessoa real ligada ao projeto e uma pergunta útil para organizar o mês (fora do calendário de dezembro: espera uma pessoa real, com autorização de imagem e de fala).',
     acao: 'Recolher uma dúvida externa: qual etapa mais confunde hoje (registrar, planejar ou revisar).',
     familia: 'Humana e institucional',
     capa: { titulo: 'Por onde começar a organizar o mês?' },
@@ -380,12 +380,12 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'T01',
-    pasta: 'D13-T01-trend-post-reproduzido',
-    dia: 13,
+    pasta: 'reserva-T01-trend-post-reproduzido',
+    reserva: true,
     nome: 'Trend de post reproduzido (assinaturas)',
     formato: 'carrossel-trend',
     alternativaPerene: 'P06',
-    objetivo: 'Refletir sobre prioridades e mudanças possíveis, no formato de post reproduzido (posição flexível do D13, só se houver referência adequada na revisão semanal).',
+    objetivo: 'Refletir sobre prioridades e mudanças possíveis, no formato de post reproduzido (fora do calendário de dezembro: só entra com referência adequada e direitos de uso conferidos).',
     acao: 'Salvar para conferir as assinaturas quando as próximas cobranças chegarem; uma pergunta específica nos comentários.',
     familia: 'Trend (post reproduzido), com nome e ícone oficiais',
     paginas: [
@@ -432,7 +432,7 @@ const PECAS = [
     ],
     ajustes: ['Visual de post reproduzido (fundo branco, cabeçalho de autor, texto direto), sem faixas azuis nem caixas lima, como o Playbook manda para a trend. Sem @, selo, curtidas nem comentários.'],
     depende: [
-      'Decidir na revisão semanal (até 48 horas antes) se há referência de trend adequada e direitos de uso; se não houver, publicar a alternativa perene P06.',
+      'Decidir na revisão semanal (até 48 horas antes) se há referência de trend adequada e direitos de uso; se não houver, a peça não sai.',
       'Ficha de referência externa do Manual (mídia exata, origem, direitos, plano B) preenchida antes de produzir.',
       'Só exibir um @ depois de confirmado o identificador real.',
     ],
@@ -532,12 +532,12 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'P09',
-    pasta: 'D20-P09-video-com-integrante-antes-de-uma-compra',
-    dia: 20,
+    pasta: 'reserva-P09-video-com-integrante-antes-de-uma-compra',
+    reserva: true,
     nome: 'O que acontece antes de uma compra?',
     formato: 'video-integrante',
     alternativaDe: 'T02',
-    objetivo: 'Oferecer uma pergunta de observação antes de comprar (alternativa perene da posição flexível do D20).',
+    objetivo: 'Oferecer uma pergunta de observação antes de comprar (fora do calendário de dezembro: espera uma pessoa real, com autorização de imagem e de fala).',
     acao: 'Escolher uma pergunta do vídeo para observar uma próxima decisão de compra (salvar ou comentar a experiência).',
     familia: 'Humana e institucional',
     capa: { titulo: 'O que acontece antes de uma compra?' },
@@ -562,15 +562,15 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'T02',
-    pasta: 'D20-T02-trend-a-definir',
-    dia: 20,
+    pasta: 'reserva-T02-trend-a-definir',
+    reserva: true,
     nome: 'Trend em circulação (a definir na revisão semanal)',
     formato: 'trend-a-definir',
     alternativaPerene: 'P09',
     objetivo: 'Reconhecimento e reflexão, num formato em circulação escolhido na revisão semanal.',
     acao: 'Salvar ou comentar a experiência.',
     semArte: true,
-    depende: ['Escolher a referência perto da publicação (48 horas antes), registrar link, data e direitos; se faltar relevância, autorização ou tempo, publicar a P09.'],
+    depende: ['Escolher a referência perto da publicação (48 horas antes), registrar link, data e direitos; se faltar relevância, autorização ou tempo, a peça não sai. Fora do calendário de dezembro.'],
   },
   // =============================================================================================================================
   {
@@ -624,8 +624,8 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'P11',
-    pasta: 'D25-P11-reel-primeiro-registro-de-despesa',
-    dia: 25,
+    pasta: 'reserva-P11-reel-primeiro-registro-de-despesa',
+    reserva: true,
     nome: 'Primeiro registro de despesa',
     formato: 'reel',
     objetivo: 'Reduzir a dúvida de começo: mostrar a primeira tarefa até o resultado.',
@@ -667,8 +667,8 @@ const PECAS = [
   // =============================================================================================================================
   {
     id: 'B01',
-    pasta: 'D27-B01-bem-estar-financeiro-nas-empresas',
-    dia: 27,
+    pasta: 'reserva-B01-bem-estar-financeiro-nas-empresas',
+    reserva: true,
     nome: 'Bem-estar financeiro nas empresas',
     formato: 'carrossel',
     objetivo: 'Apresentar o benefício para empresas.',
@@ -721,12 +721,56 @@ const PECAS = [
   },
   // =============================================================================================================================
   {
+    id: 'N01',
+    pasta: 'D27-N01-os-planos-da-clarevo',
+    dia: 27,
+    nome: 'Os planos da Clarevo',
+    formato: 'carrossel',
+    objetivo: 'Dizer quais são os planos e quanto custam, com as palavras do site, antes da abertura (D-130): sem convite para assinar.',
+    acao: 'Conhecer a Clarevo pelo link da bio.',
+    familia: 'Editorial',
+    paginas: [
+      { modelo: 'capaAzul', titulo: 'Os *planos* da Clarevo', sub: 'Dois planos, com os mesmos recursos do app.' },
+      { modelo: 'texto', rotulo: 'Individual', titulo: '*R$ 29,90* por mês ou R$ 269,90 por ano.', corpo: 'Para uma pessoa, com o seu espaço Pessoal, que só você vê.', chamada: 'Assinatura em breve, com 14 dias grátis, sem cartão.' },
+      { modelo: 'texto', rotulo: 'Família', titulo: '*R$ 69,90* por mês ou R$ 629,90 por ano.', corpo: 'Uma assinatura só, para até 6 pessoas. Cada pessoa tem o próprio Pessoal, e a Família em comum mostra as contas da casa.', chamada: 'Assinatura em breve, com 14 dias grátis, sem cartão.' },
+      { modelo: 'texto', titulo: 'Os dois planos têm *todos os recursos*.', corpo: 'O que muda é para quem é a assinatura.' },
+      { modelo: 'final', titulo: 'Conheça a Clarevo pelo link da bio.', corpo: 'Assinatura em breve, com 14 dias grátis, sem cartão.' },
+    ],
+    legenda:
+      'A Clarevo tem dois planos, com os mesmos recursos do app. Individual: R$ 29,90 por mês ou R$ 269,90 por ano, para uma pessoa. Família: R$ 69,90 por mês ou R$ 629,90 por ano, uma assinatura só para até 6 pessoas. O que muda é para quem é a assinatura. Assinatura em breve, com 14 dias grátis, sem cartão. Conheça a Clarevo pelo link da bio.',
+    alt: [
+      'Capa do carrossel, fundo azul: "Os planos da Clarevo. Dois planos, com os mesmos recursos do app."',
+      'Fundo claro, plano Individual: "R$ 29,90 por mês ou R$ 269,90 por ano. Para uma pessoa, com o seu espaço Pessoal, que só você vê. Assinatura em breve, com 14 dias grátis, sem cartão."',
+      'Fundo claro, plano Família: "R$ 69,90 por mês ou R$ 629,90 por ano. Uma assinatura só, para até 6 pessoas. Cada pessoa tem o próprio Pessoal, e a Família em comum mostra as contas da casa. Assinatura em breve, com 14 dias grátis, sem cartão."',
+      'Fundo claro com o texto "Os dois planos têm todos os recursos. O que muda é para quem é a assinatura."',
+      'Fundo azul com o texto "Conheça a Clarevo pelo link da bio. Assinatura em breve, com 14 dias grátis, sem cartão."',
+    ],
+    ajustes: [
+      'Peça nova de 27/11/2026 (D-130, item 4: os planos e os preços podem aparecer, com as palavras do site). Não está no Playbook.',
+      'Os preços são reais, não exemplo: por isso a peça não leva "Exemplo fictício". O anual aparece só como preço, sem "equivale a" e sem falar em economia (D-127).',
+      'Sem convite para assinar e sem data. A frase do site acompanha cada preço (páginas 2 e 3) e fecha a peça (página 5), para uma página compartilhada sozinha não parecer venda aberta; no site, cada cartão de preço leva a etiqueta "Em breve".',
+      '"Uma assinatura só" resume a frase do site "Uma assinatura só, paga pela pessoa titular", para o preço não ser lido como por pessoa; "espaço Pessoal" acrescenta a palavra do app ("espaço") à frase do site "com o seu Pessoal".',
+    ],
+    depende: [
+      'No dia de publicar, conferir os preços e as frases com a página Planos do site. O preço ainda é uma pergunta aberta ao advogado (pergunta 47): se mudar, a peça muda junto.',
+      'Não gravar nem capturar a tela Conta, Assinatura.',
+      'Montar no Canva com camadas editáveis e publicar (registrar URL, horário e janela de leitura).',
+    ],
+    conferencia: [
+      { afirmacao: 'Individual: R$ 29,90 por mês ou R$ 269,90 por ano. Família: R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas.', situacao: 'Confirmado', nota: 'Página Planos do site e `packages/core/src/plano-precos.ts` (D-127); o teste confere os quatro valores com o núcleo.' },
+      { afirmacao: 'Dois planos, com os mesmos recursos do app. O que muda é para quem é a assinatura. Os dois planos têm todos os recursos.', situacao: 'Confirmado', nota: 'Página Planos do site; "Os dois têm todos os recursos" e "para até 6 pessoas" também estão na página Comece aqui.' },
+      { afirmacao: 'Para uma pessoa, com o seu espaço Pessoal, que só você vê. Uma assinatura só, para até 6 pessoas. Cada pessoa tem o próprio Pessoal, e a Família em comum mostra as contas da casa.', situacao: 'Confirmado, com limite', nota: 'Frases da página Planos do site (D-055; "Uma assinatura só, paga pela pessoa titular"). A demonstração não tem Família de exemplo: a peça não mostra tela.' },
+      { afirmacao: 'Assinatura em breve, com 14 dias grátis, sem cartão.', situacao: 'Confirmado', nota: 'Frase da capa do site (D-128), liberada para as peças (D-130).' },
+    ],
+  },
+  // =============================================================================================================================
+  {
     id: 'P12',
     pasta: 'stories-e-ajuda-P12-duvida-de-acesso',
     dia: null,
     nome: 'Dúvida de acesso (Stories e destaque Ajuda)',
     formato: 'video-integrante',
-    objetivo: 'Responder uma pergunta externa recorrente sobre acesso. No v2.2 a P12 sai do D27 (que é da B01) e fica nos Stories e no destaque Ajuda.',
+    objetivo: 'Responder uma pergunta externa recorrente sobre acesso. A P12 fica nos Stories e no destaque Ajuda, depois da abertura.',
     acao: 'Acessar ou pedir orientação pelo canal de ajuda confirmado.',
     familia: 'Humana e institucional',
     capa: { titulo: 'Dúvida de acesso', tag: 'Orientação inicial' },
@@ -769,8 +813,8 @@ const PECAS = [
   // ou no lugar de uma peça repetida.
   {
     id: 'R01',
-    pasta: 'reserva-R01-calendario-do-mes',
-    reserva: true,
+    pasta: 'D13-R01-o-salario-entrou',
+    dia: 13,
     nome: 'O salário entrou: calendário visual',
     formato: 'carrossel',
     objetivo: 'Entender que o calendário participa da leitura do mês (exemplo regular com calendário visual, sem trend).',
@@ -819,7 +863,7 @@ const PECAS = [
       'A página 4 traz também a barra de 100% do Manual (exemplo A): 60,714% pago, 19,048% a pagar e 20,238% diferença, que somam 100%; arredondados a uma casa, 60,7%, 19,0% e 20,2% somam 99,9%, e a página diz isso.',
       'A conta é do exemplo: no app a "Diferença do mês" é Recebido menos Pago (aqui, R$ 1.650) e o "Ainda a pagar" fica à parte. Nunca chamar a diferença desta peça de "Diferença do mês" nem mostrar tela do app com o calendário editorial.',
     ],
-    depende: ['Peça de reserva: a equipe decide a data. Montar no Canva e publicar.'],
+    depende: ['Montar no Canva com camadas editáveis e publicar (registrar URL, horário e janela de leitura).'],
     conferencia: [
       { afirmacao: 'R$ 4.200 − R$ 2.550 − R$ 800 = R$ 850, diferença após essas despesas.', situacao: 'Exemplo fictício, conta conferida', nota: 'Rotular como diferença do exemplo; o app tem outra conta (Diferença do mês é só Recebido menos Pago) e não mostra saldo.' },
     ],
@@ -976,15 +1020,15 @@ const PECAS = [
   },
   {
     id: 'F01',
-    pasta: 'reserva-F01-5-perguntas-para-organizar-o-mes',
-    reserva: true,
+    pasta: 'D30-F01-5-perguntas-para-organizar-o-mes',
+    dia: 30,
     nome: '5 perguntas para organizar o mês',
     formato: 'carrossel',
     objetivo: 'Pauta F01 do Playbook: organizar o mês sem tentar resolver tudo de uma vez.',
     acao: 'Escolher uma pergunta e começar por ela; salvar para a próxima revisão.',
-    familia: 'Fotográfica cotidiana e editorial',
+    familia: 'Editorial',
     paginas: [
-      { modelo: 'capaFoto', titulo: '5 perguntas para organizar o mês sem tentar resolver tudo de uma vez', cena: CENAS.f01Capa },
+      { modelo: 'capaAzul', titulo: '*5 perguntas* para organizar o mês sem tentar resolver tudo de uma vez' },
       { modelo: 'numeroPergunta', numero: 1, total: 5, titulo: 'O que vence primeiro?' },
       { modelo: 'numeroPergunta', numero: 2, total: 5, titulo: 'O que já foi pago?' },
       { modelo: 'numeroPergunta', numero: 3, total: 5, titulo: 'Qual despesa ainda falta registrar?' },
@@ -995,7 +1039,7 @@ const PECAS = [
     legenda:
       'Organizar o mês não precisa começar por tudo ao mesmo tempo. Estas cinco perguntas ajudam a olhar uma parte de cada vez: o que vence primeiro, o que já foi pago, o que falta registrar, o que mudou na renda ou nas contas e qual ajuste é possível agora. Escolha uma pergunta e comece por ela. Salve para consultar na próxima revisão.',
     alt: [
-      'Capa com cena de rotina (foto real a escolher pela equipe) e o texto "5 perguntas para organizar o mês sem tentar resolver tudo de uma vez".',
+      'Capa do carrossel, fundo azul, com o texto "5 perguntas para organizar o mês sem tentar resolver tudo de uma vez".',
       'Pergunta 1 de 5: "O que vence primeiro?"',
       'Pergunta 2 de 5: "O que já foi pago?"',
       'Pergunta 3 de 5: "Qual despesa ainda falta registrar?"',
@@ -1003,8 +1047,11 @@ const PECAS = [
       'Pergunta 5 de 5: "Qual ajuste é possível agora?"',
       'Fundo azul com o texto "Escolha uma pergunta e comece por ela."',
     ],
-    ajustes: ['A legenda é nova (o Playbook traz a pauta, sem legenda), só com frases da própria pauta.'],
-    depende: ['Peça de reserva (ciclo seguinte ou no lugar de uma peça repetida). Foto real de rotina na capa, com autorização.'],
+    ajustes: [
+      'A legenda é nova (o Playbook traz a pauta, sem legenda), só com frases da própria pauta.',
+      'Capa só com texto, sem foto (decisão do Enzo de 27/11/2026); o Playbook pede foto de rotina na capa. No plano de dezembro, fecha o mês (D30).',
+    ],
+    depende: ['Montar no Canva com camadas editáveis e publicar (registrar URL, horário e janela de leitura).'],
     conferencia: [{ afirmacao: 'Sem afirmação sobre o app.', situacao: 'Sem afirmação sobre o app', nota: 'Pauta educativa; as perguntas valem com ou sem o app.' }],
   },
   {
@@ -1015,9 +1062,9 @@ const PECAS = [
     formato: 'carrossel',
     objetivo: 'Pauta F02 do Playbook: conversar sobre as contas da casa sem começar pela cobrança.',
     acao: 'Guardar o roteiro para preparar a conversa.',
-    familia: 'Fotográfica cotidiana e editorial',
+    familia: 'Editorial',
     paginas: [
-      { modelo: 'capaFoto', titulo: 'Como conversar sobre as contas da casa sem começar pela cobrança?', cena: CENAS.f02Capa },
+      { modelo: 'capaAzul', titulo: 'Como conversar sobre as *contas da casa* sem começar pela cobrança?' },
       { modelo: 'numeroPergunta', numero: 1, total: 4, titulo: 'Combine um momento.', passo: true },
       { modelo: 'numeroPergunta', numero: 2, total: 4, titulo: 'Reúna as despesas compartilhadas.', passo: true },
       { modelo: 'numeroPergunta', numero: 3, total: 4, titulo: 'Ouça as prioridades de cada pessoa.', passo: true },
@@ -1027,7 +1074,7 @@ const PECAS = [
     legenda:
       'Falar de contas em casa pode começar de outro jeito: combinando um momento, reunindo as despesas compartilhadas, ouvindo as prioridades de cada pessoa e definindo um acordo possível, com uma data para rever. Cada casa divide renda e responsabilidades do seu jeito. Guarde este roteiro para preparar a conversa.',
     alt: [
-      'Capa com cena de casa (foto real a escolher pela equipe) e o texto "Como conversar sobre as contas da casa sem começar pela cobrança?"',
+      'Capa do carrossel, fundo azul, com o texto "Como conversar sobre as contas da casa sem começar pela cobrança?"',
       'Passo 1 de 4: "Combine um momento."',
       'Passo 2 de 4: "Reúna as despesas compartilhadas."',
       'Passo 3 de 4: "Ouça as prioridades de cada pessoa."',
@@ -1036,7 +1083,7 @@ const PECAS = [
     ],
     ajustes: ['Os passos do Playbook ("combinar um momento; reunir...") viraram imperativos, e "não supor que toda família divide renda do mesmo modo" virou a frase "Cada casa divide renda e responsabilidades do seu jeito". A legenda é nova.'],
     depende: [
-      'Peça de reserva. Foto real de casa na capa, com autorização de imagem.',
+      'Fora do calendário de dezembro: no plano, fica para janeiro de 2027. Capa só com texto, sem foto (decisão do Enzo de 27/11/2026).',
       'Se a peça passar a citar a Família da Clarevo (D-055), conferir antes: a demonstração não tem Família de exemplo e não há gravação.',
     ],
     conferencia: [{ afirmacao: 'Sem afirmação sobre o app.', situacao: 'Sem afirmação sobre o app', nota: 'Pauta educativa sobre conversa em casa; não cita a Família do app.' }],
@@ -1051,33 +1098,33 @@ const CALENDARIO = [
   { dia: 1, tipo: 'preparo', peca: 'Conta', formato: 'Configuração', objetivo: 'Perfil seguro e da Clarevo', acao: 'Criar a conta com o identificador @clarevo, contato de recuperação da equipe, autenticação em duas etapas e quem administra, publica e responde.', depende: 'Equipe: conta, acessos e responsáveis; guardar acessos em local restrito.' },
   { dia: 2, tipo: 'preparo', peca: 'Perfil', formato: 'Configuração', objetivo: 'Primeira visita clara', acao: 'Subir avatar, nome, bio e link; criar os destaques; testar o link no navegador do Instagram.', depende: 'Equipe: publicar; conferir o limite do nome na conta e o link da bio.' },
   { dia: 3, tipo: 'preparo', peca: 'Produto', formato: 'Conferência', objetivo: 'Acesso e primeira tarefa conferidos', acao: 'Conferir a oferta (assinatura em breve, convite só para conhecer), a demonstração e a primeira tarefa; preencher a ficha de acesso.', depende: 'Produto: responsável a designar, versão e data do teste. Proprietária: oferta.' },
-  { dia: 4, tipo: 'preparo', peca: 'P01 a P03', formato: 'Produção', objetivo: 'Três fixados prontos', acao: 'Montar P01, P02 e P03 no Canva e no Edits, com texto e telas conferidos; preparar Stories de apoio; conferir a leitura no celular.', depende: 'Marketing: Canva e Edits. Fotos reais da P01. Revisão da conferência.' },
-  { dia: 5, tipo: 'carrossel', peca: 'P01', formato: 'Carrossel fixado, 6 páginas', objetivo: 'Compreensão do produto', acao: 'Ver o fixado Clarevo na prática (P02).', depende: 'Fotos reais; publicar e fixar; Stories de apoio levando à peça.' },
+  { dia: 4, tipo: 'preparo', peca: 'P01 a P03', formato: 'Produção', objetivo: 'Três fixados prontos', acao: 'Montar P01, P02 e P03 no Canva e no Edits, com texto e telas conferidos; preparar Stories de apoio; conferir a leitura no celular.', depende: 'Marketing: Canva e Edits. Revisão da conferência.' },
+  { dia: 5, tipo: 'carrossel', peca: 'P01', formato: 'Carrossel fixado, 6 páginas', objetivo: 'Compreensão do produto', acao: 'Ver o fixado Clarevo na prática (P02).', depende: 'Publicar e fixar; Stories de apoio levando à peça.' },
   { dia: 6, tipo: 'reel', peca: 'P02', formato: 'Reel fixado', objetivo: 'Mostrar uma tarefa real', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Edição final no Edits; gravação refeita se a versão mudou; publicar e fixar.' },
   { dia: 7, tipo: 'carrossel', peca: 'P03', formato: 'Carrossel fixado, 5 páginas', objetivo: 'Orientar a oferta atual', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Link da bio conferido no navegador do Instagram; publicar e fixar.' },
   { dia: 8, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories com a sequência de apoio (pergunta, explicação, ação) levando ao fixado.', depende: 'Marketing: Stories com recursos nativos (enquete e caixa de perguntas).' },
   { dia: 9, tipo: 'carrossel', peca: 'P04', formato: 'Carrossel, 5 páginas', objetivo: 'Entender a diferença', acao: 'Salvar a sequência de conferência.', depende: 'Montar no Canva; publicar; registrar salvamentos.' },
   { dia: 10, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P04; ler e responder perguntas em dia útil.', depende: 'Quem responde: rotina de leitura e horário real de atendimento.' },
   { dia: 11, tipo: 'reel', peca: 'P05', formato: 'Reel', objetivo: 'Demonstrar orçamento', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Fluxo validado na versão atual; edição final; publicar.' },
-  { dia: 12, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P05; pesquisar a referência de trend para o D13 (revisão semanal).', depende: 'Marketing: shortlist com link e data da referência, direitos e alternativa perene.' },
-  { dia: 13, tipo: 'integrante', peca: 'P06 ou T01', formato: 'Posição flexível de trend', objetivo: 'Identificação e conversa', acao: 'Uma pergunta específica. T01 (carrossel de post reproduzido) se houver trend adequada; senão, P06 (pergunta da integrante, em vídeo real).', depende: 'Decisão até 48 horas antes; gravação com integrante real e autorização (P06); ficha de referência (T01).' },
+  { dia: 12, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P05.', depende: 'Marketing.' },
+  { dia: 13, tipo: 'carrossel', peca: 'R01', formato: 'Carrossel, 5 páginas', objetivo: 'Ler o mês com o calendário', acao: 'Usar as perguntas na próxima revisão.', depende: 'Montar no Canva; publicar; registrar salvamentos.' },
   { dia: 14, tipo: 'revisao', peca: 'Revisão D14', formato: 'Reunião curta', objetivo: 'Compreensão, visitas, acessos, cadastros e primeira tarefa', acao: 'Conferir os números do painel do Instagram e as contagens do app; anotar a pergunta externa mais frequente e o principal obstáculo.', depende: 'Equipe: relatório semanal; "não medido" onde não houver dado.' },
   { dia: 15, tipo: 'escuta', peca: 'Stories', formato: 'Stories e escuta', objetivo: 'Recolher dúvidas', acao: 'Caixa de perguntas nativa: qual parte você gostaria de entender melhor? Sem dados pessoais.', depende: 'Quem responde; a resposta padrão da equipe.' },
   { dia: 16, tipo: 'carrossel', peca: 'P07', formato: 'Carrossel, 5 páginas', objetivo: 'Comparar compromisso e preço', acao: 'Guardar o roteiro de perguntas.', depende: 'Montar no Canva; publicar; registrar salvamentos e compartilhamentos.' },
   { dia: 17, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P07.', depende: 'Marketing.' },
   { dia: 18, tipo: 'reel', peca: 'P08', formato: 'Reel', objetivo: 'Demonstrar o fluxo de meta', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Fluxo validado; edição final; publicar.' },
-  { dia: 19, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P08; pesquisar a referência de trend para o D20.', depende: 'Marketing: shortlist da referência, direitos e alternativa perene.' },
-  { dia: 20, tipo: 'integrante', peca: 'P09 ou T02', formato: 'Posição flexível de trend', objetivo: 'Reconhecimento e reflexão', acao: 'Salvar ou comentar a experiência. T02 (formato em circulação escolhido na revisão semanal) ou, como alternativa perene, P09 (observação do contexto de uma compra).', depende: 'Decisão até 48 horas antes; gravação com integrante real, função confirmada e autorização (P09).' },
+  { dia: 19, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P08.', depende: 'Marketing.' },
+  { dia: 20, tipo: 'reel', peca: 'Reels do mercado', formato: 'Reel', objetivo: 'Mostrar a compra de mercado no orçamento', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Gravação de `scripts/gravar-redes.js --so reels` (ainda sem pasta no gerador); edição final no Edits e capa no Canva; conferir o `.srt`; publicar.' },
   { dia: 21, tipo: 'revisao', peca: 'Revisão D21', formato: 'Reunião curta', objetivo: 'Que explicação repetir e que atrito corrigir no acesso ou no app', acao: 'Decidir o que repetir e corrigir.', depende: 'Equipe; produto para o atrito encontrado.' },
   { dia: 22, tipo: 'escuta', peca: 'Stories', formato: 'Stories e escuta', objetivo: 'Recolher dúvidas', acao: 'Caixa de perguntas nativa; transformar dúvidas recorrentes em pauta.', depende: 'Quem responde.' },
   { dia: 23, tipo: 'carrossel', peca: 'P10', formato: 'Carrossel, 6 páginas', objetivo: 'Ensinar a revisar o orçamento', acao: 'Fazer a revisão com seus registros.', depende: 'Conferir período e campos da captura; montar no Canva; publicar.' },
   { dia: 24, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P10.', depende: 'Marketing.' },
-  { dia: 25, tipo: 'reel', peca: 'P11', formato: 'Reel', objetivo: 'Reduzir dúvida de começo', acao: 'Concluir a primeira tarefa.', depende: 'Canal de ajuda definido para o destaque Ajuda; gravação refeita se a versão mudou; publicar.' },
-  { dia: 26, tipo: 'livre', peca: 'Stories', formato: 'Stories de apoio', objetivo: 'Contexto e escuta', acao: 'Stories de apoio à P11 e preparação da B01.', depende: 'Canal comercial e revisão técnica de saúde e NR-1 em andamento.' },
-  { dia: 27, tipo: 'carrossel', peca: 'B01', formato: 'Carrossel, 5 páginas', objetivo: 'Apresentar o benefício', acao: 'Solicitar apresentação pelo canal conferido.', depende: 'BLOQUEADA sem canal comercial conferido e sem revisão técnica (saúde e NR-1) e do advogado; só então o destaque Para empresas.' },
+  { dia: 25, tipo: 'livre', peca: 'Sem publicação', formato: 'Pausa', objetivo: 'Véspera de Natal', acao: 'Sem publicação no feed. Responder perguntas em dia útil.', depende: 'Quem responde.' },
+  { dia: 26, tipo: 'livre', peca: 'Sem publicação', formato: 'Pausa', objetivo: 'Natal', acao: 'Sem publicação no feed. Conferir os preços da N01 com a página Planos do site antes do D27.', depende: 'Conferência dos preços.' },
+  { dia: 27, tipo: 'carrossel', peca: 'N01', formato: 'Carrossel, 5 páginas', objetivo: 'Dizer os planos e os preços, com as palavras do site', acao: 'Conhecer a Clarevo pelo link da bio.', depende: 'Preços conferidos com o site no dia; sem convite para assinar; montar no Canva; publicar.' },
   { dia: 28, tipo: 'revisao', peca: 'Revisão D28', formato: 'Reunião curta', objetivo: 'O que trouxe perguntas externas, cadastros e primeira tarefa', acao: 'Comparar os números; separar equipe e pessoas de fora.', depende: 'Equipe; contagens do app lidas pela equipe no SQL Editor.' },
-  { dia: 29, tipo: 'escuta', peca: 'Stories e revisão D29', formato: 'Stories, escuta e reunião', objetivo: 'Quais temas repetir e quais peças refazer', acao: 'Recolher dúvidas e revisar as peças.', depende: 'Equipe.' },
-  { dia: 30, tipo: 'decisao', peca: 'Revisão D30', formato: 'Decisão', objetivo: 'Há evidência para ampliar a distribuição?', acao: 'Decidir temas a repetir, ajustes de acesso e cadência do próximo ciclo. Antes de ampliar: destino funcionando, cadastro e primeira tarefa observados, mensagem compreendida por pessoas de fora e origem identificada.', depende: 'Proprietária e equipe.' },
+  { dia: 29, tipo: 'decisao', peca: 'Revisão D29', formato: 'Stories, escuta e decisão', objetivo: 'Há evidência para ampliar a distribuição? Quais temas repetir e quais peças refazer', acao: 'Recolher dúvidas, revisar as peças e decidir os temas a repetir e a cadência do próximo ciclo. Antes de ampliar: destino funcionando, mensagem compreendida por pessoas de fora e canal de ajuda pronto.', depende: 'Proprietária e equipe; relatório do ciclo, com "não medido" onde não houver dado.' },
+  { dia: 30, tipo: 'carrossel', peca: 'F01', formato: 'Carrossel, 7 páginas', objetivo: 'Organizar o mês sem tentar resolver tudo de uma vez', acao: 'Escolher uma pergunta e começar por ela.', depende: 'Montar no Canva; publicar; registrar salvamentos.' },
 ];
 
 module.exports = { PERFIL, DESTAQUES, CENAS, PESSOA, TERMOS_DO_APP, PECAS, CALENDARIO, GRAVACOES, ANTES_DA_ABERTURA, R, rs, rsc };

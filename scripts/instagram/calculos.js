@@ -54,6 +54,8 @@ const EXEMPLOS = {
   parcelado: { parcelas: 6, valorParcela: R(120), total: R(720), aVista: R(650), diferenca: R(70) },
   // Manual B: à vista ou em dez parcelas (diferença nominal, nunca juros nem CET).
   dezParcelas: { parcelas: 10, valorParcela: R(120), total: R(1200), aVista: R(1000), diferenca: R(200), percentualSobreAVista: 20 },
+  // N01: os preços reais dos planos (D-127), em centavos, iguais aos de `packages/core/src/plano-precos.ts` (o teste confere).
+  planos: { individualMes: 2990, individualAno: 26990, familiaMes: 6990, familiaAno: 62990 },
   // T01: assinaturas (exemplo fictício, sem rendimentos).
   assinaturas: { hoje: R(200), depois: R(150), diferencaPorMes: R(50), meses: 12, somaNoAno: R(600), meta: R(1200) },
   // P02: orçamento de outubro na demonstração (centavos), como a tela escreve.

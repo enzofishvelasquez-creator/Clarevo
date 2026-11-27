@@ -70,7 +70,7 @@ Nada foi criado nem publicado no Instagram até esta data.
 
 ## 7. Calendário
 
-Três publicações por semana, às terças, quintas e sábados, com Stories de apoio. Horários para testar: 12h e 19h de Brasília. As datas valem se a conta for criada até 30/11/2026; se atrasar, tudo anda junto. O calendário D1 a D30 do gerador ainda é o do Playbook: a ordem abaixo é a que vale, e o gerador será reordenado na próxima rodada.
+Três publicações por semana, às terças, quintas e sábados, com Stories de apoio. Horários para testar: 12h e 19h de Brasília. As datas valem se a conta for criada até 30/11/2026; se atrasar, tudo anda junto. O calendário D1 a D30 do gerador segue esta ordem desde 27/11/2026 (D1 é o dia da criação do perfil).
 
 ### Dezembro de 2026
 
@@ -86,8 +86,8 @@ Três publicações por semana, às terças, quintas e sábados, com Stories de 
 | Qui 17/12 | Uma meta com próximo passo | P08 | Reels | Desenhada |
 | Sáb 19/12 | A compra de mercado e o orçamento | Reels do mercado | Reels | Gravada |
 | Ter 22/12 | Revisão do mês | P10 | Carrossel, 6 páginas | Desenhada |
-| Sáb 26/12 | Os planos da Clarevo, com o preço por mês e por ano, sem falar em economia | nova | Carrossel | A criar |
-| Ter 29/12 | 5 perguntas para organizar o mês | F01 | Carrossel, 7 páginas | Falta foto real |
+| Sáb 26/12 | Os planos da Clarevo, com o preço por mês e por ano, sem falar em economia | N01 | Carrossel, 5 páginas | Desenhada |
+| Ter 29/12 | 5 perguntas para organizar o mês | F01 | Carrossel, 7 páginas | Desenhada, com a capa só com texto |
 
 Nas vésperas de Natal e de Ano-Novo não há publicação. "Desenhada" quer dizer que o desenho de referência existe: antes de publicar, cada uma passa pelo Canva e pela conferência com o app.
 
@@ -101,7 +101,7 @@ No dia da abertura, uma fixada nova entra no lugar da P03 e o destaque Comece aq
 | Primeiro registro de despesa | P11 | Só depois da abertura; depende do contato de ajuda |
 | As metas mais comuns para o ano | nova | A criar |
 | O dinheiro do negócio separado do da casa | nova | A criar, com conferência própria do Espaço Negócio |
-| Conversar sobre as contas da casa | F02 | Falta foto real |
+| Conversar sobre as contas da casa | F02 | Desenhada, com a capa só com texto |
 | À vista ou em 10 parcelas? | B | Desenhada |
 | Nota, comprovante e boleto lidos sem digitar | R03 | Espera o teste com documentos reais |
 | Organizar as finanças com a câmera do celular | R02 | Espera o teste e o app de celular |
@@ -132,7 +132,7 @@ Pedido do Enzo: depois do calendário do Instagram, publicar no Facebook e no Li
 - **Facebook:** as mesmas peças do Instagram, com a legenda adaptada. A página é criada pelo Enzo.
 - **LinkedIn:** página da empresa, com texto mais longo e institucional: bastidores do produto, educação financeira no trabalho, quem trabalha por conta e MEI. O conteúdo para empresas continua esperando o contato comercial, a revisão técnica e o advogado.
 - **YouTube:** vídeos animados feitos por código, com a identidade da Clarevo, textos, números e telas reais da demonstração. Sem imagem gerada por IA, sem voz sintética e sem trilha sem direitos de uso: narração só de pessoa real que autorize, ou vídeo com texto na tela.
-- **Site:** o espaço já existe, é a página Novidades (`site-src/novidades/*.md`, com regras editoriais, imagem de capa e RSS). A proposta é publicar ali os textos longos de cada assunto. A pasta é da sessão do app: ou a sessão de redes entrega os textos prontos, ou o Enzo libera essa pasta para a sessão de redes.
+- **Site:** o espaço já existe, é a página Novidades (`site-src/novidades/*.md`, com regras editoriais, imagem de capa e RSS). A proposta é publicar ali os textos longos de cada assunto. O Enzo liberou essa pasta para a sessão de redes em 27/11/2026 (D-130): a sessão escreve os textos, gera as páginas e avisa a sessão do app antes de cada um.
 - Em todos: sem parâmetro de rastreamento, sem pixel, e contas criadas só pelo Enzo.
 
 ## 10. Como medir
@@ -148,7 +148,7 @@ Pedido do Enzo: depois do calendário do Instagram, publicar no Facebook e no Li
 2. Se "a partir de janeiro" pode aparecer nas publicações. Proposta: só depois de o dia estar firme.
 3. E-mail e horário de ajuda confirmados, para o destaque Ajuda e a P11.
 4. Conta de teste do Telegram, com nome fictício, criada pelo Enzo.
-5. Fotos próprias que podem ser usadas e quem da equipe aceita gravar, com autorização. A P01 já ficou com a capa só com texto (decisão de 27/11/2026); sem foto, a F01 e a F02 precisam do mesmo.
+5. Quem da equipe aceita gravar, com autorização de imagem e de fala. As capas da P01, da F01 e da F02 ficaram só com texto (decisão de 27/11/2026).
 6. A segunda linha da bio: manter "App para organizar seu mês." ou aproximar do subtítulo do site.
 7. Empresas: se o "pedir uma apresentação" do site é o contato comercial conferido.
-8. A ordem das outras redes e se a pasta de Novidades do site passa para a sessão de redes.
+8. A ordem das outras redes. Proposta: Facebook, LinkedIn, o site e, por último, o YouTube.

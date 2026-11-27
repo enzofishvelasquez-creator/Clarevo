@@ -333,7 +333,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(peca('T02').semArte).toBe(true);
   });
 
-  it('o calendário cobre D1 a D30, com as peças do Playbook v2.2 nos dias certos', () => {
+  it('o calendário cobre D1 a D30, com as peças do plano de dezembro (D-130) nos dias certos', () => {
     const dias = new Map(conteudo.CALENDARIO.map((c) => [c.dia, c.peca]));
     expect([...dias.keys()].sort((a, b) => a - b)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
     expect(dias.get(5)).toBe('P01');
@@ -341,13 +341,71 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     expect(dias.get(7)).toBe('P03');
     expect(dias.get(9)).toBe('P04');
     expect(dias.get(11)).toBe('P05');
-    expect(dias.get(13)).toBe('P06 ou T01');
+    expect(dias.get(13)).toBe('R01');
     expect(dias.get(16)).toBe('P07');
     expect(dias.get(18)).toBe('P08');
-    expect(dias.get(20)).toBe('P09 ou T02');
+    expect(dias.get(20)).toBe('Reels do mercado');
     expect(dias.get(23)).toBe('P10');
-    expect(dias.get(25)).toBe('P11');
-    expect(dias.get(27)).toBe('B01');
+    expect(dias.get(25)).toBe('Sem publicação');
+    expect(dias.get(26)).toBe('Sem publicação');
+    expect(dias.get(27)).toBe('N01');
+    expect(dias.get(30)).toBe('F01');
+  });
+
+  it('a pasta de cada peça diz o dia do calendário, e o que saiu de dezembro fica em reserva', () => {
+    const pecas = conteudo.PECAS as unknown as { id: string; pasta: string; dia?: number | null; reserva?: boolean }[];
+    for (const p of pecas) {
+      if (p.dia) expect(p.pasta.startsWith(`D${String(p.dia).padStart(2, '0')}-${p.id}-`), p.id).toBe(true);
+      if (p.reserva) expect(p.pasta.startsWith(`reserva-${p.id}-`), p.id).toBe(true);
+      expect(Boolean(p.dia) && Boolean(p.reserva), p.id).toBe(false);
+    }
+    const noCalendario = pecas.filter((p) => p.dia).map((p) => p.id).sort();
+    expect(noCalendario).toEqual(['F01', 'N01', 'P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P10', 'R01']);
+    for (const id of ['P06', 'P09', 'P11', 'B01', 'T01', 'T02', 'R02', 'R03', 'B', 'F02']) expect(pecas.find((p) => p.id === id)?.reserva, id).toBe(true);
+  });
+
+  it('a N01 traz os quatro preços dos planos iguais aos do núcleo, com a frase do site e sem convite para assinar', () => {
+    const fonte = readFileSync(join(ROOT, 'packages', 'core', 'src', 'plano-precos.ts'), 'utf8');
+    expect(fonte).toContain('individual: { mensal: 2990, anual: 26990 }');
+    expect(fonte).toContain('familiar: { mensal: 6990, anual: 62990 }');
+    const planos = (calc.EXEMPLOS as unknown as { planos: Record<string, number> }).planos;
+    expect(planos).toEqual({ individualMes: 2990, individualAno: 26990, familiaMes: 6990, familiaAno: 62990 });
+    const n01 = peca('N01');
+    const txt = JSON.stringify(n01.paginas) + (n01.legenda ?? '');
+    for (const preco of ['R$ 29,90', 'R$ 269,90', 'R$ 69,90', 'R$ 629,90']) expect(txt).toContain(preco);
+    expect(txt).toContain(calc.FRASE_DA_ASSINATURA);
+    expect(txt).not.toMatch(/assine|crie sua conta|econom|desconto|equivale|fictíci/i);
+    expect(n01.legenda?.endsWith('Conheça a Clarevo pelo link da bio.')).toBe(true);
+  });
+
+  it('as regras da N01 recusam preço faltando ou no plano errado, a frase longe do preço, economia, convite para assinar e data, também no texto alternativo', () => {
+    type Peca = (typeof conteudo.PECAS)[number] & { alt?: string[] };
+    const com = (muda: (p: Peca) => void) => {
+      const pecas = JSON.parse(JSON.stringify(conteudo.PECAS)) as Peca[];
+      muda(pecas.find((p) => p.id === 'N01')!);
+      return validar.conferirRegrasDasPecas(pecas).filter((e) => e.startsWith('N01:')).length;
+    };
+    const F = calc.FRASE_DA_ASSINATURA;
+    expect(com(() => {})).toBe(0);
+    expect(com((p) => { p.legenda = (p.legenda ?? '').replace('R$ 269,90', 'R$ 29,90'); })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.legenda = (p.legenda ?? '').replace(F, ''); })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas!.at(-1)!.corpo = 'Conheça o app.'; p.paginas![1]!.corpo = 'Para uma pessoa.'; delete (p.paginas![1] as { chamada?: string }).chamada; })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas![1]!.titulo = '*R$ 69,90* por mês ou R$ 629,90 por ano.'; })).toBeGreaterThanOrEqual(1);
+    expect(com((p) => { p.paginas![1]!.titulo = '*R$ 269,90* por mês ou R$ 29,90 por ano.'; })).toBeGreaterThanOrEqual(1);
+    for (const frase of ['No anual tem desconto.', 'Economize no anual.', 'O anual sai mais barato.', 'Pague 9 meses e leve 12.', 'Assine sem cartão.', 'Garanta o seu plano.', 'A assinatura abre em janeiro.', 'A partir de 2027.', 'Equivale a menos por mês.']) {
+      expect(com((p) => { p.legenda = `${frase} ${p.legenda ?? ''}`; }), frase).toBeGreaterThanOrEqual(1);
+      expect(com((p) => { p.alt = [...(p.alt ?? []).slice(0, 4), `${(p.alt ?? [])[4] ?? ''} ${frase}`]; }), `alt: ${frase}`).toBeGreaterThanOrEqual(1);
+    }
+    // Os preços dos planos só aparecem na N01.
+    const outra = JSON.parse(JSON.stringify(conteudo.PECAS)) as Peca[];
+    const p04 = outra.find((p) => p.id === 'P04')!;
+    p04.legenda = `${p04.legenda ?? ''} O plano custa R$ 29,90.`;
+    expect(validar.conferirRegrasDasPecas(outra).some((e) => e.startsWith('P04:'))).toBe(true);
+  });
+
+  it('cada peça com dia está nesse dia do calendário', () => {
+    const dias = new Map(conteudo.CALENDARIO.map((c) => [c.dia, c.peca]));
+    for (const p of conteudo.PECAS as unknown as { id: string; dia?: number | null }[]) if (p.dia) expect(dias.get(p.dia), p.id).toBe(p.id);
   });
 });
 
