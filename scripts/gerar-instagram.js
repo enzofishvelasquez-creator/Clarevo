@@ -415,11 +415,11 @@ async function main() {
         ['P02', 'capa.png', 'reel', true],
         ['P03', 'pagina-1.png', 'carrossel', true],
         ['P10', 'pagina-1.png', 'carrossel', false],
+        ['N02', 'capa.png', 'reel', false],
         ['P08', 'capa.png', 'reel', false],
         ['P07', 'pagina-1.png', 'carrossel', false],
         ['R01', 'pagina-1.png', 'carrossel', false],
         ['P05', 'capa.png', 'reel', false],
-        ['P04', 'pagina-1.png', 'carrossel', false],
       ].map(([id, nome, tipo, fixado]) => ({ arquivo: arq(id, nome), tipo, fixado, codigo: id }));
       if (celulas.every((c) => fs.existsSync(c.arquivo))) {
         const destaques = DESTAQUES.map((d, i) => ({ nome: d.nome, depois: d.depois, arquivo: path.join(perfilDir, 'destaques', `capa-${i + 1}-${d.id}.png`) }));
@@ -432,7 +432,7 @@ async function main() {
         fs.writeFileSync(path.join(perfilDir, 'previa-do-perfil.png'), png.codificar(img, { paleta: false }));
         console.log(`perfil: prévia ${img.largura}x${img.altura}`);
       } else {
-        console.log('perfil: a prévia precisa das peças P01 a P05, P07, P08, P10 e R01 já geradas (rode sem --so ou inclua as peças)');
+        console.log('perfil: a prévia precisa das peças P01, P02, P03, P05, P07, P08, P10, R01 e N02 já geradas (rode sem --so ou inclua as peças)');
       }
     }
 
@@ -511,7 +511,7 @@ O QUE É FOTO, PESSOA E TELA
 ORDEM DE PUBLICAÇÃO (plano de dezembro, D-130; o detalhe está em calendario.md e calendario.png)
 D1 a D4  preparo do perfil: pasta perfil/ (avatar, destaques, nome e bio, prévia)
 ${ordemPub.map((p) => `${dia(p).padEnd(8)} ${p.id.padEnd(4)} ${p.nome}  (${p.pasta}/)`).join('\n')}
-D20 é o Reels do mercado, gravado por scripts/gravar-redes.js (ainda sem pasta aqui). D25 fica sem publicação (véspera de Natal).
+D20 é o Reels do mercado (N02). D25 e D26 ficam sem publicação (véspera e dia de Natal).
 P12 (dúvida de acesso) fica nos Stories e no destaque Ajuda (pasta stories-e-ajuda-P12-...).
 Fora do calendário de dezembro: pastas reserva-* (janeiro, depois da abertura ou à espera de algo; o motivo está na ficha.md de cada uma).
 
@@ -526,6 +526,7 @@ BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - B01 e o destaque Para empresas: canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
 - P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento. A P11 só sai depois da abertura (D-130).
 - R02 e R03: fora até a leitura de nota, comprovante, boleto e holerite estar testada com documentos reais (D-130); a R02 espera também o app de celular.
+- N02 (Reels do mercado): a tela Anotar gasto mostra o botão "Escanear nota fiscal"; o Enzo decide se pode aparecer, já que a leitura de nota está fora das peças.
 - N01 (os planos): conferir os preços e as frases com a página Planos do site no dia de publicar; o preço ainda é pergunta aberta ao advogado (47).
 - P03, a bio e o fim dos Reels: antes da abertura, o convite é só para conhecer (D-130), sem data, lista de espera nem chamada para criar conta. Na abertura, uma fixada nova entra no lugar da P03.
 - Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram.

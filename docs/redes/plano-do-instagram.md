@@ -84,7 +84,7 @@ Três publicações por semana, às terças, quintas e sábados, com Stories de 
 | Sáb 12/12 | O salário entrou: quais contas ainda chegam este mês? | R01 | Carrossel, 5 páginas | Desenhada |
 | Ter 15/12 | Parcela e total da compra | P07 | Carrossel, 5 páginas | Desenhada |
 | Qui 17/12 | Uma meta com próximo passo | P08 | Reels | Desenhada |
-| Sáb 19/12 | A compra de mercado e o orçamento | Reels do mercado | Reels | Gravada |
+| Sáb 19/12 | A compra de mercado e o orçamento | N02 | Reels | Desenhada |
 | Ter 22/12 | Revisão do mês | P10 | Carrossel, 6 páginas | Desenhada |
 | Sáb 26/12 | Os planos da Clarevo, com o preço por mês e por ano, sem falar em economia | N01 | Carrossel, 5 páginas | Desenhada |
 | Ter 29/12 | 5 perguntas para organizar o mês | F01 | Carrossel, 7 páginas | Desenhada, com a capa só com texto |

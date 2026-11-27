@@ -126,6 +126,26 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     ];
     for (const re of PROIBIDO_NOS_PLANOS) if (re.test(tudo)) erros.push(`N01: a peça dos planos não pode ter ${re}`);
   }
+  const n02 = pecas.find((p) => p.id === 'N02');
+  if (n02) {
+    // O Reels do mercado (D20): cada parte confere os números sozinha, para a legenda certa não esconder um roteiro errado.
+    const roteiro = JSON.stringify(n02.roteiro || []);
+    const legenda = n02.legenda || '';
+    const m = EXEMPLOS.mercado;
+    const valores = [m.compra, m.usado, EXEMPLOS.orcamento.mercado.orcado, m.faltam].map((c) => reais(c, { centavos: true }));
+    for (const [onde, txt] of [['o roteiro', roteiro], ['a legenda', legenda]]) {
+      for (const v of valores) if (!txt.includes(v)) erros.push(`N02: falta ${v} em ${onde}`);
+      if (!txt.includes('não é saldo nem autorização para gastar')) erros.push(`N02: ${onde} diz que o orçamento não é saldo nem autorização para gastar`);
+      if (!/fictíci/i.test(txt)) erros.push(`N02: ${onde} diz que os números são fictícios`);
+    }
+    if (!roteiro.includes(`${m.percentualAviso}%`) || !roteiro.includes(`${m.percentualCard}%`)) erros.push(`N02: o roteiro lê ${m.percentualAviso}% no aviso e ${m.percentualCard}% no card`);
+    for (const pct of roteiro.match(/\d+(?:,\d+)?%/g) || []) if (![`${m.percentualAviso}%`, `${m.percentualCard}%`].includes(pct)) erros.push(`N02: o roteiro cita ${pct}, que a tela não mostra`);
+    if (!/fictíci/i.test(JSON.stringify(n02.capa || {}))) erros.push('N02: a capa traz "Exemplo fictício"');
+    if (!legenda.endsWith('Conheça a Clarevo pelo link da bio.')) erros.push('N02: a legenda termina com "Conheça a Clarevo pelo link da bio."');
+    const tudo = JSON.stringify([n02.roteiro, n02.legenda, n02.alt, n02.altCapa, n02.capa]);
+    for (const re of [/nota fiscal/i, /escane/i, /\bnota\b/i, /comprovante/i, /boleto/i, /holerite/i, /sem digitar/i, /\bl[êe] (?:a|o)\b/i, /econom/i])
+      if (re.test(tudo)) erros.push(`N02: a peça não pode ter ${re}`);
+  }
   // Os preços dos planos só aparecem na N01, que é a peça que os traz com a frase do site.
   for (const p of pecas) {
     if (p.id === 'N01') continue;
@@ -151,7 +171,7 @@ function conferirRegrasDasPecas(pecas = PECAS) {
   // Antes da abertura (D-130): os Reels fecham convidando a conhecer a Clarevo pelo link da bio, sem sugerir usar agora. Em P02, P05 e
   // P08 a frase está no último trecho (narração e texto na tela) e no fim da legenda. Na P11, que só sai depois da abertura, a narração
   // traz a frase e o último trecho é "Na sua conta, o primeiro registro começa do zero.".
-  for (const id of ['P02', 'P05', 'P08', 'P11']) {
+  for (const id of ['P02', 'P05', 'P08', 'N02', 'P11']) {
     const r = por(id);
     if (!r) continue;
     const fim = 'Conheça a Clarevo pelo link da bio';
@@ -185,7 +205,7 @@ function conferirRegrasDasPecas(pecas = PECAS) {
   for (const p of pecas) if (p.legenda && /\[[^\]]*\]/.test(p.legenda)) erros.push(p.id + ': a legenda tem um campo entre colchetes; legenda pronta não pode ter marcador a preencher');
   for (const p of pecas) {
     const txt = t(p);
-    if (/\bsaldo\b/i.test(txt) && !['P02', 'P03', 'P04', 'R01', 'P11'].includes(p.id)) erros.push(`${p.id}: cita "saldo"; só as peças que explicam que a diferença não é saldo podem`);
+    if (/\bsaldo\b/i.test(txt) && !['P02', 'P03', 'P04', 'R01', 'P11', 'N02'].includes(p.id)) erros.push(`${p.id}: cita "saldo"; só as peças que explicam que a diferença não é saldo podem`);
     if (/cura|sono|produtividade|tranquilidade/i.test(txt)) erros.push(`${p.id}: promete ou cita cura, sono, produtividade ou tranquilidade`);
     if (/ansiedade|depress/i.test(txt)) erros.push(`${p.id}: cita ansiedade ou depressão`);
     if (/\bjuros\b|\bCET\b/i.test(txt) && !['P07', 'B', 'R01'].includes(p.id)) erros.push(`${p.id}: cita juros ou CET fora das peças de compra parcelada`);

@@ -156,6 +156,16 @@ A arte final é montada no Canva como design nativo, com camadas editáveis e DM
 6. **Gerar design ou imagem por IA no Canva, só com decisão de Enzo** (seção 6). Nunca pessoas, rostos, depoimentos ou telas do app.
 7. A Elis baixa e publica. A sessão não publica nem agenda pelo Canva e não mexe nas configurações, no plano, na equipe nem no compartilhamento da conta do Canva.
 
+**Combinado de 27/11/2026 (Enzo, depois do retorno da Elis):**
+
+- **Quem edita é a Elis.** "Sou eu quem edito no Canva. O chat só dá a ideia." A sessão entrega a peça montada como design editável, nunca imagem fechada.
+- **Pasta "Clarevo | Instagram | para editar"** (https://www.canva.com/folder/FAHcHhH14jU). A sessão pode criar designs novos e cópias ali **sem perguntar a cada vez**, partindo do modelo da Elis ("Clarevo | Comece por aqui | Apresentação fixa", que nunca é alterado). Não toca em nada que não seja da Clarevo. Quando a peça fica pronta, deixa um **comentário no próprio design** avisando, com a legenda sugerida.
+- **Permissões:** as ações de ler, copiar, editar, mover para a pasta e comentar estão liberadas em `.claude/settings.json`. Gerar imagem por IA, exportar, publicar modelo e mexer na conta seguem de fora.
+- **Tom:** mais solto e humano, menos "robótico". Frases curtas, com humor leve e situações do dia a dia ("quem nunca?"), sem culpa. Toda frase precisa ser entendida por quem nunca ouviu falar do app (a página 6 da P01 antiga não foi entendida).
+- **Conteúdo mais dinâmico:** dia a dia, gente, bicho, meme, vídeo feito por Enzo e pela Elis, e peças que puxam comentário. As regras das seções 5 e 6 continuam valendo.
+- **Imagens:** da galeria do Canva, com escolha da Elis. As ferramentas do Canva desta sessão não buscam fotos na galeria, então cada design traz um **espaço marcado para foto ou meme**, com a ideia da cena e os termos de busca; a Elis escolhe e troca. Sem IA (seção 6).
+- **Peças já na pasta (27/11/2026):** "Clarevo | 01 | Comece por aqui | cópia para editar" (P01 ajustada); "Clarevo | 02 | Quem nunca? | para editar" (identificação, espaço de foto nas páginas 1 e 2); "Clarevo | 03 | Reels dia a dia: chegou dezembro | para gravar" (roteiro de 7 cenas, uns 15 segundos, para a Elis gravar; a orientação de cada cena sai antes de publicar); "Clarevo | 04 | Isso ou aquilo? | para editar" (interativo, pede as respostas nos comentários); "Clarevo | 05 | Expectativa x realidade: dezembro | para editar" (meme, espaço de foto na página 2); "Clarevo | 06 | Quem manda na casa? (pets) | para editar" (gastos com bicho, espaço de foto nas páginas 1 e 2). Cada uma tem a legenda sugerida no comentário do design.
+
 ## 9. Como trabalhar
 
 - **Responda em português do Brasil, curto.** A Elis e Enzo não são da área técnica: diga o que foi feito, o que ela precisa olhar e o próximo passo, sem jargão.
@@ -291,7 +301,7 @@ Em 27/11/2026 o perfil ainda não tinha sido criado. O plano (fases, calendário
 - O gerador do Instagram com o perfil (avatar, destaques, bio, prévia), os carrosséis do calendário (P01, P03, P04, P07, P10, B01 e T01), as peças de reserva (R01, R02 "Organizar as finanças com a câmera do celular", B, F01, F02 e o Reels R03), as capas, os rascunhos em vídeo e o calendário D1 a D30 (`docs/25`).
 - As gravações da demonstração: P02, P05, P08, P11, o Reels da compra de mercado e do orçamento (pedido da Elis em 09/11, D-089 F) e o Reels R03 de nota, comprovante e boleto lidos sem digitar (pedido da Elis em 31/10).
 - A peça "câmera do celular" (R02 e R03) e o vídeo do mercado são os dois pedidos da Elis já atendidos.
-- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
+- Desde 27/11/2026 (D-130): o calendário D1 a D30 do gerador segue o plano de dezembro (P01, P02, P03, P04, P05, R01, P07, P08, N02, que é o Reels do mercado, P10, N01 e F01); a peça nova N01, "Os planos da Clarevo", com os preços do site; e as capas da P01, da F01 e da F02 só com texto. O que saiu de dezembro está nas pastas `reserva-*`, com o motivo em cada ficha.
 
 ### 14.2 Perguntas a Enzo: respondidas e abertas
 

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Canva__read-design",
+      "mcp__Canva__edit-design",
+      "mcp__Canva__copy-design",
+      "mcp__Canva__create-folder",
+      "mcp__Canva__move-item-to-folder",
+      "mcp__Canva__comment-on-design",
+      "mcp__Canva__list-comments",
+      "mcp__Canva__list-replies",
+      "mcp__Canva__reply-to-comment",
+      "mcp__Canva__list-folder-items",
+      "mcp__Canva__search-designs",
+      "mcp__Canva__search-folders",
+      "mcp__Canva__get-assets",
+      "mcp__Canva__list-brand-kits",
+      "mcp__Canva__help"
+    ]
+  }
+}
