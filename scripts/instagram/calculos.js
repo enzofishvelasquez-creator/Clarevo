@@ -182,8 +182,6 @@ const MARCA_MASCULINA = /\b(?:o|O|do|Do|no|No|ao|Ao|pelo|Pelo|um|Um|num|Num|este
 const NOMES_PROIBIDOS = /\b(Adriana|Cristina|Elis|Enzo|Velasquez|Mayra|Macedo|Jo[ãa]o Carvalho)\b/;
 /** Promessas e termos que o Playbook e o Manual proíbem de afirmar. */
 const PROMESSAS = [
-  /\bgr[áa]tis\b/i,
-  /teste gratuito/i,
   /lista de espera/i,
   /saldo dispon[ií]vel/i,
   /acaba com a ansiedade/i,
@@ -193,18 +191,29 @@ const PROMESSAS = [
   /adequada com uma assinatura/i,
   /redu[çc][ãa]o garantida/i,
   /garantid[oa]\b/i,
-  // Acesso em preparação (D-067): nada que sugira acesso aberto ("como acessar", "conhecer o acesso", cadastro, download).
+  // Antes da abertura (D-130): o convite é só para conhecer. Nada que sugira usar agora ("como acessar", cadastro, download).
   /fixado Como acessar/i,
   /(?:saber|ver|veja) como acessar/i,
   /conhecer o acesso/i,
   /(?:comece|come[çc]ar) (?:a usar|agora)/i,
   /baix(?:e|ar) (?:o|a) (?:app|aplicativo)/i,
   /cadastr(?:e-se|ar-se)/i,
+  /cri(?:e|ar) (?:sua|uma|a) conta/i,
+  /\bassine\b/i,
+  /\buse (?:agora|hoje)\b/i,
 ];
+
+/** A única frase em que "grátis" e "em breve" podem aparecer: a da capa do site (D-128), liberada por Enzo (D-130). */
+const FRASE_DA_ASSINATURA = 'Assinatura em breve, com 14 dias grátis, sem cartão.';
+/** Fora da frase do site, estes termos são recusados mesmo em frase com "sem" ou "não" ("14 dias grátis, sem cartão" solto não passa). */
+const SO_NA_FRASE_DO_SITE = [/\bgr[áa]tis\b/i, /gratuit/i, /\bem breve\b/i];
+/** O texto do tempo em que o site falava em fase de testes (D-128 tirou do site; D-130, das peças). Vale também em frase negada. */
+const TEXTO_ANTIGO_DO_ACESSO = [/fase de testes?/i, /\bpiloto\b/i, /informações de acesso/i, /acesso em prepara/i, /disponibilidade/i, /abre no lançamento/i, /quem testa/i];
 
 /**
  * Devolve os problemas de redação de um texto (lista vazia quando está de acordo). `origem` identifica o texto na mensagem. Um termo de
- * promessa só passa quando a própria frase o nega ("não é saldo disponível", "sem lista de espera").
+ * promessa só passa quando a própria frase o nega ("não é saldo disponível", "sem lista de espera"); o texto antigo do acesso e
+ * "grátis" ou "em breve" fora da frase do site não passam nem assim.
  */
 function conferirRedacao(texto, origem) {
   const erros = [];
@@ -212,7 +221,10 @@ function conferirRedacao(texto, origem) {
   if (FAZER_SENTIDO.test(texto)) erros.push(`${origem}: a expressão que o CLAUDE.md proíbe`);
   if (MARCA_MASCULINA.test(texto)) erros.push(`${origem}: a marca no masculino ("o Clarevo")`);
   if (NOMES_PROIBIDOS.test(texto)) erros.push(`${origem}: nome de pessoa real`);
-  for (const frase of texto.split(/(?<=[.!?])\s+|\n/)) {
+  for (const re of TEXTO_ANTIGO_DO_ACESSO) if (re.test(texto)) erros.push(`${origem}: texto antigo do acesso, que o site não diz mais (${re})`);
+  const semFrase = texto.split(FRASE_DA_ASSINATURA).join(' ');
+  for (const re of SO_NA_FRASE_DO_SITE) if (re.test(semFrase)) erros.push(`${origem}: termo que só pode aparecer na frase do site "${FRASE_DA_ASSINATURA}" (${re})`);
+  for (const frase of semFrase.split(/(?<=[.!?])\s+|\n/)) {
     if (/\b(n[ãa]o|sem|nunca|nem)\b/i.test(frase)) continue;
     for (const re of PROMESSAS) if (re.test(frase)) erros.push(`${origem}: termo que o Playbook proíbe (${re})`);
   }
@@ -235,4 +247,7 @@ module.exports = {
   PARES_EM_USO,
   conferirContrastes,
   conferirRedacao,
+  FRASE_DA_ASSINATURA,
+  SO_NA_FRASE_DO_SITE,
+  TEXTO_ANTIGO_DO_ACESSO,
 };

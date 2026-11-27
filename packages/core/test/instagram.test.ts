@@ -31,14 +31,15 @@ const calc = require(join(ROOT, 'scripts', 'instagram', 'calculos.js')) as {
   PARES_EM_USO: { texto: string; fundo: string; soIcone?: boolean }[];
   conferirContrastes: () => string[];
   conferirRedacao: (texto: string, origem: string) => string[];
+  FRASE_DA_ASSINATURA: string;
 };
 const conteudo = require(join(ROOT, 'scripts', 'instagram', 'conteudo.js')) as {
-  PERFIL: { nome: string; bio: string[]; bioAcessoAberto: string[]; link: string };
+  PERFIL: { nome: string; bio: string[]; link: string; identificador: string };
   DESTAQUES: { id: string; nome: string }[];
   TERMOS_DO_APP: string[];
   PECAS: {
     id: string;
-    paginas?: { modelo: string; nota?: string; numero?: string; corpo?: string }[];
+    paginas?: { modelo: string; titulo?: string; nota?: string; numero?: string; corpo?: string }[];
     formato: string;
     legenda?: string;
     alt?: unknown;
@@ -67,22 +68,22 @@ describe('Instagram: perfil (D-069)', () => {
   it('o nome de exibição tem até 30 caracteres e a bio, até 150, mesmo se a quebra de linha valesse 2', () => {
     expect(calc.contarCaracteres(conteudo.PERFIL.nome)).toBe(30);
     expect(calc.contarCaracteres(conteudo.PERFIL.nome)).toBeLessThanOrEqual(calc.LIMITES.nome);
-    for (const linhas of [conteudo.PERFIL.bio, conteudo.PERFIL.bioAcessoAberto]) {
+    for (const linhas of [conteudo.PERFIL.bio]) {
       const total = calc.contarCaracteres(linhas.join('\n'));
       expect(total).toBeLessThanOrEqual(calc.LIMITES.bio);
       expect(total + linhas.length - 1).toBeLessThanOrEqual(calc.LIMITES.bio);
       expect(linhas).toHaveLength(3);
     }
-    expect(conteudo.PERFIL.bio.map((l) => calc.contarCaracteres(l))).toEqual([54, 27, 36]);
-    expect(calc.contarCaracteres(conteudo.PERFIL.bio.join('\n'))).toBe(119);
+    expect(conteudo.PERFIL.bio.map((l) => calc.contarCaracteres(l))).toEqual([54, 27, 19]);
+    expect(calc.contarCaracteres(conteudo.PERFIL.bio.join('\n'))).toBe(102);
   });
 
-  it('a bio de hoje segue o Playbook v2.2 com o acesso em preparação (D-067) e a bio do acesso aberto traz "Conheça a Clarevo"', () => {
+  it('a bio segue o Playbook v2.2 e termina com "Conheça a Clarevo" (D-130), e o identificador é @clarevo', () => {
     expect(conteudo.PERFIL.nome).toBe('Clarevo | Bem-estar financeiro');
     expect(conteudo.PERFIL.bio[0]).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
     expect(conteudo.PERFIL.bio[1]).toBe('App para organizar seu mês.');
-    expect(conteudo.PERFIL.bio[2]).toBe('Acompanhe as informações de acesso ↓');
-    expect(conteudo.PERFIL.bioAcessoAberto[2]).toBe('Conheça a Clarevo ↓');
+    expect(conteudo.PERFIL.bio[2]).toBe('Conheça a Clarevo ↓');
+    expect(conteudo.PERFIL.identificador).toBe('@clarevo');
     expect(conteudo.PERFIL.link).toBe('clarevo.app.br/comece.html');
     expect(conteudo.PERFIL.link).not.toMatch(/[?&#]|utm_/);
   });
@@ -184,7 +185,26 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(ruim('Não é saldo disponível.')).toBe(0);
     expect(ruim('Veja como acessar a Clarevo')).toBe(1);
     expect(ruim('Para conhecer o acesso, veja o fixado Como acessar.')).toBeGreaterThanOrEqual(1);
-    expect(ruim('Veja no perfil as informações de acesso.')).toBe(0);
+    expect(ruim('Veja no perfil as informações de acesso.')).toBe(1);
+    expect(ruim('A Clarevo está em fase de testes.')).toBe(1);
+    expect(ruim('A versão para pessoas e empresas abre no piloto.')).toBe(1);
+    expect(ruim('Não estamos mais em fase de testes.')).toBe(1);
+    expect(ruim('Conheça a Clarevo pelo link da bio.')).toBe(0);
+    expect(ruim('Assinatura em breve, com 14 dias grátis, sem cartão.')).toBe(0);
+    expect(ruim('Comece agora, com 14 dias grátis.')).toBeGreaterThanOrEqual(1);
+    // "grátis", "gratuito" e "em breve" só na frase do site, mesmo em frase com "sem" ou "não".
+    expect(ruim('14 dias grátis, sem cartão.')).toBe(1);
+    expect(ruim('Teste gratuito de 14 dias, sem cartão.')).toBe(1);
+    expect(ruim('Em breve nas lojas.')).toBe(1);
+    expect(ruim('Assinatura em breve, com 14 dias grátis, sem cartão. Cancele quando quiser.')).toBe(0);
+    // Convite para criar conta ou assinar, e as variações do texto antigo do acesso.
+    expect(ruim('Crie sua conta e organize o mês.')).toBe(1);
+    expect(ruim('Assine a Clarevo.')).toBe(1);
+    expect(ruim('A Clarevo está em fase de teste.')).toBe(1);
+    expect(ruim('Acesso em preparação.')).toBe(1);
+    expect(ruim('Acompanhe a disponibilidade da Clarevo.')).toBe(1);
+    expect(ruim('O acesso abre no lançamento.')).toBe(1);
+    expect(ruim('Entrar (quem testa)')).toBe(1);
     expect(ruim('A Clarevo acaba com a ansiedade')).toBe(1);
     expect(ruim('Sem lista de espera nem data de abertura.')).toBe(0);
   });
@@ -197,12 +217,16 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(todos).not.toMatch(/[\u2014\u2013]/);
   });
 
-  it('a P03 é a versão com acesso em preparação: sem lista de espera, data, preço, "grátis" nem chamada de cadastro', () => {
+  it('a P03 convida só a conhecer (D-130): sem lista de espera, data, preço nem cadastro, e "grátis" só na frase do site', () => {
     const p03 = peca('P03');
     const txt = JSON.stringify(p03.paginas) + (p03.legenda ?? '');
-    expect(txt).not.toMatch(/lista de espera|gr[áa]tis|teste gratuito|cadastre|R\$|\d{1,2}\/\d{1,2}|\bem breve\b/i);
-    expect(txt).toMatch(/fase de testes/);
-    expect(txt).toMatch(/próximas informações de acesso/);
+    const semFrase = txt.split(calc.FRASE_DA_ASSINATURA).join(' ');
+    expect(calc.FRASE_DA_ASSINATURA).toBe('Assinatura em breve, com 14 dias grátis, sem cartão.');
+    expect(txt).toContain(calc.FRASE_DA_ASSINATURA);
+    expect(semFrase).not.toMatch(/lista de espera|gr[áa]tis|teste gratuito|cadastre|R\$|\d{1,2}\/\d{1,2}|\bem breve\b/i);
+    expect(txt).not.toMatch(/fase de testes|piloto|informações de acesso/i);
+    expect(txt).toMatch(/Conheça a Clarevo pelo link da bio\./);
+    expect(p03.paginas?.[0]).toMatchObject({ titulo: 'Como conhecer a Clarevo' });
   });
 
   it('a B01 traz a ressalva da NR-1 e nenhum serviço que o produto não tem', () => {
@@ -236,13 +260,33 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(ultimo?.em).toBeLessThan(35.6 - 3);
   });
 
-  it('os Reels mandam ver no perfil as informações de acesso (acesso em preparação), nunca o fixado "Como acessar" nem "saber como acessar"', () => {
+  it('os Reels terminam com "Conheça a Clarevo pelo link da bio" (D-130), sem o texto antigo do acesso nem convite para usar ou criar conta', () => {
     for (const id of ['P02', 'P05', 'P08', 'P11']) {
       const p = peca(id);
       const todos = JSON.stringify([p.roteiro, p.legenda, p.alt]);
-      expect(todos, id).toContain('Veja no perfil as informações de acesso');
-      expect(todos, id).not.toMatch(/fixado Como acessar|como acessar|conhecer o acesso|link da bio/i);
+      expect(todos, id).toContain('Conheça a Clarevo pelo link da bio');
+      expect(todos, id).not.toMatch(/fixado Como acessar|como acessar|conhecer o acesso|informações de acesso|fase de testes|cadastr|comece a usar/i);
+      if (id === 'P11') continue;
+      const ultimo = p.roteiro?.[p.roteiro.length - 1];
+      expect(ultimo?.fala.endsWith('Conheça a Clarevo pelo link da bio.'), id).toBe(true);
+      expect(ultimo?.tela?.endsWith('Conheça a Clarevo pelo link da bio'), id).toBe(true);
+      expect(p.legenda?.endsWith('Conheça a Clarevo pelo link da bio.'), id).toBe(true);
     }
+  });
+
+  it('as regras recusam um Reel com outro fecho depois da frase, sem a frase na tela ou com outra chamada no fim da legenda, e uma P03 com data ou convite para criar conta', () => {
+    const copia = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
+    const com = (id: string, muda: (p: (typeof conteudo.PECAS)[number]) => void) => {
+      const pecas = copia(conteudo.PECAS);
+      muda(pecas.find((x) => x.id === id)!);
+      return validar.conferirRegrasDasPecas(pecas).filter((e) => e.startsWith(id + ':'));
+    };
+    expect(validar.conferirRegrasDasPecas()).toEqual([]);
+    expect(com('P02', (p) => p.roteiro!.push({ em: 99, tela: 'Outro fecho', fala: 'Outro fecho.' })).length).toBeGreaterThanOrEqual(1);
+    expect(com('P05', (p) => { p.roteiro!.at(-1)!.tela = 'Depois, confira os registros da categoria'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P08', (p) => { p.legenda = 'Conheça a Clarevo pelo link da bio. Veja também o destaque.'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P03', (p) => { p.legenda = (p.legenda ?? '') + ' A partir de janeiro de 2027.'; }).length).toBeGreaterThanOrEqual(1);
+    expect(com('P03', (p) => { p.legenda = (p.legenda ?? '') + ' Crie sua conta agora.'; }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('a P02 dá sujeito à frase "não é saldo nem autorização para gastar" no texto na tela dos 17 aos 24 s', () => {
