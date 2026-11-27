@@ -44,8 +44,9 @@ Hoje a Clarevo manda só os e-mails do login (confirmar o cadastro e definir nov
 - **Dados:** só o e-mail e a data do fim do teste. O registro de cada aviso (`trial_notices`) guarda a pessoa (o identificador interno), o
   dia do fim do teste, a situação, as horas e o identificador da mensagem no Resend ou um código de erro curto; **nunca o e-mail**. O app
   não lê a tabela (RLS sem política, sem privilégio), e o registro da função (logs) leva só contagens, o identificador do aviso e códigos.
-- **Guarda:** os registros saem 6 meses depois do dia do fim do teste (o mesmo prazo de A7, na preparação diária) e, na hora, com a
-  exclusão da conta.
+- **Guarda:** os registros saem 6 meses depois do dia do fim do teste (o mesmo prazo de A7) e, na hora, com a exclusão da conta. Quem apaga
+  os de 6 meses é só a preparação diária, o agendamento `clarevo-aviso-fim-do-teste-fila`: por isso ele fica no ar mesmo com o aviso
+  desligado (seção 5). Desligado, ele não põe ninguém na fila nem chama nada fora do banco; só apaga e marca como expirado.
 
 ## 2. Como está montado
 
@@ -95,21 +96,28 @@ sem chamar o Resend e sem receber o e-mail da pessoa. O ensaio fica num registro
 
 ## 4. Como ligar (só o Enzo, nesta ordem)
 
-O Claude Chrome pode preparar as consultas e o editor; segredo nenhum passa pelo chat, pelo repositório ou pelo Claude Chrome.
+O Claude Chrome pode preparar as consultas e o editor nos passos sem segredo (1, 2, 4, 5, 6, 8 e 9). **Nos passos com segredo (3, o token,
+e 7, a chave do Resend), o Claude Chrome fica desligado** (a extensão desconectada, sem nenhuma aba do Supabase, do Resend ou do Bitwarden
+ligada a ele), e o Enzo faz sozinho: segredo nenhum passa pelo chat, pelo repositório ou por uma tela que o Claude Chrome vê.
 
 1. **Migração.** Aplicar a 0051 no SQL Editor e conferir (`docs/05`, passo 12ar, conferência 21am). Não envia nada.
 2. **Função.** Em Edge Functions, criar `aviso-fim-do-teste` pelo editor, colar todo o conteúdo de
    `supabase/functions/aviso-fim-do-teste/index.ts`, publicar e deixar **"Verify JWT with legacy secret" desligado**. Sem o token, ela
    responde 503 e não faz nada.
-3. **Token** (inventado pelo próprio banco; ninguém digita). No SQL Editor, numa consulta nova:
+3. **Token** (só o Enzo, com o Claude Chrome desligado). O token nunca aparece num resultado de consulta: ele nasce no Bitwarden e é
+   colado em dois lugares.
+   1. No Bitwarden, gere uma senha nova pelo gerador de senhas: **64 caracteres**, com letras maiúsculas, letras minúsculas e números, e
+      **sem caracteres especiais** (a função aceita só letras, algarismos, `_` e `-`). Salve como um item novo, "Clarevo, AVISOS_EMAIL_TOKEN".
+   2. No painel do Supabase, abra a tela do **Vault** (procure "Vault" no menu do projeto) e crie um segredo novo com o nome
+      `clarevo_avisos_email_token`, a descrição "Acorda a função aviso-fim-do-teste (docs/53)" e, como valor, o token colado do Bitwarden.
+      Se o painel não mostrar a tela do Vault, abra o SQL Editor numa consulta nova, escreva você mesmo
+      `select vault.create_secret('<token>', 'clarevo_avisos_email_token', 'Acorda a função aviso-fim-do-teste (docs/53)');`, troque
+      `<token>` pelo token colado do Bitwarden, rode (o resultado é só o identificador do segredo), apague o texto da consulta e feche sem
+      salvar.
+   3. Em Edge Functions, Secrets, crie `AVISOS_EMAIL_TOKEN` com o mesmo token, colado do Bitwarden.
 
-   ```sql
-   select vault.create_secret(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 'clarevo_avisos_email_token',
-                              'Acorda a função aviso-fim-do-teste (docs/53)');
-   ```
-
-   Depois, numa outra consulta, `select decrypted_secret from vault.decrypted_secrets where name = 'clarevo_avisos_email_token';`, copie o
-   valor e cole em Edge Functions, Secrets, com o nome `AVISOS_EMAIL_TOKEN`; guarde no Bitwarden. Feche o resultado sem salvar a consulta.
+   Não rode consulta em `vault.decrypted_secrets` para ver o token: o agendamento do passo 5 lê o valor direto do Vault, sem mostrar. Para
+   trocar o token, gere outro no Bitwarden e repita os passos 2 (editando o segredo no Vault) e 3.
 4. **pg_net.** Em Database, Extensions, procurar "pg_net" e ligar (o pg_cron já está ligado desde o passo 12o).
 5. **Agendamento.** Numa consulta nova, troque `<endereço da função>` pelo endereço que o painel mostra para a função (Edge Functions,
    `aviso-fim-do-teste`, termina em `/functions/v1/aviso-fim-do-teste`; não é segredo) e rode:
@@ -130,7 +138,7 @@ O Claude Chrome pode preparar as consultas e o editor; segredo nenhum passa pelo
 
    Conferir (só leitura): `select jobname, schedule, active from cron.job where jobname like 'clarevo-aviso-fim-do-teste-%' order by jobname;`
    devolve as duas linhas (`-envio` com `5 12-20 * * *` e `-fila` com `45 11 * * *`, as duas ativas). Com o interruptor desligado, as
-   duas rodam e não fazem nada.
+   duas rodam e não enviam nada. A `-fila` é também a que apaga os registros com mais de 6 meses: ela fica sempre (seção 5).
 6. **Ensaio, primeiro.** `select public.clarevo_staff_set_trial_notice_mode('ensaio');` (devolve o modo e a fila do dia). Antes do início
    da cobrança, a fila sai vazia (esperado). Depois do início, deixe pelo menos um dia em ensaio e confira:
 
@@ -141,7 +149,7 @@ O Claude Chrome pode preparar as consultas e o editor; segredo nenhum passa pelo
    As linhas `dry_run = true` com situação `ensaio` são as pessoas que receberiam (só a contagem; o e-mail não fica gravado). Para não esperar
    a hora cheia, entre 9h e 18h, rode numa consulta a mesma chamada `select net.http_post(...)` do agendamento e veja a resposta em
    `select status_code, content from net._http_response order by created desc limit 1;` (200, com `"modo": "ensaio"` e as contagens).
-7. **Chave do Resend.** No Resend, em API Keys, crie uma chave só para este aviso, com permissão "Sending access" e só para o domínio
+7. **Chave do Resend** (só o Enzo, com o Claude Chrome desligado). No Resend, em API Keys, crie uma chave só para este aviso, com permissão "Sending access" e só para o domínio
    `clarevo.app.br` (separada da chave do SMTP do login, para poder revogar uma sem a outra). Cole em Edge Functions, Secrets, com o nome
    `RESEND_API_KEY`; guarde no Bitwarden. Sem ela, nada é enviado.
 8. **Ligar.** `select public.clarevo_staff_set_trial_notice_mode('ligado');`. Na rodada seguinte, os avisos do dia saem. Acompanhe pela
@@ -156,10 +164,13 @@ O Claude Chrome pode preparar as consultas e o editor; segredo nenhum passa pelo
   estiver saindo naquele segundo termina) e a preparação não põe mais ninguém na fila; o que ficou pendente expira no dia seguinte.
 - **Sem depender do banco:** apague o segredo `RESEND_API_KEY` em Edge Functions, Secrets (e revogue a chave no Resend). A função continua
   no ar, mas não envia.
-- **Parar os agendamentos:** `select cron.unschedule('clarevo-aviso-fim-do-teste-envio'); select cron.unschedule('clarevo-aviso-fim-do-teste-fila');`
+- **Parar o envio:** `select cron.unschedule('clarevo-aviso-fim-do-teste-envio');`. **Não pare a `-fila`:** ela é o único lugar que apaga
+  os registros com mais de 6 meses (a promessa da política) e marca como expirado o que ficou pendente. Com o interruptor desligado, ela não
+  põe ninguém na fila e não chama nada fora do banco, então pode ficar para sempre.
 - **Tirar tudo:** apagar a função `aviso-fim-do-teste`, o segredo `AVISOS_EMAIL_TOKEN` e o token do Vault
-  (`delete from vault.secrets where name = 'clarevo_avisos_email_token';`). Os registros somem sozinhos em 6 meses; para apagar já,
-  `delete from public.trial_notices;`. A migração pode ficar: desligada, não faz nada.
+  (`delete from vault.secrets where name = 'clarevo_avisos_email_token';`), parar o envio (acima) e, só então, apagar os registros e parar a
+  fila, nesta ordem: `delete from public.trial_notices;` e `select cron.unschedule('clarevo-aviso-fim-do-teste-fila');`. Sem a `-fila`, nada
+  mais apaga registro nenhum: por isso os registros saem antes dela. A migração pode ficar: desligada, não faz nada.
 
 ## 6. O que a função responde (para os registros)
 

@@ -14,7 +14,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WITHDRAWAL_PIX_PAGES = exports.TransientError = exports.REFUSED_EVENTS = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.WITHDRAWAL_REFUND_EVENTS = exports.WITHDRAWAL_PIX_PAGES = exports.RefundUnclearError = exports.AsaasCallError = exports.TransientError = exports.REFUSED_EVENTS = exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.ASAAS_CYCLE = exports.PAYMENTS_LOOKBACK_MONTHS_YEARLY = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
     exports.paymentsLookbackMonths = paymentsLookbackMonths;
     exports.periodOfCycle = periodOfCycle;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
@@ -233,6 +233,12 @@ const __mods = [
     class TransientError extends Error {
     }
     exports.TransientError = TransientError;
+    class AsaasCallError extends TransientError {
+    }
+    exports.AsaasCallError = AsaasCallError;
+    class RefundUnclearError extends TransientError {
+    }
+    exports.RefundUnclearError = RefundUnclearError;
     function budget(startedAt, clock = Date.now) {
         return () => {
             const left = exports.REQUEST_BUDGET_MS - (clock() - startedAt);
@@ -266,11 +272,11 @@ const __mods = [
                 res = await fetcher(`${config.apiBase}${path}`, init);
             }
             catch {
-                throw new TransientError(`Asaas indisponível em ${method} ${bare(path)}`);
+                throw new AsaasCallError(`Asaas indisponível em ${method} ${bare(path)}`);
             }
             const out = await readJson(res);
             if (out.status >= 500)
-                throw new TransientError(`Asaas respondeu ${out.status} em ${method} ${bare(path)}`);
+                throw new AsaasCallError(`Asaas respondeu ${out.status} em ${method} ${bare(path)}`);
             return out;
         };
     }
@@ -411,27 +417,31 @@ const __mods = [
             if (typeof w.external_ref === 'string' && HASH.test(w.external_ref) && p)
                 web.push({ externalRef: w.external_ref, plan: p, after: parseWithdrawalAfter(w.access_after) });
         }
-        const pix = [];
-        for (const x of rows(r.pix)) {
-            const p = plan(x.plan);
-            const paidOn = typeof x.paid_on === 'string' && DAY.test(x.paid_on) ? x.paid_on : null;
-            const startsOn = typeof x.starts_on === 'string' && DAY.test(x.starts_on) ? x.starts_on : null;
-            if (typeof x.payment_hash !== 'string' || !HASH.test(x.payment_hash) || !p || !paidOn)
-                continue;
-            pix.push({ paymentHash: x.payment_hash, plan: p, period: x.period === 'anual' ? 'anual' : 'mensal', paidOn, startsOn, after: parseWithdrawalAfter(x.access_after) });
-        }
+        const day = (v) => (typeof v === 'string' && DAY.test(v) ? v : null);
         const withdrawals = [];
         for (const w of rows(r.withdrawals)) {
             if ((w.provider !== 'web' && w.provider !== 'pix') || typeof w.purchase_hash !== 'string' || !HASH.test(w.purchase_hash))
                 continue;
-            if ((w.status !== 'pedida' && w.status !== 'devolvida') || typeof w.requested_at !== 'string' || Number.isNaN(Date.parse(w.requested_at)))
+            if ((w.status !== 'pedida' && w.status !== 'devolvida' && w.status !== 'abandonada') || typeof w.requested_at !== 'string' || Number.isNaN(Date.parse(w.requested_at)))
                 continue;
             const amount = typeof w.amount_cents === 'number' && Number.isSafeInteger(w.amount_cents) && w.amount_cents > 0 ? w.amount_cents : null;
-            withdrawals.push({ provider: w.provider, purchaseHash: w.purchase_hash, status: w.status, requestedAt: w.requested_at, amountCents: amount });
+            withdrawals.push({ provider: w.provider, purchaseHash: w.purchase_hash, status: w.status, requestedAt: w.requested_at, amountCents: amount, contractedOn: day(w.contracted_on) });
+        }
+        const pix = [];
+        for (const x of rows(r.pix)) {
+            const p = plan(x.plan);
+            const paidOn = day(x.paid_on);
+            if (typeof x.payment_hash !== 'string' || !HASH.test(x.payment_hash) || !p)
+                continue;
+            const hash = x.payment_hash;
+            if (!paidOn && !withdrawals.some((w) => w.provider === 'pix' && w.purchaseHash === hash && w.status === 'pedida' && w.contractedOn))
+                continue;
+            pix.push({ paymentHash: hash, plan: p, period: x.period === 'anual' ? 'anual' : 'mensal', paidOn, startsOn: day(x.starts_on), after: parseWithdrawalAfter(x.access_after) });
         }
         return { web, pix, withdrawals };
     }
     exports.WITHDRAWAL_PIX_PAGES = 5;
+    exports.WITHDRAWAL_REFUND_EVENTS = new Set(['PAYMENT_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS']);
     function createAssinaturaWebHandler(deps) {
         const log = deps.log ?? (() => { });
         const now = deps.now ?? (() => new Date());
@@ -468,6 +478,18 @@ const __mods = [
             }
             return ref;
         }
+        async function closeWithdrawal(db, personId, provider, purchaseHash) {
+            try {
+                const r = await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: provider, p_purchase_hash: purchaseHash, p_refunded: true });
+                if (r.status === 200 && (0, servidor_comum_1.obj)(r.json)?.result === 'devolvida')
+                    log('aviso de estorno: pedido de desistência marcado como devolvido');
+                else if (r.status !== 200 && r.status !== 404)
+                    log(`banco não marcou o pedido de desistência no aviso de estorno (${r.status})`);
+            }
+            catch {
+                log('banco indisponível ao marcar o pedido de desistência no aviso de estorno');
+            }
+        }
         async function applyPixPayment(clients, ev, paymentId, eventId) {
             const { asaas, db } = clients;
             const got = await asaas('GET', `/payments/${encodeURIComponent(paymentId)}`);
@@ -499,6 +521,8 @@ const __mods = [
                 p_event_at: ev.at.toISOString(),
                 ...periodArg(ref.period),
             });
+            if (exports.WITHDRAWAL_REFUND_EVENTS.has(ev.event) && !p.deleted && desistencia_1.REFUND_STATUSES.has(p.status))
+                await closeWithdrawal(db, ref.personId, 'pix', (0, sha256_1.sha256Hex)(p.id));
             if (applied.status !== 200) {
                 log(`banco recusou o aviso ${ev.event} de Pix (${applied.status})`);
                 return 'recusado';
@@ -564,6 +588,9 @@ const __mods = [
                 ...periodArg(periodOfCycle(sub.cycle)),
                 ...validFromArg(validFrom),
             });
+            const refunded = exports.WITHDRAWAL_REFUND_EVENTS.has(ev.event) ? payments.find((p) => p.id === ev.payment?.id) : undefined;
+            if (refunded && !refunded.deleted && desistencia_1.REFUND_STATUSES.has(refunded.status))
+                await closeWithdrawal(db, ref.personId, 'web', (0, sha256_1.sha256Hex)(sub.id));
             if (applied.status !== 200) {
                 log(`banco recusou o aviso ${ev.event} (${applied.status})`);
                 return 'recusado';
@@ -609,11 +636,12 @@ const __mods = [
         }
         async function findWithdrawals({ asaas }, personId, o) {
             const found = [];
+            const pending = (provider, hash) => o.withdrawals.find((w) => w.provider === provider && w.purchaseHash === hash && w.status === 'pedida') ?? null;
             for (const plan of exports.PLANS) {
                 const candidates = o.web.filter((w) => w.plan === plan);
                 if (candidates.length === 0)
                     continue;
-                const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&includeDeleted=true&limit=10`);
+                const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&includeDeleted=true&limit=100`);
                 if (r.status !== 200)
                     throw new TransientError('Asaas não listou as assinaturas');
                 for (const raw of list(r.json)) {
@@ -629,30 +657,58 @@ const __mods = [
                     const payments = list(pays.json)
                         .map(asaasPaymentFrom)
                         .filter((p) => p !== null && (p.subscription === null || p.subscription === s.id));
-                    found.push({ provider: 'web', purchaseHash: w.externalRef, plan: w.plan, period: periodOfCycle(s.cycle), after: w.after, check: (0, desistencia_1.cardWithdrawal)(payments, now()), sub: s });
+                    const check = (0, desistencia_1.cardWithdrawal)(payments, now(), pending('web', w.externalRef) !== null);
+                    found.push({ provider: 'web', purchaseHash: w.externalRef, plan: w.plan, period: periodOfCycle(s.cycle), after: w.after, check, sub: s });
                 }
             }
-            if (o.pix.length > 0) {
-                const days = o.pix.map((x) => x.paidOn).sort();
-                const from = (0, dates_1.addDays)(days[0], -1);
-                const to = (0, dates_1.addDays)(days[days.length - 1], 1);
-                const pending = new Map(o.pix.map((x) => [x.paymentHash, x]));
-                for (let page = 0; page < exports.WITHDRAWAL_PIX_PAGES && pending.size > 0; page++) {
-                    const r = await asaas('GET', `/payments?billingType=PIX&paymentDate%5Bge%5D=${from}&paymentDate%5Ble%5D=${to}&limit=100&offset=${page * 100}`);
-                    if (r.status !== 200)
-                        throw new TransientError(`Asaas respondeu ${r.status} ao listar cobranças de Pix`);
-                    for (const raw of list(r.json)) {
-                        const p = asaasPaymentFrom(raw);
-                        const row = p && !p.subscription ? pending.get((0, sha256_1.sha256Hex)(p.id)) : undefined;
-                        if (!p || !row)
-                            continue;
-                        pending.delete(row.paymentHash);
-                        found.push({ provider: 'pix', purchaseHash: row.paymentHash, plan: row.plan, period: row.period, after: row.after, check: (0, desistencia_1.pixWithdrawal)(row, p, now()) });
-                    }
-                    if ((0, servidor_comum_1.obj)(r.json)?.hasMore !== true)
-                        break;
-                }
+            if (o.pix.length === 0)
+                return found;
+            const wanted = new Map();
+            for (const row of o.pix) {
+                const rec = pending('pix', row.paymentHash);
+                const paidOn = row.paidOn ?? rec?.contractedOn ?? null;
+                if (paidOn)
+                    wanted.set(row.paymentHash, { row, paidOn, recorded: rec !== null });
             }
+            const take = (raw) => {
+                const p = asaasPaymentFrom(raw);
+                const hit = p && !p.subscription ? wanted.get((0, sha256_1.sha256Hex)(p.id)) : undefined;
+                if (!p || !hit)
+                    return;
+                wanted.delete(hit.row.paymentHash);
+                const { row } = hit;
+                found.push({ provider: 'pix', purchaseHash: row.paymentHash, plan: row.plan, period: row.period, after: row.after, check: (0, desistencia_1.pixWithdrawal)({ paidOn: hit.paidOn, startsOn: row.startsOn }, p, now(), hit.recorded) });
+            };
+            for (const ref of new Set([...wanted.values()].map((x) => (0, pix_1.pixReference)(personId, x.row.plan, x.row.period)))) {
+                if (wanted.size === 0)
+                    break;
+                const r = await asaas('GET', `/payments?externalReference=${encodeURIComponent(ref)}&limit=100`);
+                if (r.status !== 200)
+                    throw new TransientError(`Asaas respondeu ${r.status} ao listar cobranças de Pix pela referência`);
+                for (const raw of list(r.json))
+                    take(raw);
+            }
+            if (wanted.size === 0)
+                return found;
+            const missing = wanted.size;
+            const ranges = [...wanted.values()].map(({ row, paidOn }) => [
+                (0, dates_1.addDays)(paidOn, row.paidOn === null && row.startsOn ? -exports.SCHEDULED_FIRST_CHARGE_MAX_DAYS : -1),
+                (0, dates_1.addDays)(paidOn, 1),
+            ]);
+            const from = ranges.map((x) => x[0]).sort()[0];
+            const to = ranges.map((x) => x[1]).sort().reverse()[0];
+            let pages = 0;
+            for (let page = 0; page < exports.WITHDRAWAL_PIX_PAGES && wanted.size > 0; page++) {
+                pages++;
+                const r = await asaas('GET', `/payments?billingType=PIX&paymentDate%5Bge%5D=${from}&paymentDate%5Ble%5D=${to}&limit=100&offset=${page * 100}`);
+                if (r.status !== 200)
+                    throw new TransientError(`Asaas respondeu ${r.status} ao listar cobranças de Pix`);
+                for (const raw of list(r.json))
+                    take(raw);
+                if ((0, servidor_comum_1.obj)(r.json)?.hasMore !== true)
+                    break;
+            }
+            log(`desistência: ${missing} pagamento(s) de Pix sem a referência na cobrança do Asaas; ${missing - wanted.size} achado(s) pelos dias de pagamento, em ${pages} página(s)`);
             return found;
         }
         const recordOf = (o, f) => o.withdrawals.find((w) => w.provider === f.provider && w.purchaseHash === f.purchaseHash) ?? null;
@@ -664,15 +720,33 @@ const __mods = [
             if (del.status !== 200 && del.status !== 404)
                 throw new TransientError(`Asaas respondeu ${del.status} ao remover a assinatura`);
         }
-        async function refund(asaas, payments) {
+        async function currentPayment(asaas, path) {
+            const r = await asaas('GET', path);
+            return r.status === 200 ? asaasPaymentFrom(r.json) : null;
+        }
+        async function refund(asaas, payments, resumed) {
             for (const p of payments) {
                 const path = `/payments/${encodeURIComponent(p.id)}`;
-                const r = await asaas('POST', `${path}/refund`, { description: desistencia_1.WITHDRAWAL_REFUND_DESCRIPTION });
+                if (resumed) {
+                    const before = await currentPayment(asaas, path);
+                    if (before && desistencia_1.REFUND_STATUSES.has(before.status))
+                        continue;
+                    if (!before || before.deleted || !desistencia_1.REFUNDABLE_STATUSES.has(before.status))
+                        throw new TransientError('a cobrança relida não está paga para devolver');
+                }
+                let r;
+                try {
+                    r = await asaas('POST', `${path}/refund`, { description: desistencia_1.WITHDRAWAL_REFUND_DESCRIPTION });
+                }
+                catch (e) {
+                    if (e instanceof AsaasCallError)
+                        throw new RefundUnclearError(`devolução sem resposta clara: ${e.message}`);
+                    throw e;
+                }
                 if (r.status === 200)
                     continue;
-                const again = await asaas('GET', path);
-                const current = again.status === 200 ? asaasPaymentFrom(again.json) : null;
-                if (current && desistencia_1.REFUND_STATUSES.has(current.status))
+                const again = await currentPayment(asaas, path).catch(() => null);
+                if (again && desistencia_1.REFUND_STATUSES.has(again.status))
                     continue;
                 throw new TransientError(`Asaas recusou a devolução (${r.status})`);
             }
@@ -691,10 +765,11 @@ const __mods = [
                 return [401, { result: 'nao_autenticado' }];
             if (!o)
                 throw new TransientError('resposta inesperada de billing_withdrawal_options');
-            const found = o.web.length + o.pix.length > 0 ? await findWithdrawals(clients, personId, o) : [];
+            const found = (o.web.length + o.pix.length > 0 ? await findWithdrawals(clients, personId, o) : []).filter((f) => recordOf(o, f)?.status !== 'abandonada');
+            const pendingFirst = (f) => (recordOf(o, f)?.status === 'pedida' ? 0 : 1);
             const best = found
                 .flatMap((f) => (f.check.state === 'pode' ? [{ offer: f, check: f.check }] : []))
-                .sort((a, b) => b.check.startDay.localeCompare(a.check.startDay))[0];
+                .sort((a, b) => pendingFirst(a.offer) - pendingFirst(b.offer) || b.check.startDay.localeCompare(a.check.startDay))[0];
             const done = found.find((f) => f.check.state === 'devolvida' && recordOf(o, f) !== null);
             const receipt = (f, requestedAt, amountCents) => ({
                 result: 'recebida',
@@ -746,6 +821,8 @@ const __mods = [
                 case 'nova':
                 case 'retomar':
                     break;
+                case 'encerrada':
+                    return [200, { result: 'sem_compra' }];
                 case 'concluida':
                     return [200, receipt(offer, requestedAt ?? now().toISOString(), check.amountCents)];
                 case 'em_andamento':
@@ -765,11 +842,14 @@ const __mods = [
             const at = requestedAt ?? now().toISOString();
             try {
                 await removeSubscription(asaas, offer.sub);
-                await refund(asaas, check.refundable);
+                await refund(asaas, check.refundable, b?.result === 'retomar');
             }
             catch (e) {
-                await db.rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: false }).catch(() => undefined);
-                log(`desistência sem devolução concluída: ${e instanceof Error ? e.message : 'erro'}`);
+                const unclear = e instanceof RefundUnclearError;
+                await db
+                    .rpcService('billing_withdrawal_finish', { p_person: personId, p_provider: offer.provider, p_purchase_hash: offer.purchaseHash, p_refunded: false, p_unclear: unclear })
+                    .catch(() => undefined);
+                log(`desistência sem devolução concluída${unclear ? ' (devolução sem resposta clara: trava de 5 minutos)' : ''}: ${e instanceof Error ? e.message : 'erro'}`);
                 return [e instanceof TransientError ? 503 : 500, { result: 'tente_de_novo', requestedAt: at }];
             }
             const finished = await db
@@ -1317,12 +1397,12 @@ const __mods = [
         }
         return total;
     }
-    function cardWithdrawal(payments, now) {
+    function cardWithdrawal(payments, now, recorded = false) {
         const charged = payments.map((p) => ({ p, day: cardChargeDay(p) })).filter((x) => x.day !== null);
         if (charged.length === 0)
             return { state: 'nada_cobrado' };
         const startDay = charged.map((x) => x.day).sort()[0];
-        if (!withinWithdrawal(startDay, now))
+        if (!recorded && !withinWithdrawal(startDay, now))
             return { state: 'fora_do_prazo', startDay };
         const refundable = charged.map((x) => x.p).filter((p) => exports.REFUNDABLE_STATUSES.has(p.status));
         if (refundable.length === 0) {
@@ -1334,11 +1414,11 @@ const __mods = [
     function pixWithdrawalStart(row) {
         return row.startsOn && row.startsOn > row.paidOn ? row.startsOn : row.paidOn;
     }
-    function pixWithdrawal(row, payment, now) {
+    function pixWithdrawal(row, payment, now, recorded = false) {
         const startDay = pixWithdrawalStart(row);
         if (payment.deleted)
             return { state: 'sem_compra' };
-        if (!withinWithdrawal(startDay, now))
+        if (!recorded && !withinWithdrawal(startDay, now))
             return { state: 'fora_do_prazo', startDay };
         if (exports.REFUND_STATUSES.has(payment.status))
             return { state: 'devolvida', startDay };

@@ -180,7 +180,7 @@ export const WEB_WITHDRAWAL_TEXT = {
     fora_do_prazo: `O prazo de 7 dias para desistir desta compra terminou. Se tiver dúvida, escreva para ${SUPPORT_EMAIL}.`,
     nada_cobrado: 'Nada foi cobrado até agora, então não há valor a devolver. Para encerrar a assinatura sem cobrança, use Cancelar assinatura.',
     sem_compra: `Não foi encontrada uma compra pela web para devolver nesta conta. Se tiver dúvida, escreva para ${SUPPORT_EMAIL}.`,
-    muitas_tentativas: `Muitas tentativas em pouco tempo. Escreva para ${SUPPORT_EMAIL} para concluir a devolução.`,
+    muitas_tentativas: `Este pedido de desistência já teve muitas tentativas pela tela. Escreva para ${SUPPORT_EMAIL} para concluir a devolução.`,
     indisponivel: `A desistência pela tela não está disponível agora. Para desistir, escreva para ${SUPPORT_EMAIL}.`,
     /** A falha do Asaas (ou da rede), com a hora do pedido quando ele já ficou gravado. */
     tente_de_novo: (when: string | null) =>

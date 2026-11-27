@@ -12,7 +12,9 @@
  * - Pix: cada pagamento é uma compra; o prazo conta do dia do pagamento ou, se ele foi feito no teste grátis, do dia em que o período pago
  *   começa (o fim do teste, `billing_pix_payments.starts_on`, D-129).
  * O prazo vale até o fim do 7º dia seguinte (o dia do começo não conta, Código Civil, art. 132) no fuso mais a oeste do Brasil (Acre, UTC-5):
- * ninguém perde horas por estar a oeste de Brasília. A tela mostra o 7º dia.
+ * ninguém perde horas por estar a oeste de Brasília. A tela mostra o 7º dia. O prazo vale para o pedido: um pedido gravado no prazo
+ * (`billing_withdrawals`, situação 'pedida') continua depois dele (`recorded`), e a devolução que ficou sem resposta no 7º dia é concluída
+ * no dia seguinte.
  *
  * Desistir devolve o valor integral da compra no mesmo meio de pagamento (o estorno no cartão, a devolução do Pix), pela API do Asaas
  * (`POST /v3/payments/{id}/refund`, sem valor: o integral), e, no cartão, remove a assinatura antes (`DELETE /v3/subscriptions/{id}`), para
@@ -98,13 +100,14 @@ function refundTotal(refundable: readonly AsaasPayment[]): number | null {
 
 /**
  * A desistência de uma assinatura no cartão, pelas cobranças dela no Asaas: o prazo conta da primeira cobrança paga, e voltam todas as
- * cobranças pagas da assinatura que ainda dá para devolver (normalmente só essa). As já devolvidas não voltam de novo.
+ * cobranças pagas da assinatura que ainda dá para devolver (normalmente só essa). As já devolvidas não voltam de novo. `recorded`: a compra
+ * já tem um pedido gravado no prazo ('pedida'), que continua depois dele.
  */
-export function cardWithdrawal(payments: readonly AsaasPayment[], now: Date): WithdrawalCheck {
+export function cardWithdrawal(payments: readonly AsaasPayment[], now: Date, recorded = false): WithdrawalCheck {
   const charged = payments.map((p) => ({ p, day: cardChargeDay(p) })).filter((x): x is { p: AsaasPayment; day: IsoDate } => x.day !== null);
   if (charged.length === 0) return { state: 'nada_cobrado' };
   const startDay = charged.map((x) => x.day).sort()[0]!;
-  if (!withinWithdrawal(startDay, now)) return { state: 'fora_do_prazo', startDay };
+  if (!recorded && !withinWithdrawal(startDay, now)) return { state: 'fora_do_prazo', startDay };
   const refundable = charged.map((x) => x.p).filter((p) => REFUNDABLE_STATUSES.has(p.status));
   if (refundable.length === 0) {
     return charged.some((x) => REFUND_STATUSES.has(x.p.status)) ? { state: 'devolvida', startDay } : { state: 'sem_compra' };
@@ -128,11 +131,14 @@ export function pixWithdrawalStart(row: Pick<PixPurchaseRow, 'paidOn' | 'startsO
   return row.startsOn && row.startsOn > row.paidOn ? row.startsOn : row.paidOn;
 }
 
-/** A desistência de um pagamento por Pix: o dia vem do banco; a situação e o valor, da cobrança atual no Asaas. */
-export function pixWithdrawal(row: Pick<PixPurchaseRow, 'paidOn' | 'startsOn'>, payment: AsaasPayment, now: Date): WithdrawalCheck {
+/**
+ * A desistência de um pagamento por Pix: o dia vem do banco; a situação e o valor, da cobrança atual no Asaas. `recorded`: o pagamento já tem
+ * um pedido gravado no prazo ('pedida'), que continua depois dele.
+ */
+export function pixWithdrawal(row: Pick<PixPurchaseRow, 'paidOn' | 'startsOn'>, payment: AsaasPayment, now: Date, recorded = false): WithdrawalCheck {
   const startDay = pixWithdrawalStart(row);
   if (payment.deleted) return { state: 'sem_compra' };
-  if (!withinWithdrawal(startDay, now)) return { state: 'fora_do_prazo', startDay };
+  if (!recorded && !withinWithdrawal(startDay, now)) return { state: 'fora_do_prazo', startDay };
   if (REFUND_STATUSES.has(payment.status)) return { state: 'devolvida', startDay };
   if (!REFUNDABLE_STATUSES.has(payment.status)) return { state: 'sem_compra' };
   const amountCents = cents(payment);

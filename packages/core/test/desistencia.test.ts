@@ -227,7 +227,7 @@ describe('Desistência em 7 dias (D-131, item F): o interruptor e o prazo', () =
     expect(o).toEqual({
       web: [{ externalRef: sha256Hex(SUB), plan: 'individual', after: { status: 'leitura', until: '2026-11-10T15:00:00+00:00', provider: null } }],
       pix: [{ paymentHash: sha256Hex(PIX), plan: 'familiar', period: 'anual', paidOn: '2026-11-27', startsOn: null, after: { status: 'teste', until: '2026-12-09T15:00:00+00:00', provider: null } }],
-      withdrawals: [{ provider: 'pix', purchaseHash: sha256Hex(PIX), status: 'devolvida', requestedAt: REQUESTED, amountCents: 62990 }],
+      withdrawals: [{ provider: 'pix', purchaseHash: sha256Hex(PIX), status: 'devolvida', requestedAt: REQUESTED, amountCents: 62990, contractedOn: null }],
     });
     expect(parseWithdrawalOptions({ result: 'sem_pessoa' })).toBe('sem_pessoa');
     expect(parseWithdrawalOptions(null)).toBeNull();
@@ -263,7 +263,7 @@ describe('Desistência em 7 dias: a função do servidor', () => {
     expect(net.sent.map((s) => `${s.method} ${s.url}`)).toEqual([
       'GET https://projeto.supabase.co/auth/v1/user',
       'POST https://projeto.supabase.co/rest/v1/rpc/billing_withdrawal_options',
-      `GET ${ASAAS_SANDBOX_URL}/subscriptions?externalReference=${encodeURIComponent(webReference(ANA, 'individual'))}&includeDeleted=true&limit=10`,
+      `GET ${ASAAS_SANDBOX_URL}/subscriptions?externalReference=${encodeURIComponent(webReference(ANA, 'individual'))}&includeDeleted=true&limit=100`,
       `GET ${ASAAS_SANDBOX_URL}/payments?subscription=${SUB}&limit=100`,
     ]);
     expect(net.sent[1]?.body).toEqual({ p_person: ANA });
@@ -357,7 +357,7 @@ describe('Desistência em 7 dias: a função do servidor', () => {
     expect(unmarked.sent.some((s) => s.url.includes('/refund'))).toBe(false);
   });
 
-  it('falha do Asaas: a trava sai, o pedido continua gravado com a hora, a resposta é neutra; a repetição relê o Asaas antes de pedir de novo', async () => {
+  it('falha do Asaas: o pedido continua gravado com a hora, a resposta é neutra; a devolução sem resposta clara segura a trava, a recusa clara a solta', async () => {
     let refundStatus = 503;
     let current = 'CONFIRMED';
     const b = bank();
@@ -370,14 +370,15 @@ describe('Desistência em 7 dias: a função do servidor', () => {
       ...b.answers,
     });
     const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW });
-    // 5xx: não se sabe se devolveu; a trava sai e a pessoa vê a hora do pedido.
+    // 5xx no pedido de devolução: não se sabe se devolveu; a trava fica (p_unclear, 5 minutos no banco) e a pessoa vê a hora do pedido.
     let res = await h(appReq({ action: 'desistir' }));
     expect([res.status, JSON.parse(res.body)]).toEqual([503, { result: 'tente_de_novo', requestedAt: REQUESTED }]);
-    expect(b.finished.at(-1)).toEqual({ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: false });
-    // Recusa (400) com a cobrança ainda paga: nada feito, a mesma resposta neutra.
+    expect(b.finished.at(-1)).toEqual({ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: false, p_unclear: true });
+    // Recusa (400) com a cobrança ainda paga: nada feito, a mesma resposta neutra, e a trava sai na hora.
     refundStatus = 400;
     res = await h(appReq({ action: 'desistir' }));
     expect([res.status, JSON.parse(res.body)]).toEqual([503, { result: 'tente_de_novo', requestedAt: REQUESTED }]);
+    expect(b.finished.at(-1)).toEqual({ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: false, p_unclear: false });
     // Recusa porque a tentativa anterior já devolveu: a cobrança relida está devolvida, e conta como feita.
     current = 'CONFIRMED';
     net.sent.length = 0;
@@ -413,23 +414,26 @@ describe('Desistência em 7 dias: a função do servidor', () => {
     expect(JSON.parse((await h(appReq({ action: 'desistir' }))).body)).toEqual({ result: 'sem_compra' });
   });
 
-  it('Pix: acha a cobrança da pessoa pelos dias que o banco diz (e o resumo), devolve o integral por Pix e não remove nada; com várias páginas, segue até achar', async () => {
+  it('Pix sem a referência na cobrança: acha a cobrança da pessoa pelos dias que o banco diz (e o resumo), devolve o integral por Pix e não remove nada; com várias páginas, segue até achar', async () => {
     const row = { payment_hash: sha256Hex(PIX), plan: 'familiar', period: 'anual', paid_on: '2026-11-27', starts_on: null, access_after: afterTeste };
     const other = (i: number) => ({ id: `pay_outra_${i}`, status: 'RECEIVED', billingType: 'PIX', value: 29.9, paymentDate: '2026-11-27' });
     const b = bank();
+    const logs: string[] = [];
     const net = fakeNet({
       ...user(),
       ...options({ pix: [row] }),
       'GET /v3/payments': (_init, url) => ({
         status: 200,
-        body: url.includes('offset=0')
-          ? { data: [other(1), other(2)], hasMore: true }
-          : { data: [other(3), { id: PIX, status: 'RECEIVED', billingType: 'PIX', value: 629.9, paymentDate: '2026-11-27' }], hasMore: false },
+        body: url.includes('externalReference=')
+          ? { data: [], hasMore: false }
+          : url.includes('offset=0')
+            ? { data: [other(1), other(2)], hasMore: true }
+            : { data: [other(3), { id: PIX, status: 'RECEIVED', billingType: 'PIX', value: 629.9, paymentDate: '2026-11-27' }], hasMore: false },
       }),
       [`POST /v3/payments/${PIX}/refund`]: () => ({ status: 200, body: { id: PIX, status: 'REFUND_IN_PROGRESS' } }),
       ...b.answers,
     });
-    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW, log: (m) => logs.push(m) });
     expect(JSON.parse((await h(appReq({ action: 'desistencia' }))).body)).toEqual({
       result: 'pode',
       meio: 'pix',
@@ -440,9 +444,13 @@ describe('Desistência em 7 dias: a função do servidor', () => {
       after: { status: 'teste', until: '2026-12-09T15:00:00+00:00', provider: null },
     });
     expect(net.calls('/v3/payments?').map((s) => s.url.replace(ASAAS_SANDBOX_URL, ''))).toEqual([
+      `/payments?externalReference=${encodeURIComponent(`clarevo-pix:${ANA}:familiar:anual`)}&limit=100`,
       '/payments?billingType=PIX&paymentDate%5Bge%5D=2026-11-26&paymentDate%5Ble%5D=2026-11-28&limit=100&offset=0',
       '/payments?billingType=PIX&paymentDate%5Bge%5D=2026-11-26&paymentDate%5Ble%5D=2026-11-28&limit=100&offset=100',
     ]);
+    // O registro diz que a busca pelos dias foi usada, só com contagens (nenhum identificador de ninguém).
+    expect(logs).toEqual(['desistência: 1 pagamento(s) de Pix sem a referência na cobrança do Asaas; 1 achado(s) pelos dias de pagamento, em 2 página(s)']);
+    expect(logs.join(' ')).not.toContain(ANA);
     const res = await h(appReq({ action: 'desistir' }));
     expect(JSON.parse(res.body)).toMatchObject({ result: 'recebida', meio: 'pix', amountCents: 62990 });
     // Só a cobrança da pessoa volta; nenhuma das outras, nenhuma assinatura removida.
@@ -502,6 +510,215 @@ describe('Desistência em 7 dias: a função do servidor', () => {
     expect(src).toContain('includeDeleted=true');
     expect(src).not.toContain(WEB_WITHDRAWAL_TEXT.action);
     expect(src).not.toContain('PENDENTES DA REVISÃO');
+  });
+});
+
+describe('Desistência em 7 dias: revisão independente de 27/11/2026', () => {
+  // A compra de 20/11: o último dia é 27/11 (até 04h59 UTC de 28/11, a meia-noite no Acre). 28/11 às 06h UTC: 01h no Acre, o 8º dia.
+  const LATE = new Date('2026-11-28T06:00:00.000Z');
+  const cardPay = (status: string, extra: Record<string, unknown> = {}) => asaasPayment(status, { dueDate: '2026-11-20', confirmedDate: '2026-11-20', ...extra });
+  const pedida = (provider: 'web' | 'pix', id: string, extra: Record<string, unknown> = {}) => ({
+    provider,
+    purchase_hash: sha256Hex(id),
+    status: 'pedida',
+    requested_at: '2026-11-28T02:50:00.000Z',
+    amount_cents: 2990,
+    contracted_on: '2026-11-20',
+    ...extra,
+  });
+  const hook = (payload: unknown) => ({ method: 'POST', header: (n: string) => (n.toLowerCase() === 'asaas-access-token' ? TOKEN : null), body: async () => JSON.stringify(payload) });
+
+  it('regras: o pedido gravado no prazo (recorded) continua depois dele, no cartão e no Pix; sem pedido, o prazo vale', () => {
+    expect(withinWithdrawal('2026-11-20', new Date('2026-11-28T04:59:00.000Z'))).toBe(true);
+    expect(cardWithdrawal([pay('2026-11-20')], LATE)).toEqual({ state: 'fora_do_prazo', startDay: '2026-11-20' });
+    expect(cardWithdrawal([pay('2026-11-20')], LATE, true)).toMatchObject({ state: 'pode', startDay: '2026-11-20', amountCents: 2990 });
+    expect(cardWithdrawal([pay('2026-11-20', 'REFUND_IN_PROGRESS')], LATE, true)).toEqual({ state: 'devolvida', startDay: '2026-11-20' });
+    expect(cardWithdrawal([pay('2026-12-09', 'PENDING')], LATE, true)).toEqual({ state: 'nada_cobrado' });
+    const p = pay('2026-11-20', 'RECEIVED', { id: PIX, subscription: null, billingType: 'PIX' });
+    expect(pixWithdrawal({ paidOn: '2026-11-20', startsOn: null }, p, LATE)).toEqual({ state: 'fora_do_prazo', startDay: '2026-11-20' });
+    expect(pixWithdrawal({ paidOn: '2026-11-20', startsOn: null }, p, LATE, true)).toMatchObject({ state: 'pode', startDay: '2026-11-20' });
+    expect(pixWithdrawal({ paidOn: '2026-11-20', startsOn: null }, { ...p, deleted: true }, LATE, true)).toEqual({ state: 'sem_compra' });
+  });
+
+  it('o estorno que ficou sem resposta no 7º dia: no dia seguinte, a repetição relê a cobrança e conclui a devolução (não "fora_do_prazo")', async () => {
+    const b = bank({ result: 'retomar', requested_at: '2026-11-28T02:50:00.000Z' });
+    const net = fakeNet({
+      ...user(),
+      ...options({ web: [webCandidate()], withdrawals: [pedida('web', SUB)] }),
+      // A assinatura já removida na tentativa de antes; a cobrança ainda paga.
+      ...asaasCard({ deleted: true, status: 'INACTIVE', payments: () => [cardPay('CONFIRMED')] }),
+      [`GET /v3/payments/${PAY}`]: () => ({ status: 200, body: cardPay('CONFIRMED') }),
+      [`POST /v3/payments/${PAY}/refund`]: () => ({ status: 200, body: { id: PAY, status: 'REFUNDED' } }),
+      ...b.answers,
+    });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => LATE });
+    // A leitura continua oferecendo (o último dia é o de verdade, 27/11).
+    expect(JSON.parse((await h(appReq({ action: 'desistencia' }))).body)).toMatchObject({ result: 'pode', meio: 'cartao', lastDay: '2026-11-27', amountCents: 2990 });
+    const res = await h(appReq({ action: 'desistir' }));
+    expect([res.status, JSON.parse(res.body)]).toEqual([200, { result: 'recebida', meio: 'cartao', requestedAt: '2026-11-28T02:50:00.000Z', amountCents: 2990, after: { status: 'leitura', until: '2026-11-10T15:00:00+00:00', provider: null } }]);
+    const asaasCalls = net.sent.filter((x) => x.url.includes('asaas') && !x.url.includes('/subscriptions')).map((x) => `${x.method} ${x.url.replace(ASAAS_SANDBOX_URL, '').replace(/\?.*$/, '')}`);
+    // Na repetição, a própria cobrança é relida antes do pedido de devolução; nada de remover a assinatura de novo.
+    expect(asaasCalls.slice(-3)).toEqual(['GET /payments', `GET /payments/${PAY}`, `POST /payments/${PAY}/refund`]);
+    expect(net.sent.some((x) => x.method === 'DELETE')).toBe(false);
+    expect(b.finished).toEqual([{ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: true }]);
+  });
+
+  it('a repetição que acha a cobrança já devolvida ao reler (a tentativa sem resposta deu certo): conclui sem pedir outra devolução', async () => {
+    const b = bank({ result: 'retomar', requested_at: REQUESTED });
+    const net = fakeNet({
+      ...user(),
+      ...options({ web: [webCandidate()], withdrawals: [pedida('web', SUB, { requested_at: REQUESTED })] }),
+      // A lista ainda mostra a cobrança paga; a leitura da própria cobrança já mostra a devolução em andamento.
+      ...asaasCard({ deleted: true, status: 'INACTIVE', payments: () => [asaasPayment('CONFIRMED')] }),
+      [`GET /v3/payments/${PAY}`]: () => ({ status: 200, body: asaasPayment('REFUND_IN_PROGRESS') }),
+      [`POST /v3/payments/${PAY}/refund`]: () => ({ status: 200, body: {} }),
+      ...b.answers,
+    });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW });
+    expect(JSON.parse((await h(appReq({ action: 'desistir' }))).body)).toMatchObject({ result: 'recebida', requestedAt: REQUESTED });
+    expect(net.calls('/refund')).toEqual([]);
+    expect(b.finished).toEqual([{ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: true }]);
+  });
+
+  it('a trava: o pedido de devolução sem resposta (rede, prazo, 5xx) a segura por 5 minutos; a falha antes dele a solta na hora', async () => {
+    const cases: { name: string; answers: Record<string, Answer>; begin?: unknown; throwOn?: string; unclear: boolean }[] = [
+      { name: 'rede caiu no pedido de devolução', answers: {}, throwOn: `POST /v3/payments/${PAY}/refund`, unclear: true },
+      { name: '502 no pedido de devolução', answers: { [`POST /v3/payments/${PAY}/refund`]: () => ({ status: 502, body: 'bad gateway' }) }, unclear: true },
+      {
+        name: 'a remoção da assinatura falhou (antes do pedido de devolução)',
+        answers: { [`DELETE /v3/subscriptions/${SUB}`]: () => ({ status: 503, body: {} }), [`POST /v3/payments/${PAY}/refund`]: () => ({ status: 200, body: {} }) },
+        unclear: false,
+      },
+      {
+        name: 'a releitura da cobrança na repetição falhou (antes do pedido de devolução)',
+        begin: { result: 'retomar', requested_at: REQUESTED },
+        answers: { [`GET /v3/payments/${PAY}`]: () => ({ status: 500, body: {} }), [`POST /v3/payments/${PAY}/refund`]: () => ({ status: 200, body: {} }) },
+        unclear: false,
+      },
+    ];
+    for (const c of cases) {
+      const b = bank(c.begin);
+      const net = fakeNet({ ...user(), ...options({ web: [webCandidate()] }), ...asaasCard({ payments: () => [asaasPayment('CONFIRMED')] }), ...c.answers, ...b.answers });
+      const fetcher: HttpFetch = async (url, init) => {
+        if (c.throwOn && `${init.method} ${url.replace(/^https:\/\/[^/]+/, '')}` === c.throwOn) throw new Error('rede');
+        return net.fetcher(url, init);
+      };
+      const h = createAssinaturaWebHandler({ config: sandbox, fetch: fetcher, now: () => NOW });
+      const res = await h(appReq({ action: 'desistir' }));
+      expect([res.status, JSON.parse(res.body)], c.name).toEqual([503, { result: 'tente_de_novo', requestedAt: REQUESTED }]);
+      expect(b.finished, c.name).toEqual([{ p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: false, p_unclear: c.unclear }]);
+      if (!c.unclear) expect(net.calls('/refund'), c.name).toEqual([]);
+    }
+  });
+
+  it('Pix: acha a cobrança pela referência do Checkout de Pix da pessoa (a do mês, sem o período), sem varrer os dias de pagamento', async () => {
+    const row = { payment_hash: sha256Hex(PIX), plan: 'individual', period: 'mensal', paid_on: '2026-11-27', starts_on: null, access_after: afterLeitura };
+    const logs: string[] = [];
+    const net = fakeNet({
+      ...user(),
+      ...options({ pix: [row] }),
+      'GET /v3/payments': (_init, url) => ({
+        status: 200,
+        body: url.includes('externalReference=')
+          ? { data: [{ id: 'pay_outra', status: 'RECEIVED', billingType: 'PIX', value: 29.9 }, { id: PIX, status: 'RECEIVED', billingType: 'PIX', value: 29.9, externalReference: `clarevo-pix:${ANA}:individual` }], hasMore: false }
+          : { data: [], hasMore: false },
+      }),
+    });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW, log: (m) => logs.push(m) });
+    expect(JSON.parse((await h(appReq({ action: 'desistencia' }))).body)).toMatchObject({ result: 'pode', meio: 'pix', plan: 'individual', period: 'mensal', amountCents: 2990, lastDay: '2026-12-04' });
+    expect(net.calls('/v3/payments?').map((x) => x.url.replace(ASAAS_SANDBOX_URL, ''))).toEqual([`/payments?externalReference=${encodeURIComponent(`clarevo-pix:${ANA}:individual`)}&limit=100`]);
+    expect(logs).toEqual([]);
+  });
+
+  it('Pix já devolvido pelo aviso de estorno (sem o dia pago no banco), com o pedido ainda "pedida": a repetição acha a devolução e marca; a leitura confirma sem gravar', async () => {
+    const row = { payment_hash: sha256Hex(PIX), plan: 'individual', period: 'mensal', paid_on: null, starts_on: null, access_after: afterLeitura };
+    const opts = { pix: [row], withdrawals: [pedida('pix', PIX, { requested_at: REQUESTED, contracted_on: '2026-11-27' })] };
+    expect(parseWithdrawalOptions({ result: 'ok', web: [], ...opts })).toMatchObject({ pix: [{ paymentHash: sha256Hex(PIX), paidOn: null }] });
+    const b = bank();
+    const net = fakeNet({
+      ...user(),
+      ...options(opts),
+      'GET /v3/payments': () => ({ status: 200, body: { data: [{ id: PIX, status: 'REFUNDED', billingType: 'PIX', value: 29.9 }], hasMore: false } }),
+      ...b.answers,
+    });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => LATE });
+    const receipt = { result: 'recebida', meio: 'pix', requestedAt: REQUESTED, amountCents: 2990, after: { status: 'leitura', until: '2026-11-10T15:00:00+00:00', provider: null } };
+    expect(JSON.parse((await h(appReq({ action: 'desistencia' }))).body)).toEqual(receipt);
+    expect(b.finished).toEqual([]);
+    expect(JSON.parse((await h(appReq({ action: 'desistir' }))).body)).toEqual(receipt);
+    expect(b.begun).toEqual([]);
+    expect(b.finished).toEqual([{ p_person: ANA, p_provider: 'pix', p_purchase_hash: sha256Hex(PIX), p_refunded: true }]);
+    expect(net.calls('/refund')).toEqual([]);
+  });
+
+  it('o aviso de estorno do Asaas marca o pedido de desistência como devolvido (cartão e Pix), só com a cobrança já estornada, e nunca falha o aviso', async () => {
+    const finished: Record<string, unknown>[] = [];
+    let finishAnswer: () => { status: number; body: unknown } = () => ({ status: 200, body: { result: 'devolvida' } });
+    let current = 'REFUNDED';
+    const net = fakeNet({
+      [`GET /v3/subscriptions/${SUB}`]: () => ({ status: 200, body: { id: SUB, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', externalReference: webReference(ANA, 'individual'), dateCreated: '2026-11-27' } }),
+      'GET /v3/payments': () => ({ status: 200, body: { data: [asaasPayment(current)] } }),
+      [`GET /v3/payments/${PIX}`]: () => ({ status: 200, body: { id: PIX, status: current === 'REFUNDED' ? 'REFUND_IN_PROGRESS' : current, billingType: 'PIX', externalReference: `clarevo-pix:${ANA}:individual`, value: 29.9 } }),
+      'POST /rest/v1/rpc/billing_apply': () => ({ status: 200, body: { result: 'aplicado' } }),
+      'POST /rest/v1/rpc/billing_pix_apply': () => ({ status: 200, body: { result: 'aplicado' } }),
+      'POST /rest/v1/rpc/billing_withdrawal_finish': (init) => {
+        finished.push(JSON.parse(init.body ?? '{}'));
+        return finishAnswer();
+      },
+    });
+    const logs: string[] = [];
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW, log: (m) => logs.push(m) });
+    const card = (event: string, id = 'evt_c') => hook({ id, event, dateCreated: '2026-11-27 12:01:00', payment: { id: PAY, status: current, subscription: SUB } });
+    const pixHook = (event: string, id = 'evt_p') => hook({ id, event, dateCreated: '2026-11-27 12:01:00', payment: { id: PIX, status: current } });
+    expect(JSON.parse((await h(card('PAYMENT_REFUNDED'))).body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(JSON.parse((await h(pixHook('PAYMENT_REFUND_IN_PROGRESS'))).body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(finished).toEqual([
+      { p_person: ANA, p_provider: 'web', p_purchase_hash: sha256Hex(SUB), p_refunded: true },
+      { p_person: ANA, p_provider: 'pix', p_purchase_hash: sha256Hex(PIX), p_refunded: true },
+    ]);
+    // Sem pedido ('sem_pedido'), sem a migração 0050 (404), o banco com erro ou fora do ar: o aviso continua aplicado (200).
+    for (const answer of [() => ({ status: 200, body: { result: 'sem_pedido' } }), () => ({ status: 404, body: {} }), () => ({ status: 500, body: {} })]) {
+      finishAnswer = answer;
+      expect(JSON.parse((await h(card('PAYMENT_REFUNDED', `evt_${finished.length}`))).body).outcome).toBe('aplicado');
+    }
+    const down: HttpFetch = async (url, init) => {
+      if (url.includes('billing_withdrawal_finish')) throw new Error('rede');
+      return net.fetcher(url, init);
+    };
+    const h2 = createAssinaturaWebHandler({ config: sandbox, fetch: down, now: () => NOW, log: (m) => logs.push(m) });
+    expect(await h2(pixHook('PAYMENT_REFUNDED', 'evt_down')).then((r) => [r.status, JSON.parse(r.body).outcome])).toEqual([200, 'aplicado']);
+    // Outro aviso, ou o aviso de estorno com a cobrança paga de novo no Asaas (estorno negado): nada é marcado.
+    const before = finished.length;
+    await h(card('PAYMENT_RECEIVED', 'evt_recebida'));
+    current = 'RECEIVED';
+    await h(card('PAYMENT_REFUNDED', 'evt_negado_c'));
+    await h(pixHook('PAYMENT_REFUND_IN_PROGRESS', 'evt_negado_p'));
+    expect(finished.length).toBe(before);
+    expect(logs.join(' ')).not.toContain(ANA);
+  });
+
+  it('o pedido abandonado pela equipe não volta para a tela: a leitura não oferece, e "desistir" responde "sem_compra" sem pedir nada', async () => {
+    const b = bank();
+    const net = fakeNet({
+      ...user(),
+      ...options({ web: [webCandidate()], withdrawals: [pedida('web', SUB, { status: 'abandonada', requested_at: REQUESTED })] }),
+      ...asaasCard({ payments: () => [asaasPayment('CONFIRMED')] }),
+      ...b.answers,
+    });
+    const h = createAssinaturaWebHandler({ config: sandbox, fetch: net.fetcher, now: () => NOW });
+    expect(JSON.parse((await h(appReq({ action: 'desistencia' }))).body)).toEqual({ result: 'sem_direito' });
+    expect(JSON.parse((await h(appReq({ action: 'desistir' }))).body)).toEqual({ result: 'sem_compra' });
+    expect(b.begun).toEqual([]);
+    // Abandonado entre a leitura e o pedido: o banco responde "encerrada".
+    const b2 = bank({ result: 'encerrada', requested_at: REQUESTED });
+    const net2 = fakeNet({ ...user(), ...options({ web: [webCandidate()] }), ...asaasCard({ payments: () => [asaasPayment('CONFIRMED')] }), ...b2.answers });
+    const h2 = createAssinaturaWebHandler({ config: sandbox, fetch: net2.fetcher, now: () => NOW });
+    expect(JSON.parse((await h2(appReq({ action: 'desistir' }))).body)).toEqual({ result: 'sem_compra' });
+    expect(net2.sent.some((x) => x.method === 'DELETE' || x.url.includes('/refund'))).toBe(false);
+  });
+
+  it('o texto de muitas tentativas diz a regra (20 tentativas por pedido, sem prazo de espera)', () => {
+    expect(WEB_WITHDRAWAL_TEXT.errors.muitas_tentativas).toBe('Este pedido de desistência já teve muitas tentativas pela tela. Escreva para suporte@clarevo.app.br para concluir a devolução.');
   });
 });
 

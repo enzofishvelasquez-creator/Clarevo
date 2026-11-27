@@ -31,8 +31,8 @@
 --     erro curto. O e-mail é lido de auth.users só em trial_notice_claim, para a função, e nunca é gravado (no ensaio, nem é entregue).
 -- F7. Privilégios: trial_notices com RLS e sem privilégio nenhum (nem o app nem a chave de serviço leem a tabela). trial_notice_claim e
 --     trial_notice_finish só com a chave de serviço (a função); as outras, ninguém de fora (o pg_cron e o SQL Editor rodam como dono).
--- F8. Guarda: os registros saem 6 meses depois do dia do fim do teste (na preparação diária); excluir a conta apaga os registros na hora
---     (em cascata, ou pelo gatilho quando a pessoa fica anônima).
+-- F8. Guarda: os registros saem 6 meses depois do dia do fim do teste, só na preparação diária (o agendamento -fila, que fica mesmo com o
+--     aviso desligado, docs/53, seção 5); excluir a conta apaga os registros na hora (em cascata, ou pelo gatilho quando a pessoa fica anônima).
 -- F9. Compatível com o app publicado e com as funções de hoje: nenhuma função existente muda, nenhuma função nova para o app (130 continuam),
 --     nenhuma ação nova em record_operations (105).
 --

@@ -2,9 +2,12 @@
 -- as compras que podem estar no prazo e o acesso que fica depois (calculado como o aviso de estorno faria, sem gravar nada), o pedido uma vez
 -- por compra (nova, em andamento, retomar, concluída), a compra de outra pessoa recusada, o prazo do pedido novo (no Pix, pelo dia que o
 -- banco guarda), o caminho do aviso de estorno do Asaas que tira o período pago (de volta ao teste, só ver e exportar ou o período pago
--- antes), a pessoa que fica anônima e nada novo para o app. Pessoas FICTÍCIAS: Ana (cartão mensal, depois do teste), Bia (Pix pago no teste),
--- Caio (dois meses com Pix, o segundo pago adiantado), Davi (compras antigas, fora do prazo), Edu (outra pessoa) e Gil (fica anônima). Tudo em
--- uma transação desfeita no fim (now() é o mesmo em todo o teste).
+-- antes), a pessoa que fica anônima e nada novo para o app. Revisão independente de 27/11/2026: o pedido feito no prazo continua depois dele
+-- (as compras com pedido 'pedida' entram sempre, inclusive o Pix já devolvido, e vêm primeiro), a trava de 5 minutos da devolução sem resposta
+-- clara, o aviso de estorno que fecha o pedido, o encerramento pela equipe (devolvido ou abandonado) e a consulta da equipe (docs/39, seção 9).
+-- Pessoas FICTÍCIAS: Ana (cartão mensal, depois do teste), Bia (Pix pago no teste), Caio (dois meses com Pix, o segundo pago adiantado), Davi
+-- (compras antigas, fora do prazo), Edu (outra pessoa), Gil (fica anônima), Hugo (cartão: a devolução que ficou sem resposta no 7º dia) e Ivo
+-- (Pix devolvido pelo aviso de estorno com o pedido ainda 'pedida'). Tudo em uma transação desfeita no fim (now() é o mesmo em todo o teste).
 \set ON_ERROR_STOP 1
 \set ana '''00000000-0000-0000-0000-0000000000d1'''
 \set bia '''00000000-0000-0000-0000-0000000000d2'''
@@ -12,6 +15,8 @@
 \set davi '''00000000-0000-0000-0000-0000000000d4'''
 \set edu '''00000000-0000-0000-0000-0000000000d5'''
 \set gil '''00000000-0000-0000-0000-0000000000d6'''
+\set hugo '''00000000-0000-0000-0000-0000000000d7'''
+\set ivo '''00000000-0000-0000-0000-0000000000d8'''
 
 begin;
 
@@ -38,6 +43,8 @@ create function pg_temp.caio() returns uuid language sql as $$ select '00000000-
 create function pg_temp.davi() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000d4'::uuid $$;
 create function pg_temp.edu() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000d5'::uuid $$;
 create function pg_temp.gil() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000d6'::uuid $$;
+create function pg_temp.hugo() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000d7'::uuid $$;
+create function pg_temp.ivo() returns uuid language sql as $$ select '00000000-0000-0000-0000-0000000000d8'::uuid $$;
 create function pg_temp.sha(p_text text) returns text language sql as $$ select encode(sha256(convert_to(p_text, 'UTF8')), 'hex') $$;
 create function pg_temp.hoje() returns date language sql as $$ select (now() at time zone 'America/Sao_Paulo')::date $$;
 -- O fim do acesso esperado para o último dia pago com Pix: mais 3 dias de tolerância, até o fim do dia em Brasília.
@@ -70,13 +77,15 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:caio, 'caio.desistencia@exemplo.test', now(), '{"display_name":"Caio"}'),
   (:davi, 'davi.desistencia@exemplo.test', now(), '{"display_name":"Davi"}'),
   (:edu, 'edu.desistencia@exemplo.test', now(), '{"display_name":"Edu"}'),
-  (:gil, 'gil.desistencia@exemplo.test', now(), '{"display_name":"Gil"}');
+  (:gil, 'gil.desistencia@exemplo.test', now(), '{"display_name":"Gil"}'),
+  (:hugo, 'hugo.desistencia@exemplo.test', now(), '{"display_name":"Hugo"}'),
+  (:ivo, 'ivo.desistencia@exemplo.test', now(), '{"display_name":"Ivo"}');
 set role authenticated;
 do $$
 declare
   p uuid;
 begin
-  foreach p in array array[pg_temp.ana(), pg_temp.bia(), pg_temp.caio(), pg_temp.davi(), pg_temp.edu(), pg_temp.gil()] loop
+  foreach p in array array[pg_temp.ana(), pg_temp.bia(), pg_temp.caio(), pg_temp.davi(), pg_temp.edu(), pg_temp.gil(), pg_temp.hugo(), pg_temp.ivo()] loop
     perform pg_temp.as_(p);
     perform public.ensure_personal_space('Conta principal');
   end loop;
@@ -86,7 +95,7 @@ reset role;
 -- A cobrança começou há 60 dias. Bia criou a conta há 2 dias (está no teste, que acaba daqui a 12 dias); os outros, há 40 dias (o teste deles
 -- acabou há 26 dias).
 select public.clarevo_staff_set_billing_start(now() - interval '60 days');
-update public.persons set created_at = now() - interval '40 days' where id in (:ana, :caio, :davi, :edu, :gil);
+update public.persons set created_at = now() - interval '40 days' where id in (:ana, :caio, :davi, :edu, :gil, :hugo, :ivo);
 update public.persons set created_at = now() - interval '2 days' where id = :bia;
 
 -- ---------------------------------------------------------------------------
@@ -104,12 +113,13 @@ begin
       'sem privilégio na tabela: ' || t;
   end loop;
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.billing_withdrawals'::regclass and attnum > 0 and not attisdropped)
-       = array['id', 'person_id', 'provider', 'purchase_hash', 'plan', 'period', 'amount_cents', 'contracted_on', 'requested_at', 'status', 'refunded_at', 'attempts', 'claimed_until'],
+       = array['id', 'person_id', 'provider', 'purchase_hash', 'plan', 'period', 'amount_cents', 'contracted_on', 'requested_at', 'status', 'refunded_at', 'attempts',
+               'claimed_until', 'closed_at', 'staff_note'],
     'as colunas: nenhum dado do pagamento, só o resumo da compra';
   assert (select confdeltype from pg_constraint where conrelid = 'public.billing_withdrawals'::regclass and contype = 'f') = 'c', 'some com a pessoa (cascata)';
   assert exists (select 1 from pg_constraint where conname = 'billing_withdrawals_one_per_purchase' and contype = 'u'), 'um pedido por compra';
   foreach t in array array['billing_withdrawal_options(uuid)', 'billing_withdrawal_begin(uuid, text, text, text, text, bigint, date)',
-                           'billing_withdrawal_finish(uuid, text, text, boolean)'] loop
+                           'billing_withdrawal_finish(uuid, text, text, boolean, boolean)'] loop
     assert has_function_privilege('service_role', 'public.' || t, 'execute') and not has_function_privilege('authenticated', 'public.' || t, 'execute')
        and not has_function_privilege('anon', 'public.' || t, 'execute')
        and not exists (select 1 from aclexplode((select proacl from pg_proc where oid = ('public.' || t)::regprocedure)) a where a.grantee = 0),
@@ -119,6 +129,13 @@ begin
   assert not has_function_privilege('service_role', 'public.clarevo_withdrawal_access_after(uuid, text, text)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_withdrawal_access_after(uuid, text, text)', 'execute')
      and not has_function_privilege('anon', 'public.clarevo_withdrawal_access_after(uuid, text, text)', 'execute'), 'a interna: ninguém de fora';
+  assert not has_function_privilege('service_role', 'public.clarevo_staff_close_withdrawal(uuid, text, text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.clarevo_staff_close_withdrawal(uuid, text, text)', 'execute')
+     and not has_function_privilege('anon', 'public.clarevo_staff_close_withdrawal(uuid, text, text)', 'execute')
+     and not exists (select 1 from aclexplode((select proacl from pg_proc where oid = 'public.clarevo_staff_close_withdrawal(uuid, text, text)'::regprocedure)) a where a.grantee = 0)
+     and (select prosecdef and proconfig @> array['search_path=public'] from pg_proc where oid = 'public.clarevo_staff_close_withdrawal(uuid, text, text)'::regprocedure),
+    'a da equipe: só o SQL Editor (o dono), security definer, com search_path fixo';
+  assert to_regprocedure('public.billing_withdrawal_finish(uuid, text, text, boolean)') is null, 'só a finish com p_unclear';
   assert pg_get_functiondef('public.clarevo_forget_anonymous()'::regprocedure) ~ 'delete from public\.billing_withdrawals'
      and pg_get_functiondef('public.clarevo_forget_anonymous()'::regprocedure) ~ 'delete from public\.account_level_clock'
      and not has_function_privilege('service_role', 'public.clarevo_forget_anonymous()', 'execute'), 'o gatilho da pessoa anônima apaga também os pedidos';
@@ -134,6 +151,7 @@ select pg_temp.as_(:ana);
 select pg_temp.expect_code('select count(*) from public.billing_withdrawals', null, '42501');
 select pg_temp.expect_code(format('select public.billing_withdrawal_options(%L)', pg_temp.ana()), null, '42501');
 select pg_temp.expect_code(format($q$select public.billing_withdrawal_begin(%L, 'web', %L, 'individual', 'mensal', 2990, current_date)$q$, pg_temp.ana(), pg_temp.sha('sub_ana')), null, '42501');
+select pg_temp.expect_code($q$select public.clarevo_staff_close_withdrawal(gen_random_uuid(), 'abandonada', 'nota')$q$, null, '42501');
 reset role;
 
 -- ---------------------------------------------------------------------------
@@ -320,6 +338,140 @@ set role service_role;
 select pg_temp.as_service();
 do $$ begin
   assert public.billing_withdrawal_options(pg_temp.gil()) ->> 'result' = 'sem_pessoa', 'conta excluída: sem pessoa';
+end $$;
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- 7. Revisão independente de 27/11/2026: a trava da devolução sem resposta clara, o pedido feito no prazo que continua depois dele (também o
+--    Pix já devolvido), o aviso de estorno que fecha o pedido, a consulta da equipe e o encerramento pela equipe.
+-- ---------------------------------------------------------------------------
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  -- Hugo assina no cartão e desiste; o pedido de devolução ao Asaas fica sem resposta clara: a trava fica por 5 minutos (uma repetição ou
+  -- outra aba não pedem de novo enquanto o Asaas pode estar devolvendo).
+  r := public.billing_apply('wd-h1', 'web', pg_temp.hugo(), pg_temp.sha('sub_hugo'), 'individual', now() + interval '33 days', now());
+  r := public.billing_withdrawal_begin(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), 'individual', 'mensal', 2990, pg_temp.hoje());
+  assert r ->> 'result' = 'nova', 'Hugo: pedido novo: ' || r::text;
+  r := public.billing_withdrawal_finish(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), false, true);
+  assert r ->> 'result' = 'pedida' and (pg_temp.pedido(pg_temp.sha('sub_hugo'))).claimed_until = now() + interval '5 minutes'
+     and (pg_temp.pedido(pg_temp.sha('sub_hugo'))).closed_at is null, 'sem resposta clara: a trava fica 5 minutos: ' || r::text;
+  r := public.billing_withdrawal_begin(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), 'individual', 'mensal', 2990, pg_temp.hoje());
+  assert r ->> 'result' = 'em_andamento', 'durante a trava: em andamento: ' || r::text;
+  -- A falha clara (antes do pedido de devolução, ou a recusa) solta a trava na hora.
+  r := public.billing_withdrawal_finish(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), false);
+  assert (pg_temp.pedido(pg_temp.sha('sub_hugo'))).claimed_until is null, 'falha clara: a trava sai: ' || r::text;
+  -- Ivo paga com Pix hoje e desiste; o aviso de estorno do Asaas tira o dia pago antes da marca no pedido (a resposta do Asaas se perdeu).
+  r := public.billing_pix_apply('wd-i1', pg_temp.ivo(), 'individual', pg_temp.sha('pay_ivo'), pg_temp.hoje(), now());
+  r := public.billing_withdrawal_begin(pg_temp.ivo(), 'pix', pg_temp.sha('pay_ivo'), 'individual', 'mensal', 2990, pg_temp.hoje());
+  assert r ->> 'result' = 'nova', 'Ivo: pedido novo: ' || r::text;
+  perform public.billing_withdrawal_finish(pg_temp.ivo(), 'pix', pg_temp.sha('pay_ivo'), false);
+  r := public.billing_pix_apply('wd-i2', pg_temp.ivo(), 'individual', pg_temp.sha('pay_ivo'), null, now());
+  assert r -> 'paid_through' = 'null'::jsonb, 'Ivo: o Pix devolvido sai do período pago: ' || r::text;
+end $$;
+select pg_temp.expect_code(format($q$select public.billing_withdrawal_finish(%L, 'web', %L, false, null)$q$, pg_temp.hugo(), pg_temp.sha('sub_hugo')), 'pedido_invalido', '22023');
+reset role;
+
+-- O tempo passa (como dono, sem a API): o pedido de Hugo foi feito há 70 dias, sobre uma assinatura de 70 dias.
+update public.billing_withdrawals set requested_at = now() - interval '70 days', contracted_on = (now() at time zone 'America/Sao_Paulo')::date - 70
+ where purchase_hash = encode(sha256(convert_to('sub_hugo', 'UTF8')), 'hex');
+update public.plan_entitlements set valid_from = now() - interval '70 days' where external_ref = encode(sha256(convert_to('sub_hugo', 'UTF8')), 'hex');
+
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+  o jsonb;
+  i int;
+begin
+  -- Depois, Hugo assina e cancela 11 vezes: assinaturas mais novas, que não empurram o pedido para fora (até 10, o 'pedida' primeiro).
+  for i in 1..11 loop
+    r := public.billing_apply('wd-h-nova-' || i, 'web', pg_temp.hugo(), pg_temp.sha('sub_hugo_' || i), 'individual', now() + interval '1 day', now());
+  end loop;
+  o := public.billing_withdrawal_options(pg_temp.hugo());
+  assert jsonb_array_length(o -> 'web') = 10 and o #>> '{web,0,external_ref}' = pg_temp.sha('sub_hugo'),
+    'Hugo: a compra de 70 dias com pedido pedida entra, e primeiro: ' || o::text;
+  assert o #>> '{withdrawals,0,purchase_hash}' = pg_temp.sha('sub_hugo') and o #>> '{withdrawals,0,status}' = 'pedida'
+     and (o #>> '{withdrawals,0,contracted_on}')::date = pg_temp.hoje() - 70, 'Hugo: o pedido de 70 dias continua na lista: ' || o::text;
+  -- A repetição depois do prazo retoma (o pedido foi feito no prazo); um pedido novo de uma compra antiga continua fora do prazo.
+  r := public.billing_withdrawal_begin(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), 'individual', 'mensal', 2990, pg_temp.hoje() - 70);
+  assert r ->> 'result' = 'retomar' and (r ->> 'requested_at')::timestamptz = now() - interval '70 days', 'Hugo: depois do prazo, retoma: ' || r::text;
+  perform public.billing_withdrawal_finish(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo'), false);
+  r := public.billing_withdrawal_begin(pg_temp.hugo(), 'web', pg_temp.sha('sub_hugo_1'), 'individual', 'mensal', 2990, pg_temp.hoje() - 70);
+  assert r ->> 'result' = 'fora_do_prazo', 'pedido novo de compra antiga: fora do prazo: ' || r::text;
+  -- Ivo: o Pix já devolvido (sem o dia pago) entra, porque o pedido ainda é 'pedida', com o dia de onde o prazo contou.
+  o := public.billing_withdrawal_options(pg_temp.ivo());
+  assert jsonb_array_length(o -> 'pix') = 1 and o #>> '{pix,0,payment_hash}' = pg_temp.sha('pay_ivo') and o -> 'pix' -> 0 -> 'paid_on' = 'null'::jsonb
+     and o #>> '{withdrawals,0,status}' = 'pedida' and (o #>> '{withdrawals,0,contracted_on}')::date = pg_temp.hoje(),
+    'Ivo: o Pix devolvido com o pedido pedida: ' || o::text;
+  -- A repetição retoma (não 'sem_pagamento': o pedido já existe).
+  r := public.billing_withdrawal_begin(pg_temp.ivo(), 'pix', pg_temp.sha('pay_ivo'), 'individual', 'mensal', 2990, pg_temp.hoje());
+  assert r ->> 'result' = 'retomar', 'Ivo: retoma: ' || r::text;
+  -- O aviso de estorno fecha o pedido (a função do servidor chama billing_withdrawal_finish com p_refunded); o Pix sai das opções.
+  r := public.billing_withdrawal_finish(pg_temp.ivo(), 'pix', pg_temp.sha('pay_ivo'), true);
+  assert r ->> 'result' = 'devolvida' and (pg_temp.pedido(pg_temp.sha('pay_ivo'))).closed_at = now()
+     and (pg_temp.pedido(pg_temp.sha('pay_ivo'))).claimed_until is null, 'Ivo: devolvida pelo aviso de estorno: ' || r::text;
+  o := public.billing_withdrawal_options(pg_temp.ivo());
+  assert o -> 'pix' = '[]'::jsonb and o #>> '{withdrawals,0,status}' = 'devolvida', 'Ivo: sem compra no prazo, o pedido devolvido na lista: ' || o::text;
+  -- O aviso de estorno de uma compra sem pedido não muda nada.
+  assert public.billing_withdrawal_finish(pg_temp.edu(), 'pix', pg_temp.sha('pay_edu'), true) ->> 'result' = 'sem_pedido', 'sem pedido, nada muda';
+end $$;
+-- A chave de serviço não encerra pedidos.
+select pg_temp.expect_code(format($q$select public.clarevo_staff_close_withdrawal(%L, 'abandonada', 'nota')$q$, gen_random_uuid()), null, '42501');
+reset role;
+
+-- A consulta e o encerramento da equipe (docs/39, seção 9), como dono, no SQL Editor.
+do $$
+declare
+  r jsonb;
+  v_ids uuid[];
+  v_hugo uuid := (pg_temp.pedido(pg_temp.sha('sub_hugo'))).id;
+  v_davi uuid := (pg_temp.pedido(pg_temp.sha('sub_davi'))).id;
+begin
+  -- Só os 'pedida' com mais de uma hora e sem tentativa em andamento (Hugo); o de agora (Davi), os devolvidos e os abandonados ficam de fora.
+  select array_agg(w.id order by w.requested_at) into v_ids from public.billing_withdrawals w
+   where w.status = 'pedida' and w.requested_at < now() - interval '1 hour' and (w.claimed_until is null or w.claimed_until < now());
+  assert v_ids = array[v_hugo], 'a consulta da equipe: só Hugo: ' || coalesce(v_ids::text, 'nada');
+  r := public.clarevo_staff_close_withdrawal(v_hugo, 'devolvida', 'Devolvido pelo painel do Asaas');
+  assert r ->> 'result' = 'encerrada' and r ->> 'status' = 'devolvida' and (pg_temp.pedido(pg_temp.sha('sub_hugo'))).refunded_at = now()
+     and (pg_temp.pedido(pg_temp.sha('sub_hugo'))).closed_at = now() and (pg_temp.pedido(pg_temp.sha('sub_hugo'))).staff_note = 'Devolvido pelo painel do Asaas',
+    'a equipe encerra Hugo como devolvido: ' || r::text;
+  r := public.clarevo_staff_close_withdrawal(v_hugo, 'abandonada', 'outra nota');
+  assert r ->> 'result' = 'ja_encerrada' and r ->> 'status' = 'devolvida', 'já encerrado: nada muda: ' || r::text;
+  r := public.clarevo_staff_close_withdrawal(v_davi, 'abandonada', '  A pessoa pediu para manter a assinatura  ');
+  assert r ->> 'result' = 'encerrada' and r ->> 'status' = 'abandonada' and (pg_temp.pedido(pg_temp.sha('sub_davi'))).staff_note = 'A pessoa pediu para manter a assinatura'
+     and (pg_temp.pedido(pg_temp.sha('sub_davi'))).refunded_at is null and (pg_temp.pedido(pg_temp.sha('sub_davi'))).closed_at = now(),
+    'Davi: abandonado, com a nota: ' || r::text;
+  assert public.clarevo_staff_close_withdrawal(gen_random_uuid(), 'abandonada', 'nota') ->> 'result' = 'sem_pedido', 'sem pedido';
+  select array_agg(w.id) into v_ids from public.billing_withdrawals w
+   where w.status = 'pedida' and w.requested_at < now() - interval '1 hour' and (w.claimed_until is null or w.claimed_until < now());
+  assert v_ids is null, 'depois, a consulta da equipe não devolve nada';
+  assert not exists (select 1 from public.billing_withdrawals w where w.status = 'abandonada' and w.staff_note is null), 'abandonado sempre com nota';
+end $$;
+select pg_temp.expect_code(format($q$select public.clarevo_staff_close_withdrawal(%L, 'apagada', 'nota')$q$, gen_random_uuid()), 'pedido_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.clarevo_staff_close_withdrawal(%L, 'abandonada', '   ')$q$, gen_random_uuid()), 'pedido_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.clarevo_staff_close_withdrawal(%L, 'abandonada', %L)$q$, gen_random_uuid(), repeat('x', 301)), 'pedido_invalido', '22023');
+
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+  o jsonb;
+begin
+  -- O abandonado não volta para a tela nem entra como compra 'pedida'; um aviso de estorno depois dele (a equipe devolveu pelo painel) ainda
+  -- o marca como devolvido.
+  o := public.billing_withdrawal_options(pg_temp.davi());
+  assert o -> 'web' = '[]'::jsonb and o #>> '{withdrawals,0,status}' = 'abandonada', 'Davi: o abandonado não traz a compra: ' || o::text;
+  r := public.billing_withdrawal_begin(pg_temp.davi(), 'web', pg_temp.sha('sub_davi'), 'individual', 'anual', 26990, pg_temp.hoje());
+  assert r ->> 'result' = 'encerrada', 'Davi abandonado: encerrada: ' || r::text;
+  r := public.billing_withdrawal_finish(pg_temp.davi(), 'web', pg_temp.sha('sub_davi'), true);
+  assert r ->> 'result' = 'devolvida' and (pg_temp.pedido(pg_temp.sha('sub_davi'))).staff_note is not null
+     and (pg_temp.pedido(pg_temp.sha('sub_davi'))).refunded_at = now(), 'o aviso de estorno depois do abandono: devolvida: ' || r::text;
 end $$;
 reset role;
 
